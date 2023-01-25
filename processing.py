@@ -186,7 +186,7 @@ def natural_keys(text):
 '''Preparation of the data so that each image has the same dimension '''
 
 '''
-def preprocessing(img_dir,log_dir):
+def prepreprocessing(img_dir,log_dir):
     #looking for the parameters : max pixel in a line, max pixel columns, max len of a line (in micrometer),  max len of a column(in micrometer), max precision of a pixel horizontally, max persision of a pixel vertically
     logs=os.listdir(log_dir)
     ext_dim=[0,0,100,100]

@@ -22,7 +22,10 @@ def create_centerline(m,outline=None):
     centerline = a 2d boolean array (True where the centerline is, False everywhere else)
     '''
     mask = copy.deepcopy(m)
-    new_mask=mask[:,:,0]>0
+    if len(np.shape(mask))>2:
+        new_mask=mask[:,:,0]>0
+    else:
+        new_mask=mask>0
     unpruned_skel = padskel(mask)
     if outline == None:
         outline = utils.masks_to_outlines(new_mask)

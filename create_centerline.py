@@ -21,18 +21,52 @@ def create_centerline(m,outline=None):
     -------
     centerline = a 2d boolean array (True where the centerline is, False everywhere else)
     '''
-    mask = copy.deepcopy(m)
-    if len(np.shape(mask))>2:
-        new_mask=mask[:,:,0]>0
-    else:
-        new_mask=mask>0
+    large_mask = copy.deepcopy(m)
+    mask = only_masks(large_mask)
     unpruned_skel = padskel(mask)
     if outline == None:
-        outline = utils.masks_to_outlines(new_mask)
+        outline = utils.masks_to_outlines(mask)
     poles,centroid = explore_poles(outline)
-    centerline,length,pts,s = prune2(unpruned_skel,outline,new_mask,poles,sensitivity=5)
-    return centerline
+    centerline,length,pts,s = prune2(unpruned_skel,outline,mask,poles,sensitivity=5)
+    large_centerline = rev_embed_only_mask(large_mask,centerline)
+    return large_centerline
 
+def only_masks(mask):
+    '''Finds a bounding box of a mask and returns and crops that image to within that bounding box
+    mask = mask in an image (2d numpy array)
+    
+    Returns:
+    
+    small_mask = a cropped image of the mask
+    '''
+    if len(np.shape(mask))>2:
+        embed_mask=copy.deepcopy(mask[:,:,0])
+    else:
+        embed_mask=copy.deepcopy(mask)
+    (hor,ver) = np.nonzero(embed_mask)
+    l1 = min(hor)
+    l2 = max(hor)+1
+    k1 = min(ver)
+    k2 = max(ver)+1
+    if len(np.shape(mask))>2:
+        small_mask = mask[l1:l2,k1:k2,:]
+    else:
+        small_mask = mask[l1:l2,k1:k2]
+    return small_mask
+
+def rev_embed_only_mask(mask,image):
+    '''embeds a boolean array with the same dimensions as the output of only_mask into the original mask
+    mask = the original mask(boolean array)
+    image = an image with the same dimensions as the ouput of only_mask (boolean array)
+    '''
+    (hor,ver) = np.nonzero(mask)
+    c = np.array([min(hor),min(ver)])
+    (hcoord,vcoord) = np.nonzero(image)
+    embed_im = np.zeros(np.shape(mask))
+    for coord in zip(hcoord,vcoord):
+        new_coord = np.array(coord)+c
+        embed_im[new_coord[0],new_coord[1]] = 1
+    return embed_im
 
 def padskel(mask):
     '''
@@ -46,7 +80,7 @@ def padskel(mask):
     -------
     skel = a skeleton (boolean array)
     '''
-    mask = cv2.copyMakeBorder(mask,20,20,20,20,cv2.BORDER_CONSTANT,None,value=0)[:,:,0]>0 #add a border to the skel
+    mask = cv2.copyMakeBorder(mask,20,20,20,20,cv2.BORDER_CONSTANT,None,value=0)>0 #add a border to the skel
     skel = skeletonize(mask)
     skel = skel[20:np.shape(skel)[0]-20,20:np.shape(skel)[1]-20]
     return skel

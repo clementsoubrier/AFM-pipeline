@@ -16,33 +16,9 @@ from numba import jit
 from cellpose import utils, io, models, plot
 import re
 import copy
-from math import ceil
-
-'''
-from scipy.interpolate import splev
-from IPython.core.display import HTML
-import sys
-import pandas as pd
-from scipy.spatial import distance as dist
-import re
-from radfil import radfil_class, styles
-from astropy import units as u
-import imageio.v2 as imageio
-import copy
-from PIL import Image
-from fil_finder import FilFinder2D
-from shapely.geometry import Polygon
-from skimage.util import invert
-from skimage.morphology import skeletonize
-from scipy.interpolate import splprep
-import scipy.optimize as opt
-from pystackreg import StackReg
-import tools2
-'''
+from shutil import rmtree #erasing a whole directory
 
 
-#WARNING : this code better works way better if there is no zoom (very important) between the images (cellpose) and work better if all images have the same size 
-# to dicuss : pre-treatment of the images to get no zoom and same format
 
 
 
@@ -50,16 +26,31 @@ import tools2
 test=False
 
 ''' Paths of the data and to save the results'''
-#directory of the original dataset composed of a sequence of following pictures of the same bacterias
-my_data = (1-test)*"dataset/" +test*"datatest/"
+#Inputs
+#directory of the original dataset composed of a sequence of following pictures of the same bacterias, and with log files with .001 or no extension
+dir_name=(1-test)*"dataset/" +test*"datatest/"#name of dir
+my_data = "../data/"+dir_name #path of dir
+#directory with the usefull information of the logs, None if there is no.
+data_log=None #"../data/"+          #path and name
+
+#Temporary directories
 #directory of cropped data each image of the dataset is cropped to erase the white frame
 cropped_data=(1-test)*"cropped_data/" +test*"cropped_datatest/"
-#directory of the processed images (every image has the same pixel size and same zoom
-cropped_data=(1-test)*"cropped_data/" +test*"cropped_datatest/"
+#directory with the usefull info extracted from the logs
+cropped_log='log_'+(1-test)*"cropped_data/" +test*"cropped_datatest/"
 #directory for output data from cellpose 
 segments_path = (1-test)*"cellpose_output/"+test*"cellpose_outputtest/"
+
+
+#Outputs
+#directory of the processed images (every image has the same pixel size and same zoom)
+final_data="final_data_"+ dir_name
 #Saving path for the dictionnary
-saving_path='Main_dictionnary'
+saving_path='Main_dictionnary_'+ dir_name[:-1]
+#dimension and scale of all the final data
+dimension_data='Dimension_'+ dir_name[:-1]
+
+
 
 
 ''' Parameters'''
@@ -73,7 +64,7 @@ crop_right=101
 cel_gpu=True
 cel_model_type='cyto'
 cel_channels=[0,0]  # define CHANNELS to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
-cel_diameter = 60
+cel_diameter_param = 1 # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
 cel_flow_threshold = 0.9 
 cel_cellprob_threshold=0.0
 
@@ -86,7 +77,9 @@ ratio_erasing_masks=0.1
 hull_point=4
 
 #fraction of the preserved area to consider child and parent relation for masks
-surface_thresh=0.5
+surface_thresh=0.6
+#searching distance (pixels) for the optimization algorithm to construct transtion vectors between pictures. 
+search_diameter =100 
 
 #colors of the masks
 colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
@@ -113,8 +106,8 @@ graph_name+'masks' : mask with updated value
 
 
 
-''' Preparation of the data (sorting and cropping). Here data is a file with pictures of the cell (.png), and with the log data. For the cropping, we suppose that the frame has the sime pixel size for each picture'''
-def data_prep(data,cropup,cropdown,cropleft,cropright):
+''' Preparation of the data (sorting and cropping). Here data is a file with pictures of the cell (.png), and with the log data. For the cropping, we crop each image with the same number of pixels and dimension'''
+def data_prep(data,cropup,cropdown,cropleft,cropright,croppeddata,croppedlog,mydata,log_dir=None): #data : directory of the picture, may contain logs. log_dir : the name of a directory with the logs if it exists
     # Load up a list of input files (name as strings) from our example data. Creating the main dictionnay containing all tha information 
     files = os.listdir(data)
     
@@ -122,32 +115,32 @@ def data_prep(data,cropup,cropdown,cropleft,cropright):
     files.sort(key = natural_keys)    
     
     #clean or create the cropped directory
-    if os.path.exists(cropped_data):
-        for file in os.listdir(cropped_data):
-            os.remove(os.path.join(cropped_data, file))
+    if os.path.exists(croppeddata):
+        for file in os.listdir(croppeddata):
+            os.remove(os.path.join(croppeddata, file))
     else:
-        os.makedirs(cropped_data)
+        os.makedirs(croppeddata)
     #clean or create the log directory
-    if os.path.exists('log_'+cropped_data):
-        for file in os.listdir('log_'+cropped_data):
-            os.remove(os.path.join('log_'+cropped_data, file))
+    if os.path.exists(croppedlog):
+        for file in os.listdir(croppedlog):
+            os.remove(os.path.join(croppedlog, file))
     else:
-        os.makedirs('log_'+cropped_data)
+        os.makedirs(croppedlog)
     
     # removing the non image or log files and cropping the data to erase the white frame : to do manually depending on the dataset. Saving the cropped images
     for i in range(len(files)):
         
         if (files[i].endswith(".png")):
-            img = cv2.imread(my_data+ files[i])
+            img = cv2.imread(mydata+ files[i],0) #pictures in black and white
             if (cropup,cropdown,cropleft,cropright)!=(0,0,0,0):
                 cropped = img[cropup:-cropdown,cropleft:-cropright]
             else:
                 cropped = img
-            cv2.imwrite(cropped_data+files[i], cropped)  
-            
+            cv2.imwrite(croppeddata+files[i], cropped)  
+        
             
         #dealing with the log files
-        elif (files[i].endswith(".001")):
+        elif (files[i].endswith(".001")) or len(re.split(r'\W+',files[i]))==1:# check files ending with .001 or without any . 
             #open text file in read mode
             text_file = open(data+files[i], "r", errors='ignore' )
             #read whole file to a string
@@ -159,61 +152,155 @@ def data_prep(data,cropup,cropdown,cropleft,cropright):
             # get rid of the linebreaks
             text=re.sub(r'\n', ' ', text)
 
-            #selecting the good lines
-            match=re.match("^.*Samps/(.*|\n)Scan Line.*$",text).group(1)
+            #selecting the good lines (dimension)
+            match0=re.match("^.*Samps/(.*|\n)Scan Line.*$",text).group(1)
+            #selecting the good lines (angle)
+            match1=re.match("^.*Rotate Ang(.*|\n)Stage X.*$",text).group(1)
             #selection of the numbers
-            match=re.findall(r'\d+',match)
-            for j in range(len(match)):
-                match[j]=int(match[j])
-            res=np.zeros(4)
-            res[:2]=match[:2]
-            res[2]=match[4]/match[3]
-            res[3]=match[5]/match[2]
-            name=re.split(r'\W+',files[i])[0]
+            match0=re.findall(r'\d+\.\d+|\d+',match0)#structure : samps / lines; number of line; aspect ratio 1, aspect ratio 2, scan size 1, scan size 2
+            match1=re.findall(r'\d+\.\d+|\d+',match1)
+            if len(match0)==6: #dealing with the different format size here the aspect ratio has 2 integer
+                for j in range(4):
+                    match0[j]=int(match0[j]) 
+                match0[4]=float(match0[4])
+                match0[5]=float(match0[5])
+                res=np.array([match0[5]/match0[2]/match0[1],match0[4]/match0[3]/match0[0],float(match1[0])])#structure vertical len of a pixel, horizontal len of a pixel, r0tation
+            else :              #dealing with the different format size here the aspect ratio is a float
+                for j in range(2): 
+                    match0[j]=int(match0[j])
+                for j in range(3): 
+                    match0[2+j]=float(match0[2+j])  
+                res=np.array([match0[4]/match0[0],match0[3]/match0[0],float(match1[0])])
+            name=re.split(r'\W+',files[i])[0] #getting rid of the .001
             #saving the dimension of each picture in the log file
-            np.save('log_'+cropped_data+name,res)
+            np.save(croppedlog+name,res)
         else:
             files.remove(files[i])
+            
+            
+            
+    if log_dir is not None: #going through the directory with the same algorithm
+        files = os.listdir(log_dir)
+        files.sort(key = natural_keys) 
+        for i in range(len(files)):
+            #dealing with the log files
+            if (files[i].endswith(".001")) or len(re.split(r'\W+',files[i]))==1:# check files ending with .001 or without any . 
+                #open text file in read mode
+                text_file = open(data+files[i], "r", errors='ignore' )
+                #read whole file to a string
+                text = text_file.read()
+                
+                #close file
+                text_file.close()
+                
+                # get rid of the linebreaks
+                text=re.sub(r'\n', ' ', text)
 
-
+                #selecting the good lines (dimension)
+                match0=re.match("^.*Samps/(.*|\n)Scan Line.*$",text).group(1)
+                #selecting the good lines (angle)
+                match1=re.match("^.*Rotate Ang(.*|\n)Stage X.*$",text).group(1)
+                #selection of the numbers
+                match0=re.findall(r'\d+\.\d+|\d+',match0)#structure : samps / lines; number of line; aspect ratio 1, aspect ratio 2, scan size 1, scan size 2
+                match1=re.findall(r'\d+\.\d+|\d+',match1)
+                for j in range(4):
+                    match0[j]=int(match0[j]) 
+                match0[4]=float(match0[4])
+                match0[5]=float(match0[5])
+                res=np.array([match0[5]/match0[2]/match0[1],match0[4]/match0[3]/match0[0],float(match1[0])])#structure vertical len of a pixel, horizontal len of a pixel, r0tation
+                name=re.split(r'\W+',files[i])[0] #getting rid of the .001
+                #saving the dimension of each picture in the log file
+                np.save(croppedlog+name,res)
+            else:
+                files.remove(files[i])
+  
 #A function which allows input files to be sorted by timepoint.
 def natural_keys(text):
     return [ int(c) if c.isdigit() else c for c in re.split(r'(\d+)', text) ]
 
 
 
-
 '''Preparation of the data so that each image has the same dimension '''
-
-'''
-def prepreprocessing(img_dir,log_dir):
-    #looking for the parameters : max pixel in a line, max pixel columns, max len of a line (in micrometer),  max len of a column(in micrometer), max precision of a pixel horizontally, max persision of a pixel vertically
-    logs=os.listdir(log_dir)
-    ext_dim=[0,0,100,100]
-    for namelog in logs:
-        dim=np.load(log_dir+namelog, allow_pickle=True).item()
-        for i in [0,1]:
-            if dim[i+2]>ext_dim[i]:
-                ext_dim[i]=dim[i+2]
-        hor=dim[2]/dim[0]
-        vert=dim[3]/dim[1]
-        if hor<ext_dim[2]:
-            ext_dim[2]=hor
-        if vert<ext_dim[3]:
-            ext_dim[3]=vert
-    final_dim=[ceil(ext_dim[0]/ext_dim[2]),ceil(ext_dim[1]/ext_dim[3]),ext_dim[0],ext_dim[1]]
- '''  
+def dimension_def(croppeddata,log_dir,finaldata,dimensiondata): #dir of the images, dir of the numpy info of logs
+    #determining the main dimension and the best vertical/horizontal precision
+    phys_dim=[]
+    for file in os.listdir(croppeddata):
+        namelog=re.findall(r'\d+',file)[0]+'.npy'
+        if namelog in os.listdir(log_dir):
+            log_para=np.load(log_dir+namelog)
+            dim1,dim2 = np.shape(cv2.imread(croppeddata+file,0))
+            phys_dim.append([log_para[0]*dim1,log_para[1]*dim2,log_para[0],log_para[1]])
+        
+    phys_dim=np.array(phys_dim)
+    prec=np.min(phys_dim[:,2:4])
+    dim_height=int(np.max(phys_dim[:,0])/prec)
+    dim_len=int(np.max(phys_dim[:,1])/prec)
     
-
-
+    np.save(dimensiondata,np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
+    
+    #clean or create the final directory
+    if os.path.exists(finaldata):
+        for file in os.listdir(finaldata):
+            os.remove(os.path.join(finaldata, file))
+    else:
+        os.makedirs(finaldata)
+    
+    for file in os.listdir(croppeddata):
+        namelog=re.findall(r'\d+',file)[0]+'.npy'
+        if namelog in os.listdir(log_dir):
+            log_para=np.load(log_dir+namelog)
+            img=cv2.imread(croppeddata+file,0)
+            newimage=bili_scale_image(img,log_para[0],log_para[1],dim_height,dim_len,prec,prec)
+            cv2.imwrite(finaldata+file, newimage) 
+    #erasing the cropped data
+    rmtree(croppeddata)
+    
+# scaling algorithm     
+@jit
+def bili_scale_image(img,preci_h,preci_l,dim_h,dim_l,precf_h,precf_l):
+    newimage=np.zeros((dim_h,dim_l))
+    dim_img_h,dim_img_l=np.shape(img)
+    ratio_h=preci_h/precf_h
+    ratio_l=preci_l/precf_l
+    dim_zoom_h=int(ratio_h*dim_img_h)
+    dim_zoom_l=int(ratio_l*dim_img_l)
+    drift_h=int((dim_h-dim_zoom_h)/2)
+    drift_l=int((dim_l-dim_zoom_l)/2)
+    for i in range(dim_zoom_h-1):
+        for j in range(dim_zoom_l-1):
+            
+            ih1=int((i/ratio_h))
+            ih2=int(((i+1)/ratio_h+precf_h))
+            
+            if ih1==ih2:
+                frac_h=1
+            else:
+                frac_h=(i/ratio_h-ih1)
+            jl1=int((j/ratio_l))
+            jl2=int(((j+1)/ratio_l))
+            if jl1==jl2:
+                frac_l=1
+            else:
+                frac_h=(j/ratio_l-jl1)
+            
+            res=frac_h*frac_l*img[ih1,jl1]+(1-frac_h)*frac_l*img[ih2,jl1]+frac_h*(1-frac_l)*img[ih1,jl2]+(1-frac_h)*(1-frac_l)*img[ih2,jl2]
+            newimage[i+drift_h,j+drift_l]=res
+    return(newimage)
+   
+    
+   
 ''' Running cellpose and saving the results'''
-def run_cel(data_file,gpuval,mod,chan,dia,thres,celp,seg):
+def run_cel(data_file,gpuval,mod,chan,param_dia,thres,celp,seg,dimensiondata):
     #clean or create the output directory
     if os.path.exists(seg):
         for file in os.listdir(seg):
             os.remove(os.path.join(seg, file))
     else:
         os.makedirs(seg)
+        
+    # computation of the cell diameter
+    scale=np.load(dimensiondata+'.npy')[2]
+    dia=2/scale*param_dia
     # Specify that the cytoplasm Cellpose model for the segmentation. 
     model = models.Cellpose(gpu=gpuval, model_type=mod)
     # Loop over all of our image files and run Cellpose on each of them. 
@@ -225,23 +312,29 @@ def run_cel(data_file,gpuval,mod,chan,dia,thres,celp,seg):
 
 
 
-''' Creation of a dictionnary with the entry : adress, time, mask, outlines, mask_error'''
-def download_dict(croppeddata,segmentspath):
-    files = os.listdir(croppeddata)
+''' Creation of a dictionnary with the entry : adress, time, mask, outlines, mask_error, angle, and erasing the temporary directories'''
+def download_dict(finaldata,log_dir,segmentspath):
+    files = os.listdir(finaldata)
     dic={}
     # Sort files by timepoint.
     files.sort(key = natural_keys)
     t=0
     for fichier in files:
         fichier=fichier[:-4]
+        namelog=re.findall(r'\d+',fichier)[0]+'.npy'
         dic[fichier]={}
         dat = np.load(segmentspath+fichier+'_seg.npy', allow_pickle=True).item()
         dic[fichier]['time']=t
         t+=1
-        dic[fichier]['adress']=croppeddata+fichier+'.png'
+        dic[fichier]['adress']=finaldata+fichier+'.png'
         dic[fichier]['masks']=dat['masks']
         dic[fichier]['outlines']=utils.outlines_list(dat['masks'])
         dic[fichier]['masks_error']=(np.max(dic[fichier]['masks'])==0)
+        dic[fichier]['angle']=np.load(log_dir+namelog)[-1]
+        
+    #deleting temporary dir
+    #rmtree(segmentspath)
+    #rmtree(log_dir)
     return dic
 
 
@@ -268,26 +361,30 @@ def centroid_area(dic):
     for fichier in dic.keys():
         if not dic[fichier]['masks_error']:
             masks=dic[fichier]['masks']
-            mask_number=np.max(masks)
-            centroid=np.zeros((mask_number,2))
-            area=np.zeros(mask_number)
-            (l,L)=np.shape(masks)
-            for i in range(mask_number):
-                count=0
-                vec1=0
-                vec2=0
-                for j in range(L):
-                    for k in range(l):
-                        if masks[k,j]==i+1:
-                            vec1+=j
-                            vec2+=k
-                            count+=1
-                area[i]=count
-                centroid[i,:]=np.array([vec1//count,vec2//count])
-        dic[fichier]['centroid']=centroid
-        dic[fichier]['area']=area
+            (centroid,area)=numba_centroid_area(masks)
+            dic[fichier]['centroid']=centroid
+            dic[fichier]['area']=area
 
-
+#to improve computation speed
+@jit
+def numba_centroid_area(masks):
+    mask_number=np.max(masks)
+    centroid=np.zeros((mask_number,2))
+    area=np.zeros(mask_number)
+    (l,L)=np.shape(masks)
+    for i in range(mask_number):
+        count=0
+        vec1=0
+        vec2=0
+        for j in range(L):
+            for k in range(l):
+                if masks[k,j]==i+1:
+                    vec1+=j
+                    vec2+=k
+                    count+=1
+        area[i]=count
+        centroid[i,:]=np.array([vec1//count,vec2//count])
+    return(centroid,area)
 
 ''' Erasing too small masks (less than the fraction frac of the largest mask). Creating the centroid of the union of acceptable  mask and saving as main_centroid'''
 def clean_masks(fraction,dic,saving=False,savingpath='dict'):
@@ -421,20 +518,6 @@ def convex_numba(n0,masks,outline):
 
 ''' Computing the translation vector between an image and its child and saving it under translation_vector'''
 def mask_displacement(dic,rad):
-    ''' Older version of the algorithm
-    fichier=list(dic.keys())[0]
-    while dic[fichier]['child']!='':
-        child=dic[fichier]['child']
-        shape_1=np.shape(dic[fichier]['masks'])
-        shape_2=np.shape(dic[child]['masks'])
-        shape_f=(min(shape_1[0],shape_2[0]),min(shape_1[1],shape_2[1]))
-        mask_p=main_mask(dic[fichier]['masks'][:shape_f[0],:shape_f[1]])
-        mask_c=main_mask(dic[child]['masks'][:shape_f[0],:shape_f[1]])
-        sr = StackReg(StackReg.SCALED_ROTATION)
-        sr.register_transform(mask_p,mask_c)
-        dic[fichier]['translation_vector']=np.int_(sr.get_matrix())[:2,2]
-        fichier=child
-    '''
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         child=dic[fichier]['child']
@@ -444,7 +527,15 @@ def mask_displacement(dic,rad):
         mask_p=main_mask(dic[fichier]['masks'][:shape_f[0],:shape_f[1]])
         mask_c=main_mask(dic[child]['masks'][:shape_f[0],:shape_f[1]])
         vecguess=dic[fichier]['main_centroid']-dic[child]['main_centroid']
-        dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
+        angle=dic[fichier]['angle']-dic[child]['angle']
+        if angle==0:
+            dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
+        else:
+            dim1,dim2=np.shape(mask_p)
+            centerpoint=np.array([dim1//2,dim2//2],dtype=int)
+            vecguess=rotation_vector(angle,vecguess,centerpoint).astype(int)
+            mask_p=rotation_img(angle,mask_p,centerpoint)
+            dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
         fichier=child
 
 # Tranform all masks into one shape (the main shape)
@@ -484,7 +575,6 @@ def mask_transfert(mask,vector):
 @jit
 def opt_trans_vec(mask1,mask2,rad,vec_guess):
     # first part of the algorithm
-    #peut etre faire une PCA pour trouver l'axe principal des cellules, on suppose au'il est vertical/horizontal
     scoring=score_mask(mask1,mask_transfert(mask2, vec_guess))
     arg=vec_guess
     termination=False
@@ -515,7 +605,28 @@ def opt_trans_vec(mask1,mask2,rad,vec_guess):
             termination=True
     return arg
 
+#rotation of a vector around a point, the angle is in radian
+@jit 
+def rotation_vector(angle,vec,point):
+    mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+    return point+np.dot(mat,vec-point)
 
+#rotation of an image around a point
+@jit 
+def rotation_img(angle,img,point):
+    dim1,dim2=np.shape(img)
+    new_img=np.zeros((dim1,dim2))
+    for i in range(dim1):
+        for j in range(dim2):
+            trans_vec=rotation_vector(-angle,np.array([i,j]),point)#sign of the rotation : definition of the angle in the logs
+            i_n,j_n=trans_vec[0],trans_vec[1]
+            i_t=int(i_n)
+            j_t=int(j_n)
+            if 0<=i_t<dim1-1 and 0<=j_t<dim2-1:
+                frac_i=i_n-i_t
+                frac_j=j_n-j_t
+                new_img[i,j]=frac_i*frac_j*img[i_t,j_t]+frac_i*(1-frac_j)*img[i_t,j_t+1]+(1-frac_i)*frac_j*img[i_t+1,j_t]+(1-frac_i)*(1-frac_j)*img[i_t+1,j_t+1]
+    return new_img
 
 ''' First algorithm for creating a graph : idea is comparing the centroids of the masks of two images '''
 #not sure that we need this, naiv graph is better
@@ -570,12 +681,22 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
         
         while dic[fichier]['child']!='':
             child=dic[fichier]['child']
-            transfert=dic[fichier]['translation_vector']#dic[child]['main_centroid']-dic[fichier]['main_centroid']
+            
+            transfert=dic[fichier]['translation_vector']
             mask_c=np.copy(dic[child]['masks'])
             area_c=np.copy(dic[child]['area'])
             mask_p=np.copy(dic[fichier]['masks'])
             area_p=np.copy(dic[fichier]['area'])
+            
             mask_c=mask_transfert(mask_c,transfert)
+            
+            angle=dic[fichier]['angle']-dic[child]['angle']  
+            
+            if angle!=0:            #check on real data
+                dim1,dim2=np.shape(mask_p)
+                centerpoint=np.array([dim1//2,dim2//2],dtype=int)
+                mask_p=rotation_img(angle,mask_p,centerpoint)
+            
             mask_parent , mask_child =comparision_mask(mask_c,mask_p,area_c,area_p,threshold)
             dic[fichier]['mask_child']=mask_child
             dic[child]['mask_parent']=mask_parent
@@ -593,12 +714,22 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
         
         while dic[dic[fichier]['child']]['child']!='':
             grand_child=dic[dic[fichier]['child']]['child']
-            transfert=dic[fichier]['translation_vector']#dic[grand_child]['main_centroid']-dic[fichier]['main_centroid']
+            transfert=dic[fichier]['translation_vector']
             mask_c=np.copy(dic[grand_child]['masks'])
             area_c=np.copy(dic[grand_child]['area'])
             mask_p=np.copy(dic[fichier]['masks'])
             area_p=np.copy(dic[fichier]['area'])
+            
             mask_c=mask_transfert(mask_c,transfert)
+            
+            angle=dic[fichier]['angle']-dic[grand_child]['angle']  
+            
+            if angle!=0:            #check on real data
+                dim1,dim2=np.shape(mask_p)
+                centerpoint=np.array([dim1//2,dim2//2],dtype=int)
+                mask_p=rotation_img(angle,mask_p,centerpoint)
+            
+                
             mask_grand_parent , mask_grand_child =comparision_mask(mask_c,mask_p,area_c,area_p,threshold)
             dic[fichier]['mask_grand_child']=mask_grand_child
             dic[grand_child]['mask_grand_parent']=mask_grand_parent
@@ -742,13 +873,15 @@ def basic_graph(dic,saving=False,savingpath='dict'):
     if saving:
         np.save(savingpath,dic)
 
+
+
 ''' Ploting the images, with the masks overlaid, the label of each mask (integer) and the relation with the following masks'''
 def plot_graph_and_masks(dic,graph_name,maskcol):
     #Initialisation
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         # plot image with masks overlaid
-        img = cv2.imread(dic[fichier]['adress'])
+        img = cv2.imread(dic[fichier]['adress'],0)
         #plt.imshow(img)
         masks=dic[fichier][graph_name+'_masks']
         masknumber=np.max(masks)
@@ -776,7 +909,7 @@ def plot_graph_and_masks(dic,graph_name,maskcol):
         fichier=dic[fichier]['child']
     
     # ploting last image
-    img = cv2.imread(dic[fichier]['adress'])
+    img = cv2.imread(dic[fichier]['adress'],0)
     #plt.imshow(img)
     masks=dic[fichier][graph_name+'_masks']
     masknumber=np.max(masks)
@@ -797,7 +930,7 @@ def plot_graph_and_masks(dic,graph_name,maskcol):
 
 
 ''' Representation of the links in the graph '''
-def plot_graph(dic,graph_name,maskcol):
+def plot_graph(dic,graph_name,maskcol,binary=True):
     #First graph (simple plot)
     links_list=[]
     fichier=list(dic.keys())[0]
@@ -807,111 +940,118 @@ def plot_graph(dic,graph_name,maskcol):
         values=dic[fichier][graph_name+'_graph_values']
         next_values=dic[child][graph_name+'_graph_values']
         next_gen=[]
-        for link in dic[fichier][graph_name+'_graph']:
-            plt.plot([time,time+1],[values[link[0]-1],next_values[link[1]-1]], color='k')
-            next_gen.append([values[link[0]-1],next_values[link[1]-1]])
-        
-        #more advanced graph : contructing the lines in links_list
-        
-        if links_list!=[]:
-            final_state=links_list[-1][1]
-            final_number=links_list[-1][2]
-            count=0
-            for i in range(len(final_state)):
-                for j in next_gen:
-                    if final_state[i]==j[0] and int(final_number[i][0])>count:
-                        count=int(final_number[i][0])
-        
+        if not binary:
+            for link in dic[fichier][graph_name+'_graph']:
+                plt.plot([time,time+1],[values[link[0]-1],next_values[link[1]-1]], color='k')
         else:
-            final_state=[]
-            final_number=[]
-            count=0
-            
-        #detecting the number of lineage roots fo the next branches
+            for link in dic[fichier][graph_name+'_graph']:
+                next_gen.append([values[link[0]-1],next_values[link[1]-1]])
         
-        
-        
-        links=[time,[],[],[]]
-        for i in range(len(next_gen)):
-            #checking if there is division and differentiating the cases
-            next_descendant=0
-            for j in range(len(next_gen)):
-                if next_gen[i][0]==next_gen[j][0]:
-                    if i<j:
-                        next_descendant=1
-                    if i>j:
-                        next_descendant=-1
-                        
-            #determining the previous lineage            
-            place=-1
-            for j in range(len(final_state)):
-                if next_gen[i][0]==final_state[j]:
-                    place=j
-            if place==-1:
-                count+=1
-                number=str(int(count))
-            else :
-                number =final_number[place]
+            #more advanced graph : contructing the lines in links_list
             
-            if next_descendant==0:
-                a=''
-            if next_descendant==1:
-                a='1'
-            if next_descendant==-1:
-                a='0'
-            links[1].append(next_gen[i][1])
-            links[2].append(number+a)
-            links[3].append([number,number+a,next_gen[i][1]])
+            if links_list!=[]:
+                final_state=links_list[-1][1]
+                final_number=links_list[-1][2]
+                count=0
+                for i in range(len(final_state)):
+                    for j in next_gen:
+                        if final_state[i]==j[0] and int(final_number[i][0])>count:
+                            count=int(final_number[i][0])
             
-
-        links_list.append(links)
-        fichier=child
-    plt.show() #ploting the first graph
+            else:
+                final_state=[]
+                final_number=[]
+                count=0
+                
+            #detecting the number of lineage roots fo the next branches
+            
+            
+            
+            links=[time,[],[],[]]
+            for i in range(len(next_gen)):
+                #checking if there is division and differentiating the cases
+                next_descendant=0
+                for j in range(len(next_gen)):
+                    if next_gen[i][0]==next_gen[j][0]:
+                        if i<j:
+                            next_descendant=1
+                        if i>j:
+                            next_descendant=-1
+                            
+                #determining the previous lineage            
+                place=-1
+                for j in range(len(final_state)):
+                    if next_gen[i][0]==final_state[j]:
+                        place=j
+                if place==-1:
+                    count+=1
+                    number=str(int(count))
+                else :
+                    number =final_number[place]
+                
+                if next_descendant==0:
+                    a=''
+                if next_descendant==1:
+                    a='1'
+                if next_descendant==-1:
+                    a='0'
+                links[1].append(next_gen[i][1])
+                links[2].append(number+a)
+                links[3].append([number,number+a,next_gen[i][1]])
+                
     
-    
-    #ploting the second graph
-    for element in links_list:
-        plot_links=element[-1]
-        time= int(element[0])
-        len_col=len(maskcol)
-        for subelement in plot_links:
-            n1=subelement[0]
-            n2=subelement[1]
-            color=subelement[2]
-            number1=0
-            for i in range(len(n1)):
-                if i==0:
-                    number1+=int(n1[i])
-                else:
-                    if int(n1[i])==0:
-                        number1+=2**(-i-1)
+            links_list.append(links)
+            fichier=child
+            
+    if not binary :
+        plt.show() #ploting the first graph
+        
+    else : 
+        #ploting the second graph
+        for element in links_list:
+            plot_links=element[-1]
+            time= int(element[0])
+            len_col=len(maskcol)
+            for subelement in plot_links:
+                n1=subelement[0]
+                n2=subelement[1]
+                color=subelement[2]
+                number1=0
+                for i in range(len(n1)):
+                    if i==0:
+                        number1+=int(n1[i])
                     else:
-                        number1-=2**(-i-1)
-            number2=0
-            for i in range(len(n2)):
-                if i==0:
-                    number2+=int(n2[i])
-                else:
-                    if int(n2[i])==0:
-                        number2+=2**(-i-1)
+                        if int(n1[i])==0:
+                            number1+=2**(-i-1)
+                        else:
+                            number1-=2**(-i-1)
+                number2=0
+                for i in range(len(n2)):
+                    if i==0:
+                        number2+=int(n2[i])
                     else:
-                        number2-=2**(-i-1)
-            col=maskcol[int(color%len_col-1)]
-            plot_col=(col[0]/255,col[1]/255,col[2]/255)
-            plt.plot([time,time+1],[number1,number2],color=plot_col)
-    plt.show()
+                        if int(n2[i])==0:
+                            number2+=2**(-i-1)
+                        else:
+                            number2-=2**(-i-1)
+                col=maskcol[int(color%len_col-1)]
+                plot_col=(col[0]/255,col[1]/255,col[2]/255)
+                plt.plot([time,time+1],[number1,number2],color=plot_col)
+        plt.show()
 
 
 
 
 
 '''Running the different functions'''
-'''
-data_prep(my_data,crop_up,crop_down,crop_left,crop_right)
+''''''
+data_prep(my_data,crop_up,crop_down,crop_left,crop_right,cropped_data,cropped_log,my_data)
 
-run_cel(cropped_data,cel_gpu,cel_model_type,cel_channels,cel_diameter,cel_flow_threshold,cel_cellprob_threshold,segments_path)
+dimension_def(cropped_data,cropped_log,final_data,dimension_data)
 
-main_dict=download_dict(cropped_data,segments_path)
+run_cel(final_data,cel_gpu,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,dimension_data)
+
+main_dict=download_dict(final_data,cropped_log,segments_path)
 
 main_parenting(main_dict)
 
@@ -919,7 +1059,7 @@ centroid_area(main_dict)
 
 clean_masks(ratio_erasing_masks, main_dict)
 
-mask_displacement(main_dict,cel_diameter)
+mask_displacement(main_dict,search_diameter)
 
 #convex_hull(main_dict,hull_point)
 
@@ -929,7 +1069,7 @@ relation_mask(main_dict,surface_thresh)
 
 naiv_graph(main_dict,saving=True,savingpath=saving_path)
 
-'''
+
 #downloading main dictionnary:
 
 main_dict=np.load(saving_path+'.npy', allow_pickle=True).item()
@@ -939,5 +1079,5 @@ basic_graph(main_dict,saving=True,savingpath=saving_path)
 plot_graph(main_dict,'basic',colormask)
 
 plot_graph_and_masks(main_dict,'basic',colormask)
-
+''''''
 

@@ -17,48 +17,57 @@ from cellpose import utils, io, models, plot
 import re
 import copy
 from shutil import rmtree #erasing a whole directory
+from skimage.morphology import skeletonize #,medial_axis
+from PIL import Image #dealing with .tif images
 
 
 
 
-
-''' Running in a in a reduced dataset? '''
-test=False
 
 ''' Paths of the data and to save the results'''
 #Inputs
 #directory of the original dataset composed of a sequence of following pictures of the same bacterias, and with log files with .001 or no extension
-dir_name=(1-test)*"dataset/" +test*"datatest/"#name of dir
-my_data = "../data/"+dir_name #path of dir
+Main_directory="WT_mc2_55/30-03-2015/"
+dir_name=Main_directory+"Height/"             #name of dir
+my_data = "../data/"+dir_name       #path of dir
 #directory with the usefull information of the logs, None if there is no.
-data_log=None #"../data/"+          #path and name
+data_log="../data/"+Main_directory+"log/"             #       #path and name
 
 #Temporary directories
 #directory of cropped data each image of the dataset is cropped to erase the white frame
-cropped_data=(1-test)*"cropped_data/" +test*"cropped_datatest/"
+cropped_data=dir_name+"cropped_data/" 
 #directory with the usefull info extracted from the logs
-cropped_log='log_'+(1-test)*"cropped_data/" +test*"cropped_datatest/"
+cropped_log=dir_name+"log_cropped_data/" 
 #directory for output data from cellpose 
-segments_path = (1-test)*"cellpose_output/"+test*"cellpose_outputtest/"
+segments_path = dir_name+"cellpose_output/"
 
 
 #Outputs
 #directory of the processed images (every image has the same pixel size and same zoom)
-final_data="final_data_"+ dir_name
+final_data=dir_name+"final_data/" 
+#dictionnary and dimension directory
+Dic_dir=dir_name+"Dic_dir/" 
 #Saving path for the dictionnary
-saving_path='Main_dictionnary_'+ dir_name[:-1]
+saving_path=Dic_dir+'Main_dictionnary'
 #dimension and scale of all the final data
-dimension_data='Dimension_'+ dir_name[:-1]
-
+dimension_data=Dic_dir+'Dimension'
 
 
 
 ''' Parameters'''
 #cropping parameters
+
+crop_up=1
+crop_down=1
+crop_left=1
+crop_right=1
+'''
 crop_up=27
 crop_down=1
 crop_left=30
 crop_right=101
+'''
+
 
 #cellpose parameters
 cel_gpu=True
@@ -67,7 +76,7 @@ cel_channels=[0,0]  # define CHANNELS to run segementation on grayscale=0, R=1, 
 cel_diameter_param = 1 # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
 cel_flow_threshold = 0.9 
 cel_cellprob_threshold=0.0
-
+batch_size=8
 
 
 #erasing small masks that have a smaller relative size :
@@ -81,8 +90,15 @@ surface_thresh=0.6
 #searching distance (pixels) for the optimization algorithm to construct transtion vectors between pictures. 
 search_diameter =100 
 
+#minimum ratio of two brench length to erase the small branch
+centerline_crop_param=2
+
 #colors of the masks
 colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
+
+# different type of datasset with their quality
+
+dataset=["WT_11-02-15/","WT_mc2_55/30-03-2015/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","WT_mc2_55/05-02-2014/","delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"]                #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/",                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
 
 
 ''' main dictionnary main_dict: each image contain a dictionnary with
@@ -90,6 +106,7 @@ time : the time of the image beginning at 0
 adress : location of the cropped file
 masks : the masks as numpy array
 outlines : the outlines as a list of points
+angle: rotation angle of the image compared to a fixed reference
 centroid : an array containing the position of the centroid of each mask the centroid[i] is the centroid of the mask caracterized by i+1
 area : an array containing the position of the area (number of pixels) of each mask
 mask_error : True if cellpose computes no mask, else False
@@ -138,7 +155,12 @@ def data_prep(data,cropup,cropdown,cropleft,cropright,croppeddata,croppedlog,myd
                 cropped = img
             cv2.imwrite(croppeddata+files[i], cropped)  
         
+        elif (files[i].endswith(".tif")):
+            img = np.array(Image.open(mydata+files[i]))
+            cv2.imwrite(croppeddata+files[i][:-3]+'png', img)
             
+            
+        '''    
         #dealing with the log files
         elif (files[i].endswith(".001")) or len(re.split(r'\W+',files[i]))==1:# check files ending with .001 or without any . 
             #open text file in read mode
@@ -176,7 +198,7 @@ def data_prep(data,cropup,cropdown,cropleft,cropright,croppeddata,croppedlog,myd
             np.save(croppedlog+name,res)
         else:
             files.remove(files[i])
-            
+        '''    
             
             
     if log_dir is not None: #going through the directory with the same algorithm
@@ -186,7 +208,7 @@ def data_prep(data,cropup,cropdown,cropleft,cropright,croppeddata,croppedlog,myd
             #dealing with the log files
             if (files[i].endswith(".001")) or len(re.split(r'\W+',files[i]))==1:# check files ending with .001 or without any . 
                 #open text file in read mode
-                text_file = open(data+files[i], "r", errors='ignore' )
+                text_file = open(log_dir+files[i], "r", errors='ignore' )
                 #read whole file to a string
                 text = text_file.read()
                 
@@ -197,22 +219,56 @@ def data_prep(data,cropup,cropdown,cropleft,cropright,croppeddata,croppedlog,myd
                 text=re.sub(r'\n', ' ', text)
 
                 #selecting the good lines (dimension)
-                match0=re.match("^.*Samps/(.*|\n)Scan Line.*$",text).group(1)
-                #selecting the good lines (angle)
-                match1=re.match("^.*Rotate Ang(.*|\n)Stage X.*$",text).group(1)
-                #selection of the numbers
-                match0=re.findall(r'\d+\.\d+|\d+',match0)#structure : samps / lines; number of line; aspect ratio 1, aspect ratio 2, scan size 1, scan size 2
-                match1=re.findall(r'\d+\.\d+|\d+',match1)
-                for j in range(4):
-                    match0[j]=int(match0[j]) 
-                match0[4]=float(match0[4])
-                match0[5]=float(match0[5])
-                res=np.array([match0[5]/match0[2]/match0[1],match0[4]/match0[3]/match0[0],float(match1[0])])#structure vertical len of a pixel, horizontal len of a pixel, r0tation
-                name=re.split(r'\W+',files[i])[0] #getting rid of the .001
-                #saving the dimension of each picture in the log file
-                np.save(croppedlog+name,res)
-            else:
-                files.remove(files[i])
+                first_mat=re.match("^.*Samps/(.*|\n)Scan Line.*$",text)
+                first_mat2=re.match("^.*Scan size(.*?|\n)~m.*$",text) 
+                first_mat3=re.match("^.*Scan size(.*?|\n)nm.*$",text) 
+                if first_mat is not None:
+                    match0=first_mat.group(1)
+                    #selecting the good lines (angle)
+                    match1=re.match(r"^.*Rotate Ang(.*?|\n)\\.*$",text).group(1)
+                    #selection of the numbers
+                    match0=re.findall(r'\d+\.\d+|\d+',match0)#structure : samps / lines; number of line; aspect ratio 1, aspect ratio 2, scan size 1, scan size 2
+                    match1=re.findall(r'\d+\.\d+|\d+',match1)
+                    if len(match0)>=6:
+                        for j in range(4):
+                            match0[j]=int(match0[j]) 
+                        match0[4]=float(match0[4])
+                        match0[5]=float(match0[5])
+                        res=np.array([match0[5]/match0[2],match0[4]/match0[3],float(match1[0])])#structure vertical len of the image, horizontal len the image, r0tation
+                        name=re.split(r'\W+',files[i])[0] #getting rid of the .001
+                        #saving the dimension of each picture in the log file
+                        np.save(croppedlog+name,res)
+                elif first_mat2 is not None:
+                    first_mat=re.findall(r'\d+\.\d+|\d+',first_mat2.group(1))
+                    second_mat=re.match(r"^.*Aspect ratio(.*?|\n)\\.*$",text).group(1)
+                    second_mat=re.findall(r'\d+\.\d+|\d+',second_mat)
+                    if len(second_mat)==2:
+                        match1=re.match(r"^.*Rotate Ang(.*?|\n)\\.*$",text).group(1)
+                        match1=re.findall(r'\d+\.\d+|\d+',match1)
+                        if len(first_mat)==2:
+                            match0=[0,0,int(second_mat[0]),int(second_mat[1]),float(first_mat[0]),float(first_mat[1])]
+                        else:
+                            match0=[0,0,int(second_mat[0]),int(second_mat[1]),float(first_mat[0]),float(first_mat[0])]
+                        res=np.array([match0[5]/match0[2],match0[4]/match0[3],float(match1[0])])#structure vertical len of the image, horizontal len the image, r0tation
+                        name=re.split(r'\W+',files[i])[0] #getting rid of the .001
+                        #saving the dimension of each picture in the log file
+                        np.save(croppedlog+name,res)
+                elif first_mat3 is not None:
+                    first_mat=re.findall(r'\d+\.\d+|\d+',first_mat3.group(1))
+                    second_mat=re.match(r"^.*Aspect ratio(.*?|\n)\\.*$",text).group(1)
+                    second_mat=re.findall(r'\d+\.\d+|\d+',second_mat)
+                    if len(second_mat)==2:
+                        match1=re.match(r"^.*Rotate Ang(.*?|\n)\\.*$",text).group(1)
+                        match1=re.findall(r'\d+\.\d+|\d+',match1)
+                        if len(first_mat)==2:
+                            match0=[0,0,int(second_mat[0]),int(second_mat[1]),float(first_mat[0])/1000,float(first_mat[1])/1000]
+                        else:
+                            match0=[0,0,int(second_mat[0]),int(second_mat[1]),float(first_mat[0])/1000,float(first_mat[0])/1000]
+                        res=np.array([match0[5]/match0[2],match0[4]/match0[3],float(match1[0])])#structure vertical len of the image, horizontal len the image, r0tation
+                        name=re.split(r'\W+',files[i])[0] #getting rid of the .001
+                        #saving the dimension of each picture in the log file
+                        np.save(croppedlog+name,res)
+
   
 #A function which allows input files to be sorted by timepoint.
 def natural_keys(text):
@@ -221,7 +277,22 @@ def natural_keys(text):
 
 
 '''Preparation of the data so that each image has the same dimension '''
-def dimension_def(croppeddata,log_dir,finaldata,dimensiondata): #dir of the images, dir of the numpy info of logs
+def dimension_def(croppeddata,log_dir,finaldata,dimensiondata,dimension_directory): #dir of the images, dir of the numpy info of logs
+
+    #clean or create the final directory
+    if os.path.exists(finaldata):
+        for file in os.listdir(finaldata):
+            os.remove(os.path.join(finaldata, file))
+    else:
+        os.makedirs(finaldata)
+        
+    if os.path.exists(dimension_directory):
+        for file in os.listdir(dimension_directory):
+            os.remove(os.path.join(dimension_directory, file))
+    else:
+        os.makedirs(dimension_directory)
+    
+        
     #determining the main dimension and the best vertical/horizontal precision
     phys_dim=[]
     for file in os.listdir(croppeddata):
@@ -229,8 +300,7 @@ def dimension_def(croppeddata,log_dir,finaldata,dimensiondata): #dir of the imag
         if namelog in os.listdir(log_dir):
             log_para=np.load(log_dir+namelog)
             dim1,dim2 = np.shape(cv2.imread(croppeddata+file,0))
-            phys_dim.append([log_para[0]*dim1,log_para[1]*dim2,log_para[0],log_para[1]])
-        
+            phys_dim.append([log_para[0],log_para[1],log_para[0]/dim1,log_para[1]/dim2])
     phys_dim=np.array(phys_dim)
     prec=np.min(phys_dim[:,2:4])
     dim_height=int(np.max(phys_dim[:,0])/prec)
@@ -238,19 +308,14 @@ def dimension_def(croppeddata,log_dir,finaldata,dimensiondata): #dir of the imag
     
     np.save(dimensiondata,np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
     
-    #clean or create the final directory
-    if os.path.exists(finaldata):
-        for file in os.listdir(finaldata):
-            os.remove(os.path.join(finaldata, file))
-    else:
-        os.makedirs(finaldata)
     
     for file in os.listdir(croppeddata):
         namelog=re.findall(r'\d+',file)[0]+'.npy'
         if namelog in os.listdir(log_dir):
             log_para=np.load(log_dir+namelog)
             img=cv2.imread(croppeddata+file,0)
-            newimage=bili_scale_image(img,log_para[0],log_para[1],dim_height,dim_len,prec,prec)
+            dim1,dim2 = np.shape(img)
+            newimage=bili_scale_image(img,log_para[0]/dim1,log_para[1]/dim2,dim_height,dim_len,prec,prec)
             cv2.imwrite(finaldata+file, newimage) 
     #erasing the cropped data
     rmtree(croppeddata)
@@ -290,7 +355,7 @@ def bili_scale_image(img,preci_h,preci_l,dim_h,dim_l,precf_h,precf_l):
     
    
 ''' Running cellpose and saving the results'''
-def run_cel(data_file,gpuval,mod,chan,param_dia,thres,celp,seg,dimensiondata):
+def run_cel(data_file,gpuval,mod,chan,param_dia,thres,celp,seg,dimensiondata,batch_size=8):
     #clean or create the output directory
     if os.path.exists(seg):
         for file in os.listdir(seg):
@@ -306,7 +371,7 @@ def run_cel(data_file,gpuval,mod,chan,param_dia,thres,celp,seg,dimensiondata):
     # Loop over all of our image files and run Cellpose on each of them. 
     for fichier in os.listdir(data_file):
         img = io.imread(data_file+fichier)
-        masks, flows, st, diams = model.eval(img, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
+        masks, flows, st, diams = model.eval(img,batch_size, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
         # save results so you can load in gui
         io.masks_flows_to_seg(img, masks, flows, diams, seg+fichier[:-4], chan)
 
@@ -333,8 +398,8 @@ def download_dict(finaldata,log_dir,segmentspath):
         dic[fichier]['angle']=np.load(log_dir+namelog)[-1]
         
     #deleting temporary dir
-    #rmtree(segmentspath)
-    #rmtree(log_dir)
+    rmtree(segmentspath)
+    rmtree(log_dir)
     return dic
 
 
@@ -342,10 +407,13 @@ def download_dict(finaldata,log_dir,segmentspath):
 ''' Construction the sequence of usable pictures : linking images with previous (parent) and following (child) image'''
 def main_parenting(dic):
     parent=''
-    for fichier in dic.keys():
+    list_key=list(dic.keys())
+    for fichier in list_key:
         if not dic[fichier]['masks_error']:
             dic[fichier]['parent']=parent
             parent=fichier
+        else :
+            del dic[fichier]
     child=''
     key=list(dic.keys())
     key.reverse()
@@ -425,8 +493,8 @@ def clean_masks(fraction,dic,saving=False,savingpath='dict'):
                 main_centroid0+=area2[i]*centroid2[i,0]
                 main_centroid1+=area2[i]*centroid2[i,1]
             dic[fichier]['main_centroid']=np.array([main_centroid0//sum(area2),main_centroid1//sum(area2)])
-            if saving:
-                np.save(savingpath,dic)
+    if saving:
+        np.save(savingpath,dic)
 
 
 
@@ -488,10 +556,9 @@ def convex_hull(dic,pointnumber,saving=False,savingpath='dict'):
             for i in range(mask_number):
                 stepsize=int(len(outlines[i])//pointnumber)
                 convex[i]=convex_numba(i+1,masks,outlines[i][:-1:stepsize])
-            plt.show()
             dic[fichier]['convex_hull']=convex
-            if saving:
-                np.save(savingpath,dic)
+    if saving:
+        np.save(savingpath,dic)
 
 # Function to effectively compute the approximation, 
 @jit 
@@ -513,6 +580,332 @@ def convex_numba(n0,masks,outline):
                             if (curl1>=0 and curl2>=0 and curl3>=0 and (curl1>0 or curl2>0 or curl3>0)) or (curl1<=0 and curl2<=0 and curl3<=0 and (curl1<0 or curl2<0 or curl3<0)):
                                 convex[m,p]=n0
     return convex
+
+
+
+''' Computing the centerline of each mask and saving them in the dictionnary'''
+#main function to save the centerlines in the dictionnary
+def centerline_mask(dic,alpha_erasing_branch,saving=False,savingpath='dict'):
+
+    for fichier in dic.keys():
+        if not dic[fichier]['masks_error']:
+            masks=dic[fichier]['masks']
+            mask_number=np.max(masks)
+            centerlines=[]
+            for i in range(mask_number):
+                mask_i=transfo_bin(masks,i+1) #isolating the i+1-th mask
+                centerlines.append(construc_center(mask_i,alpha_erasing_branch))
+            dic[fichier]['centerlines']=centerlines
+    if saving:
+        np.save(savingpath,dic)
+
+#isolating the mask with number num
+@jit
+def transfo_bin(mask,num):
+    (dim1,dim2)=np.shape(mask)
+    newmask=np.zeros((dim1,dim2))
+    for i in range(dim1):
+        for j in range(dim2):
+            if mask[i,j]==num:
+                newmask[i,j]=1
+    return newmask
+
+#Constructing the centerline given a unique mask
+def construc_center(mask,alpha):
+    skel=padskel(mask)              #runing the skeleton algorithm and obtaining a boolean picture
+    ex,div=find_extremal_division_point(skel)               #extracting the extremal and division points of the skel
+    extr_seg,int_seg=division_path_detek(skel)          #EXTRACTING THE DIFFERENT SEGMENTS
+    extr_seg=fusion_erasing(extr_seg,ex,div,alpha)          #fusioning/erasing the external segments if needed
+    len_int=len(int_seg)
+    len_extr=len(extr_seg)
+    
+    if len_int==0:
+        if len_extr==1:
+            return np.array(extr_seg[0])
+        elif len_extr==2:
+            sol=extr_seg[0]+extr_seg[1][-1::-1]
+            return np.array(sol)
+        else:
+            print("Error skel format")
+            return np.array([[]])
+        
+        
+    elif len_int==1 and len_extr==2:
+        sol=extr_seg[0]
+        if max(abs(sol[-1][0]-int_seg[0][0][0]),abs(sol[-1][1]-int_seg[0][0][1]))<=3:
+            sol+=int_seg[0]
+        else:
+            sol+=int_seg[0][::-1]
+            
+        sol+=extr_seg[1][::-1]
+        return np.array(sol)
+    else:
+        print("Error skel format")
+        return np.array([[]])
+        
+    '''#we can do the case with 2 internal segment but it is quite annoying
+    elif len_int==2 and len_extr==3:
+        int0=int_seg[0]
+        int1=int_seg[0]
+        
+        #selecting the intersection point between the two internal branches
+        if int0[0]==int1[0]:
+            point=int0[0]
+            int_seg=[int0[-2::-1]+int1]
+        elif int0[0]==int1[-1]:
+            point=int0[0]
+            int_seg=[int1[:-1]+int0]
+        elif int0[-1]==int1[-1]:
+            point=int0[-1]
+            int_seg=[int0+int1[-2::-1]]
+        else :
+            point=int0[-1]
+            int_seg=[int0+int1[1:]]
+        #simplifying by erasing the external branch linked to both internal branch
+        for elem in extr_seg:
+            if elem[-1]==point:
+                extr_seg.remove(point)
+        #previous case len_int==1 and len_extr==2
+        sol=extr_seg[0]
+        if sol[-1]==int_seg[0][0]:
+            sol+=int_seg[0][1:]
+        else:
+            sol+=int_seg[0][-2::-1]
+        sol+=extr_seg[1][-2::-1]
+        return np.array(sol)
+    '''
+
+
+# skeletonization algorithm
+def padskel(mask):
+    ''' 
+    Runs skimage.morphology.skeletonize on a padded version of the mask, to avoid errors.
+    
+    Parameters
+    ----------
+    mask = an opencv image
+    
+    Returns
+    -------
+    skel = a skeleton (boolean array)
+    '''
+    mask = cv2.copyMakeBorder(mask,20,20,20,20,cv2.BORDER_CONSTANT,None,value=0)#add a border to the skel
+    skel = skeletonize(mask,method='lee')              #best skeletonization algorithms
+    #skel = skeletonize(mask)           #second skeletonization algorithms
+    #skel= medial_axis(mask)            #third skeletonization algorithms
+    skel = skel[20:np.shape(skel)[0]-20,20:np.shape(skel)[1]-20]
+    return skel
+
+# Because the skeleton is 1D, the extremal points have only one neighbour, the division points have 3, we don't take into account the cases with 4 or more neighbour (bad quality skeleton)
+def find_extremal_division_point(skel):
+    ex=[]
+    div=[]
+    dim1,dim2=np.shape(skel)
+    for i in range(dim1):
+        for j in range(dim2):
+            if skel[i,j]:
+                count=neighbourcount(i,j,dim1,dim2,skel)
+                if count==1:
+                    ex.append([i,j])
+                elif count==3:
+                    div.append([i,j])
+    return ex,div
+
+
+#counting the neighbour of a point that are also in the skeleton
+@jit
+def neighbourcount(i,j,dim1,dim2,skel):
+    count=0
+    for k in [-1,0,1]:
+        for l in [-1,0,1]:
+            if (k,l)!=(0,0) and 0<=i+k<dim1 and 0<=j+l<dim2:
+                if skel[i+k,j+l]:
+                    count+=1
+    return count                  
+
+#computing the different segment composing the skeleton : int_seg the list of the internal segment (between two points of div) the list of the external segment (between a points of ext and another point). Each segment is a list of points.
+def division_path_detek(skel):#computing the different segment composing the skeleton : int_seg the list of the internal segment (between two points of div) the list of the external segment (between a points of ext and another point)
+    ex,div=find_extremal_division_point(skel)
+    dim1,dim2=np.shape(skel)
+    if len(ex)<=1 :
+        return [],[]
+    elif len(ex)==2 : #simple case without branching
+        old_point=ex[0]
+        tot_seg=[old_point]
+        for k in [-1,0,1]:
+            for l in [-1,0,1]:
+                if (k,l)!=(0,0) and 0<=old_point[0]+k<dim1 and 0<=old_point[1]+l<dim2:
+                    if skel[old_point[0]+k,old_point[1]+l]:
+                        new_point=[old_point[0]+k,old_point[1]+l]
+                        tot_seg.append(new_point)
+        while new_point not in ex :
+            pot_new_point=[]
+            for k in [-1,0,1]:
+                for l in [-1,0,1]:
+                    if (k,l)!=(0,0) and 0<=new_point[0]+k<dim1 and 0<=new_point[1]+l<dim2 and (new_point[0]+k,new_point[1]+l)!=(old_point[0],old_point[1]) and skel[new_point[0]+k,new_point[1]+l]:
+                        pot_new_point=[new_point[0]+k,new_point[1]+l]
+            if pot_new_point==[]:
+                break
+            old_point,new_point=new_point,pot_new_point
+            tot_seg.append(new_point)         
+        return [tot_seg],[]
+    
+    elif len(ex)==3 :#simple case three connected points
+        extr_seg=[] #computation of the external case
+        for i in range(3):
+            old_point=ex[i]
+            skel[old_point[0],old_point[1]]=False
+            new_seg=[old_point]
+            for k in [-1,0,1]:
+                for l in [-1,0,1]:
+                    if  0<=old_point[0]+k<dim1 and 0<=old_point[1]+l<dim2:
+                        if skel[old_point[0]+k,old_point[1]+l]:
+                            new_point=[old_point[0]+k,old_point[1]+l]
+                            new_seg.append(new_point)
+                            skel[new_point[0],new_point[1]]=False  
+            while (new_point not in div) :
+                pot_new_point=[]
+                for k in [-1,0,1]:
+                    for l in [-1,0,1]:
+                        if  0<=new_point[0]+k<dim1 and 0<=new_point[1]+l<dim2 and skel[new_point[0]+k,new_point[1]+l]:
+                                pot_new_point=[new_point[0]+k,new_point[1]+l]
+                if pot_new_point==[]:
+                    break
+                old_point,new_point=new_point,pot_new_point
+                if new_point not in div:
+                    new_seg.append(new_point)
+                    skel[new_point[0],new_point[1]]=False 
+                else:
+                    close_neighbour=False
+                    for elem in div:
+                        if max(abs(new_point[0]-elem[0]),abs(new_point[1]-elem[1]))==1:
+                            close_neighbour=True
+                    if close_neighbour:
+                        new_seg.append(new_point)
+                        skel[new_point[0],new_point[1]]=False 
+                    else:
+                        new_seg.append(new_point)
+            extr_seg.append(new_seg)
+        return extr_seg,[]
+    
+    
+     
+    else: #case with branching
+        extr_seg=[] #computation of the external case
+        for i in range(len(ex)):
+            old_point=ex[i]
+            skel[old_point[0],old_point[1]]=False
+            new_seg=[old_point]
+            for k in [-1,0,1]:
+                for l in [-1,0,1]:
+                    if  0<=old_point[0]+k<dim1 and 0<=old_point[1]+l<dim2:
+                        if skel[old_point[0]+k,old_point[1]+l]:
+                            new_point=[old_point[0]+k,old_point[1]+l]
+                            new_seg.append(new_point)
+                            skel[new_point[0],new_point[1]]=False  
+            while (new_point not in div) :
+                pot_new_point=[]
+                for k in [-1,0,1]:
+                    for l in [-1,0,1]:
+                        if  0<=new_point[0]+k<dim1 and 0<=new_point[1]+l<dim2 and skel[new_point[0]+k,new_point[1]+l]:
+                                pot_new_point=[new_point[0]+k,new_point[1]+l]
+                if pot_new_point==[]:
+                    break
+                old_point,new_point=new_point,pot_new_point
+                if new_point not in div:
+                    new_seg.append(new_point)
+                    skel[new_point[0],new_point[1]]=False 
+                else:
+                    close_neighbour=False
+                    for elem in div:
+                        if max(abs(new_point[0]-elem[0]),abs(new_point[1]-elem[1]))<=2:
+                            close_neighbour=True
+                    if close_neighbour:
+                        new_seg.append(new_point)
+                        skel[new_point[0],new_point[1]]=False 
+                    else:
+                        new_seg.append(new_point)
+            extr_seg.append(new_seg)
+            
+        newextr_seg,newint_seg=division_path_detek(skel)
+        return extr_seg, newextr_seg+newint_seg
+
+
+
+#simplify a segment into a 1D line (so that each pixel has at most 2 neighbour), we suppose that the segment goes in one direction ( it can't go back to point where it was, but can stay one the same pixel). This function is only used in simple_fusion
+def one_D_line(seg) : 
+    #selecting the two first element
+    newseg=[seg[0],seg[1]]
+    if 2<len(seg):
+        for j in range(2,len(seg)):
+            parent=newseg[-1]
+            grandparent=newseg[-2]
+            child=seg[j]
+            if max(abs(child[0]-parent[0]),abs(child[1]-parent[1]),abs(child[0]-grandparent[0]),abs(child[1]-grandparent[1]))<=1:
+                del newseg[-1]
+                newseg.append(child)
+            else :
+                newseg.append(child)
+    if newseg[-1]==newseg[-2]:
+        del newseg[-1]
+    return newseg
+ 
+# Erasing the shortest branch if it is alpha>1 shorter than the longuest. Else fusioning two external segments linked to the same division point to get just a 1D line, works on simple cases only
+def fusion_erasing(extr_seg,ex,div,alpha):
+    if len(extr_seg)==1: #case with just one segment
+        return extr_seg
+    else: #each external segment has a connection to a division point
+        new_seg=[]
+        newdiv=[] #selection only one of the three division point if three are touching
+        
+        for point in div:
+            close_neighbour=False
+            for elem in newdiv:
+                if max(abs(point[0]-elem[0]),abs(point[1]-elem[1]))<=3:
+                    close_neighbour=True
+            if not close_neighbour:
+                newdiv.append(point)
+        
+        for i in range(len(newdiv)):
+            temp=[]
+            for seg in extr_seg:
+                if max(abs(seg[-1][0]-newdiv[i][0]),abs(seg[-1][1]-newdiv[i][1]))<=3:
+                    temp.append(seg)
+                    
+            if len(temp)==3:# only possible case for a 3 branches graph only
+                maxi=np.argmax(np.array([len(temp[0]),len(temp[1]),len(temp[2])]))
+                body=temp.pop(maxi)
+                fusi=[]
+                if len(temp[0])>alpha*len(temp[1]):
+                    return [body+temp[0][-2::-1]]
+                elif len(temp[1])>alpha*len(temp[0]):
+                    return [body+temp[1][-2::-1]]
+                else :
+                    debut=min(len(temp[0]),len(temp[1]))
+                    for i in range(debut):
+                        a=(temp[0][len(temp[0])-debut+i][0]+temp[1][len(temp[1])-debut+i][0])//2
+                        b=(temp[0][len(temp[0])-debut+i][1]+temp[1][len(temp[1])-debut+i][1])//2
+                        fusi.append([a,b]) 
+                        
+                    return [body+one_D_line(fusi)[-2::-1]]
+            
+            elif len(temp)==2:
+                if len(temp[0])>alpha*len(temp[1]):
+                    new_seg.append(temp[0]) 
+                elif len(temp[1])>alpha*len(temp[0]):
+                    new_seg.append(temp[1]) 
+                else :
+                    fusi=[]
+                    debut=min(len(temp[0]),len(temp[1]))
+                    for i in range(debut):
+                        a=(temp[0][len(temp[0])-debut+i][0]+temp[1][len(temp[1])-debut+i][0])//2
+                        b=(temp[0][len(temp[0])-debut+i][1]+temp[1][len(temp[1])-debut+i][1])//2
+                        fusi.append([a,b]) 
+                    new_seg.append(one_D_line(fusi))
+            elif len(temp)==1:
+                new_seg.append(temp[0])
+                
+        return new_seg
 
 
 
@@ -609,7 +1002,9 @@ def opt_trans_vec(mask1,mask2,rad,vec_guess):
 @jit 
 def rotation_vector(angle,vec,point):
     mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
-    return point+np.dot(mat,vec-point)
+    newvec=vec-point
+    var=np.array([mat[0,0]*newvec[0]+mat[0,1]*newvec[1],mat[1,0]*newvec[0]+mat[1,1]*newvec[1]])
+    return point+var
 
 #rotation of an image around a point
 @jit 
@@ -627,6 +1022,7 @@ def rotation_img(angle,img,point):
                 frac_j=j_n-j_t
                 new_img[i,j]=frac_i*frac_j*img[i_t,j_t]+frac_i*(1-frac_j)*img[i_t,j_t+1]+(1-frac_i)*frac_j*img[i_t+1,j_t]+(1-frac_i)*(1-frac_j)*img[i_t+1,j_t+1]
     return new_img
+
 
 ''' First algorithm for creating a graph : idea is comparing the centroids of the masks of two images '''
 #not sure that we need this, naiv graph is better
@@ -724,7 +1120,7 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
             
             angle=dic[fichier]['angle']-dic[grand_child]['angle']  
             
-            if angle!=0:            #check on real data
+            if angle!=0:            #check on real data sign of angle
                 dim1,dim2=np.shape(mask_p)
                 centerpoint=np.array([dim1//2,dim2//2],dtype=int)
                 mask_p=rotation_img(angle,mask_p,centerpoint)
@@ -876,28 +1272,35 @@ def basic_graph(dic,saving=False,savingpath='dict'):
 
 
 ''' Ploting the images, with the masks overlaid, the label of each mask (integer) and the relation with the following masks'''
-def plot_graph_and_masks(dic,graph_name,maskcol):
+def plot_graph_masks(dic,graph_name,maskcol):
     #Initialisation
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         # plot image with masks overlaid
         img = cv2.imread(dic[fichier]['adress'],0)
-        #plt.imshow(img)
         masks=dic[fichier][graph_name+'_masks']
         masknumber=np.max(masks)
         colormask=copy.deepcopy(maskcol)
         numbercolor=len(colormask)
         colormask=(masknumber//numbercolor+1)*colormask
         colormask=np.array(colormask[:masknumber])
-        mask_RGB = plot.mask_overlay(img,masks,colors=colormask)
+        mask_RGB = plot.mask_overlay(img,masks,colors=colormask)#image with masks
         plt.imshow(mask_RGB)
-        # plot the centroids
+        
+        # plot the centroids and the centerlines
         centr=dic[fichier]['centroid']
+        line=dic[fichier]['centerlines']
         for i in range(len(centr)):
+            #centroids
             plt.plot(centr[i,0], centr[i,1], color='k',marker='o')
             plt.annotate(str(int(dic[fichier][graph_name+'_graph_values'][i])), centr[i,:], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
-            main_centroid=dic[fichier]['main_centroid']
-            plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
+            #centerlines
+            if len(line[i])>1:
+                plt.plot(line[i][:,1],line[i][:,0], color='k')
+            
+        main_centroid=dic[fichier]['main_centroid']
+        plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
+            
         #plot the displacement of the centroid between two images
         next_centr=dic[dic[fichier]['child']]['centroid']
         for link in dic[fichier][graph_name+'_graph']:
@@ -905,27 +1308,34 @@ def plot_graph_and_masks(dic,graph_name,maskcol):
                 plt.annotate("", xy=(next_centr[link[1]-1][0], next_centr[link[1]-1][1]), xycoords='data', xytext=(centr[link[0]-1][0], centr[link[0]-1][1]), textcoords='data', arrowprops=dict(arrowstyle="->", connectionstyle="arc3",color='w'))
             else :
                 plt.plot(next_centr[link[1]-1][0], next_centr[link[1]-1][1],color='w',marker='o', markersize=0.5)
+        
         plt.show()
         fichier=dic[fichier]['child']
     
     # ploting last image
     img = cv2.imread(dic[fichier]['adress'],0)
-    #plt.imshow(img)
     masks=dic[fichier][graph_name+'_masks']
     masknumber=np.max(masks)
     colormask=copy.deepcopy(maskcol)
     numbercolor=len(colormask)
     colormask=(masknumber//numbercolor+1)*colormask
     colormask=np.array(colormask[:masknumber])
-    mask_RGB = plot.mask_overlay(img,masks,colors=colormask)
+    mask_RGB = plot.mask_overlay(img,masks,colors=colormask)#image with masks
     plt.imshow(mask_RGB)
-    # plot the centroids
+    
+    
+    # plot the centroids and centerlines
     centr=dic[fichier]['centroid']
+    line=dic[fichier]['centerlines']
     for i in range(len(centr)):
+        #centroids
         plt.plot(centr[i,0], centr[i,1], color='k',marker='o')
         plt.annotate(str(int(dic[fichier][graph_name+'_graph_values'][i])), centr[i,:], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
-        main_centroid=dic[fichier]['main_centroid']
-        plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
+        #centerlines
+        if len(line[i])>1:
+            plt.plot(line[i][:,1],line[i][:,0], color='k')
+    main_centroid=dic[fichier]['main_centroid']
+    plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
 
 
 
@@ -1043,41 +1453,75 @@ def plot_graph(dic,graph_name,maskcol,binary=True):
 
 
 
-'''Running the different functions'''
-''''''
-data_prep(my_data,crop_up,crop_down,crop_left,crop_right,cropped_data,cropped_log,my_data)
+if __name__ == "__main__":
+    
+    '''Running the different functions'''
+    '''
+    print(Main_directory)
 
-dimension_def(cropped_data,cropped_log,final_data,dimension_data)
+    data_prep(my_data,crop_up,crop_down,crop_left,crop_right,cropped_data,cropped_log,my_data,log_dir=data_log)
 
-run_cel(final_data,cel_gpu,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,dimension_data)
+    print("step ",0)
 
-main_dict=download_dict(final_data,cropped_log,segments_path)
+    dimension_def(cropped_data,cropped_log,final_data,dimension_data,Dic_dir)
 
-main_parenting(main_dict)
+    print("step ",1)
 
-centroid_area(main_dict)
+    run_cel(final_data,cel_gpu,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,dimension_data,batch_size=batch_size)
 
-clean_masks(ratio_erasing_masks, main_dict)
+    print("step ",2)
 
-mask_displacement(main_dict,search_diameter)
+    main_dict=download_dict(final_data,cropped_log,segments_path)
 
-#convex_hull(main_dict,hull_point)
+    print("step ",3)
 
-graph_centroid(main_dict)
+    main_parenting(main_dict)
 
-relation_mask(main_dict,surface_thresh)
+    print("step ",4)
 
-naiv_graph(main_dict,saving=True,savingpath=saving_path)
+    centroid_area(main_dict)
 
+    print("step ",5)
 
-#downloading main dictionnary:
+    clean_masks(ratio_erasing_masks, main_dict)
 
-main_dict=np.load(saving_path+'.npy', allow_pickle=True).item()
+    print("step ",6)
 
-basic_graph(main_dict,saving=True,savingpath=saving_path)
+    centerline_mask(main_dict,centerline_crop_param,saving=True,savingpath=saving_path)
 
-plot_graph(main_dict,'basic',colormask)
+    print("step ",7)
 
-plot_graph_and_masks(main_dict,'basic',colormask)
-''''''
+    mask_displacement(main_dict,search_diameter)
+
+    print("step ",8)
+
+    #convex_hull(main_dict,hull_point)
+
+    graph_centroid(main_dict)
+
+    print("step ",9)
+
+    relation_mask(main_dict,surface_thresh)
+
+    print("step ",10)
+
+    naiv_graph(main_dict)
+
+    print("step ",11)
+
+    basic_graph(main_dict,saving=True,savingpath=saving_path)
+
+    print("step ",12)
+    '''
+
+    #downloading main dictionnary and only ploting the results
+
+    main_dict=np.load(saving_path+'.npy', allow_pickle=True).item()
+
+    plot_graph(main_dict,'basic',colormask)
+
+    plot_graph_masks(main_dict,'basic',colormask)
+
+    
+
 

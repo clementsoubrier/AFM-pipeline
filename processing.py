@@ -54,9 +54,19 @@ dimension_data=Dic_dir+'Dimension'
 
 
 
+data_set=["delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/","WT_mc2_55/30-03-2015/","WT_mc2_55/05-02-2014/","WT_11-02-15/","delta parB/18-01-2015/","WT_mc2_55/04-06-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"  ]   #Anti"WT_mc2_55/30-03-2015/","WT_mc2_55/05-02-2014/","WT_11-02-15/",      #Yes "delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"          #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/"                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
+
+result_path='Height/Dic_dir/'
+
+dic_name='Main_dictionnary.npy'
+
+dim_name='Dimension.npy'
+
+
+
 ''' Parameters'''
 #cropping parameters
-
+'''
 crop_up=1
 crop_down=1
 crop_left=1
@@ -66,7 +76,7 @@ crop_up=27
 crop_down=1
 crop_left=30
 crop_right=101
-'''
+
 
 
 #cellpose parameters
@@ -80,7 +90,9 @@ batch_size=8
 
 
 #erasing small masks that have a smaller relative size :
-ratio_erasing_masks=0.1
+ratio_erasing_masks=0.2
+#erasing masks that have a ratio of saturated surface bigger than :
+ratio_saturation=0.1
 
 #number of point of the approximated convex hull (at least 3)
 hull_point=4
@@ -98,7 +110,7 @@ colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[25
 
 # different type of datasset with their quality
 
-dataset=["WT_11-02-15/","WT_mc2_55/30-03-2015/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","WT_mc2_55/05-02-2014/","delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"]                #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/",                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
+dataset="WT_mc2_55/30-03-2015/" #["WT_11-02-15/","WT_mc2_55/30-03-2015/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","WT_mc2_55/05-02-2014/","delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"]                #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/",                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
 
 
 ''' main dictionnary main_dict: each image contain a dictionnary with
@@ -115,7 +127,7 @@ main_centroid : the centroid of all masks
 parent / child : previous / next acceptable  file
 mask_parent/child/grand_parent/grand_child : tracking of the mask (area changes) over 1 and 2 generations
 translation_vector : vector to superimpose parent and child picture
-graph_name+'graph' : graph representing the relation between masks
+graph_name+'_graph' : graph representing the relation between masks
 graph_name+'graph_values': value to take for each mask (continuity of the mask)
 graph_name+'masks' : mask with updated value
 '''
@@ -159,47 +171,7 @@ def data_prep(data,cropup,cropdown,cropleft,cropright,croppeddata,croppedlog,myd
             img = np.array(Image.open(mydata+files[i]))
             cv2.imwrite(croppeddata+files[i][:-3]+'png', img)
             
-            
-        '''    
-        #dealing with the log files
-        elif (files[i].endswith(".001")) or len(re.split(r'\W+',files[i]))==1:# check files ending with .001 or without any . 
-            #open text file in read mode
-            text_file = open(data+files[i], "r", errors='ignore' )
-            #read whole file to a string
-            text = text_file.read()
-            
-            #close file
-            text_file.close()
-            
-            # get rid of the linebreaks
-            text=re.sub(r'\n', ' ', text)
-
-            #selecting the good lines (dimension)
-            match0=re.match("^.*Samps/(.*|\n)Scan Line.*$",text).group(1)
-            #selecting the good lines (angle)
-            match1=re.match("^.*Rotate Ang(.*|\n)Stage X.*$",text).group(1)
-            #selection of the numbers
-            match0=re.findall(r'\d+\.\d+|\d+',match0)#structure : samps / lines; number of line; aspect ratio 1, aspect ratio 2, scan size 1, scan size 2
-            match1=re.findall(r'\d+\.\d+|\d+',match1)
-            if len(match0)==6: #dealing with the different format size here the aspect ratio has 2 integer
-                for j in range(4):
-                    match0[j]=int(match0[j]) 
-                match0[4]=float(match0[4])
-                match0[5]=float(match0[5])
-                res=np.array([match0[5]/match0[2]/match0[1],match0[4]/match0[3]/match0[0],float(match1[0])])#structure vertical len of a pixel, horizontal len of a pixel, r0tation
-            else :              #dealing with the different format size here the aspect ratio is a float
-                for j in range(2): 
-                    match0[j]=int(match0[j])
-                for j in range(3): 
-                    match0[2+j]=float(match0[2+j])  
-                res=np.array([match0[4]/match0[0],match0[3]/match0[0],float(match1[0])])
-            name=re.split(r'\W+',files[i])[0] #getting rid of the .001
-            #saving the dimension of each picture in the log file
-            np.save(croppedlog+name,res)
-        else:
-            files.remove(files[i])
-        '''    
-            
+   
             
     if log_dir is not None: #going through the directory with the same algorithm
         files = os.listdir(log_dir)
@@ -392,7 +364,7 @@ def download_dict(finaldata,log_dir,segmentspath):
         dic[fichier]['time']=t
         t+=1
         dic[fichier]['adress']=finaldata+fichier+'.png'
-        dic[fichier]['masks']=dat['masks']
+        dic[fichier]['masks']=dat['masks'].astype(int)
         dic[fichier]['outlines']=utils.outlines_list(dat['masks'])
         dic[fichier]['masks_error']=(np.max(dic[fichier]['masks'])==0)
         dic[fichier]['angle']=np.load(log_dir+namelog)[-1]
@@ -451,26 +423,42 @@ def numba_centroid_area(masks):
                     vec2+=k
                     count+=1
         area[i]=count
-        centroid[i,:]=np.array([vec1//count,vec2//count])
+        centroid[i,:]=np.array([vec2//count,vec1//count])
     return(centroid,area)
 
-''' Erasing too small masks (less than the fraction frac of the largest mask). Creating the centroid of the union of acceptable  mask and saving as main_centroid'''
-def clean_masks(fraction,dic,saving=False,savingpath='dict'):
+''' Erasing too small masks (less than the fraction frac_mask of the largest mask), and mask with a ratio of saturated area superior to frac_satur . Creating the centroid of the union of acceptable  mask and saving as main_centroid'''
+def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'): 
     #Erase the masks that are too small (and the centroids too)
     for fichier in dic.keys():
-        masks=dic[fichier]['masks']
         if not dic[fichier]['masks_error']:
+            masks=dic[fichier]['masks']
+            img=cv2.imread(dic[fichier]['adress'],0)
             area=dic[fichier]['area']
             centroid=dic[fichier]['centroid']
+            outlines=dic[fichier]['outlines']
+            
+            
             max_area=np.max(area)
             L=len(area)
+            non_saturated=np.zeros(L) #detection of the non saturated masks
+            for i in range(L):
+                if satur_area(img,masks,i+1)<frac_satur*area[i]:
+                    non_saturated[i]=1
+            
+            max_area=max([area[i]*non_saturated[i] for i in range(L)])
             non_defect=np.zeros(L) #classification of the allowed masks
             non_defect_count=0
+            newoutlines=[]
+            
             
             for i in range(L):
-                if area[i]>=fraction*max_area:
+                if area[i]>=frac_mask*max_area and non_saturated[i]==1:
                     non_defect_count+=1
                     non_defect[i]=non_defect_count
+                    newoutlines.append(outlines[i])
+                    
+            #update the outlines
+            dic[fichier]['outlines']=newoutlines
             #new value of the area and the centroid
             area2=np.zeros(non_defect_count)
             centroid2=np.zeros((non_defect_count,2))
@@ -497,90 +485,16 @@ def clean_masks(fraction,dic,saving=False,savingpath='dict'):
         np.save(savingpath,dic)
 
 
-
-''' Ploting the images with the masks overlay, ploting the convex hulls if test_convex is True'''
-def plot_masks(fichier,dic,test_convex=False):
-
-    # plot image with masks overlaid
-    img = cv2.imread(dic[fichier]['adress'],0)
-    #plt.imshow(img)
-    masks=dic[fichier]['masks']
-    mask_RGB = plot.mask_overlay(img,masks)
-    plt.imshow(mask_RGB)
-    # plot the centroids
-    if not dic[fichier]['masks_error']:
-        centr=dic[fichier]['centroid']
-        for i in range(len(centr)):
-            plt.plot(centr[i,0], centr[i,1], color='k',marker='o')
-        if 'main_centroid' in dic[fichier].keys():
-            main_centroid=dic[fichier]['main_centroid']
-            plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
-        plt.show()
-        if test_convex:
-            plt.imshow(img,'Greys_r') 
-            colo=['b','g','r','c','m','y']
-            mask_number=np.max(masks)
-            (l,L)=np.shape(masks)
-            convex_plot=np.zeros((l,L))
-            convex=dic[fichier]['convex_hull']
-            for i in range(l):
-                for j in range(L):
-                    if convex_plot[i,j]==0:
-                        ispresent=[]
-                        for k in range(mask_number):
-                            if convex[k,i,j]!=0:
-                                ispresent.append(convex[k,i,j])
-                        lenis=len(ispresent)
-                        if lenis==1:
-                            convex_plot[i,j]=ispresent[0]
-                        elif lenis>1:
-                            convex_plot[i,j]=ispresent[np.random.randint(lenis)]
-            for i in range(l):
-                for j in range(L):
-                     if convex_plot[i,j]!=0:
-                         plt.plot(j, i, color=colo[int(convex_plot[i,j]%6)],marker=',')
-            plt.show()
-            
-
-
-''' Creating an approximation of the convex hull of each mask, which is a polygon of pointnumber vertices'''
-def convex_hull(dic,pointnumber,saving=False,savingpath='dict'):
-    #create an approximated convex hull of each mask (inside a polygone with pointnumber vertices): each hull is in a numpy array and has the same sumber as the mask
-    for fichier in dic.keys():
-        if not dic[fichier]['masks_error']:
-            masks=dic[fichier]['masks']
-            outlines=dic[fichier]['outlines']
-            mask_number=np.max(masks)
-            (l1,l2)=np.shape(masks)
-            convex=np.zeros((mask_number,l1,l2))
-            for i in range(mask_number):
-                stepsize=int(len(outlines[i])//pointnumber)
-                convex[i]=convex_numba(i+1,masks,outlines[i][:-1:stepsize])
-            dic[fichier]['convex_hull']=convex
-    if saving:
-        np.save(savingpath,dic)
-
-# Function to effectively compute the approximation, 
-@jit 
-def convex_numba(n0,masks,outline):
-    (l1,l2)=np.shape(masks)
-    convex=np.zeros((l1,l2))
-    lout=len(outline)
-    for j in range(lout-2):
-        for k in range(j+1,lout-1):
-            for l in range(k+1,lout):
-                for m in range(l1):
-                    for p in range(l2):
-                        if masks[m,p]==n0:
-                            convex[m,p]=n0
-                        else:
-                            curl1=(p-outline[j,0])*(outline[j,1]-outline[k,1])-(m-outline[j,1])*(outline[j,0]-outline[k,0])
-                            curl2=(p-outline[k,0])*(outline[k,1]-outline[l,1])-(m-outline[k,1])*(outline[k,0]-outline[l,0])
-                            curl3=(p-outline[l,0])*(outline[l,1]-outline[j,1])-(m-outline[l,1])*(outline[l,0]-outline[j,0])
-                            if (curl1>=0 and curl2>=0 and curl3>=0 and (curl1>0 or curl2>0 or curl3>0)) or (curl1<=0 and curl2<=0 and curl3<=0 and (curl1<0 or curl2<0 or curl3<0)):
-                                convex[m,p]=n0
-    return convex
-
+@jit
+def satur_area(img,masks,number):
+    (m,n)=np.shape(masks)
+    area=0
+    for i in range(m):
+        for j in range(n):
+            if masks[i,j]==number and img[i,j]==255:
+                area+=1
+    return area
+ 
 
 
 ''' Computing the centerline of each mask and saving them in the dictionnary'''
@@ -621,46 +535,56 @@ def construc_center(mask,alpha):
     
     if len_int==0:
         if len_extr==1:
-            return np.array(extr_seg[0])
+            return np.array(extr_seg[0]).astype(int)
         elif len_extr==2:
-            sol=extr_seg[0]+extr_seg[1][-1::-1]
-            return np.array(sol)
+            compo1=extr_seg[0]
+            compo2=extr_seg[1][-1::-1]
+            if compo1[-1]==compo2[0]:
+                del compo1[-1]
+            sol=compo1+list(linear_interpolation(compo1[-1],compo2[0]))+compo2
+            return np.array(sol).astype(int)
         else:
-            print("Error skel format")
-            return np.array([[]])
+            print("Error skel format,len_int==0,len_extr>2")
+            return np.array([[]]).astype(int)
         
         
     elif len_int==1 and len_extr==2:
-        sol=extr_seg[0]
-        if max(abs(sol[-1][0]-int_seg[0][0][0]),abs(sol[-1][1]-int_seg[0][0][1]))<=3:
-            sol+=int_seg[0]
+        compo1=extr_seg[0]
+        compo3=extr_seg[0][::-1]
+        if max(abs(compo1[-1][0]-int_seg[0][0][0]),abs(compo1[-1][1]-int_seg[0][0][1]))<=3:
+            compo2=int_seg[0]
         else:
-            sol+=int_seg[0][::-1]
-            
-        sol+=extr_seg[1][::-1]
-        return np.array(sol)
-    else:
-        print("Error skel format")
-        return np.array([[]])
+            compo2=int_seg[0][::-1]
+        if compo1[-1]==compo2[0]:
+            del compo1[-1]
+        if compo2[-1]==compo3[0]:
+            del compo2[-1]
+        sol=compo1+list(linear_interpolation(compo1[-1],compo2[0]))+compo2+list(linear_interpolation(compo2[-1],compo3[0]))+compo3
+        return np.array(sol).astype(int)
+    
         
-    '''#we can do the case with 2 internal segment but it is quite annoying
+    #we can do the case with 2 internal segments
     elif len_int==2 and len_extr==3:
         int0=int_seg[0]
-        int1=int_seg[0]
+        int1=int_seg[1]
         
         #selecting the intersection point between the two internal branches
-        if int0[0]==int1[0]:
+        if max(abs(int0[0][0]-int1[0][0]),abs(int0[0][1]-int1[0][1]))<=3:
             point=int0[0]
-            int_seg=[int0[-2::-1]+int1]
-        elif int0[0]==int1[-1]:
+            new_int_seg1=int0[-2::-1]
+            new_int_seg2=int1
+        elif max(abs(int0[0][0]-int1[-1][0]),abs(int0[0][1]-int1[-1][1]))<=3:
             point=int0[0]
-            int_seg=[int1[:-1]+int0]
-        elif int0[-1]==int1[-1]:
+            new_int_seg1=int1[:-1]
+            new_int_seg2=int0
+        elif max(abs(int0[-1][0]-int1[-1][0]),abs(int0[-1][1]-int1[-1][1]))<=3:
             point=int0[-1]
-            int_seg=[int0+int1[-2::-1]]
+            new_int_seg1=int0
+            new_int_seg2=int1[-2::-1]
         else :
             point=int0[-1]
-            int_seg=[int0+int1[1:]]
+            new_int_seg1=int0
+            new_int_seg2=int1[1:]
         #simplifying by erasing the external branch linked to both internal branch
         for elem in extr_seg:
             if elem[-1]==point:
@@ -673,8 +597,28 @@ def construc_center(mask,alpha):
             sol+=int_seg[0][-2::-1]
         sol+=extr_seg[1][-2::-1]
         return np.array(sol)
-    '''
-
+    else:
+        print("Error skel format, too complex")
+        return np.array([[]]).astype(int)
+    
+              #construct an integer line between 2 points in 2 D
+def linear_interpolation(point1,point2): 
+    print('used')
+    len_list= max(np.abs(point1[0]-point2[0]),np.abs(point1[1]-point2[1]))-1
+    if len_list<=0:
+        return np.zeros(0)
+    else :
+        if np.abs(point1[0]-point2[0])+1==len_list:
+            val1=np.linspace(point1[0]+1,point2[0]-1,len_list,dtype=int)
+            val2=np.linspace(point1[1],point2[1],len_list,dtype=int)
+        else:
+            val1=np.linspace(point1[0],point2[0],len_list,dtype=int)
+            val2=np.linspace(point1[1]+1,point2[1]-1,len_list,dtype=int)
+        
+        final=np.zeros((len_list,2),dtype=int)
+        final[:,0]=val1
+        final[:,1]=val2
+        return final
 
 # skeletonization algorithm
 def padskel(mask):
@@ -919,15 +863,16 @@ def mask_displacement(dic,rad):
         shape_f=(min(shape_1[0],shape_2[0]),min(shape_1[1],shape_2[1]))
         mask_p=main_mask(dic[fichier]['masks'][:shape_f[0],:shape_f[1]])
         mask_c=main_mask(dic[child]['masks'][:shape_f[0],:shape_f[1]])
-        vecguess=dic[fichier]['main_centroid']-dic[child]['main_centroid']
-        angle=dic[fichier]['angle']-dic[child]['angle']
+        
+        angle=dic[child]['angle']-dic[fichier]['angle']
         if angle==0:
+            vecguess=dic[fichier]['main_centroid']-dic[child]['main_centroid']
             dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
         else:
             dim1,dim2=np.shape(mask_p)
             centerpoint=np.array([dim1//2,dim2//2],dtype=int)
-            vecguess=rotation_vector(angle,vecguess,centerpoint).astype(int)
-            mask_p=rotation_img(angle,mask_p,centerpoint)
+            vecguess=(rotation_vector(angle,dic[fichier]['main_centroid'],centerpoint)-dic[child]['main_centroid']).astype(int)
+            mask_p=rotation_img(angle,mask_p,centerpoint).astype(int)
             dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
         fichier=child
 
@@ -1024,45 +969,6 @@ def rotation_img(angle,img,point):
     return new_img
 
 
-''' First algorithm for creating a graph : idea is comparing the centroids of the masks of two images '''
-#not sure that we need this, naiv graph is better
-def graph_centroid(dic,saving=False,savingpath='dict'):
-    centroid_parent=[]
-    fichier=list(dic.keys())[0]
-    dic[list(dic.keys())[-1]]['centroid_child']=[]
-    while dic[fichier]['child']!='':
-        dic[fichier]['centroid_parent']= centroid_parent 
-        child=dic[fichier]['child']
-        transfert=dic[child]['main_centroid']-dic[fichier]['main_centroid']
-        centro_c=np.copy(dic[child]['centroid'])
-        centro_p=np.copy(dic[fichier]['centroid'])
-        len_p=len(centro_p)
-        for i in range(len_p):
-            centro_p[i,:]+=transfert
-        centroid_parent ,centroid_child =close_pt_matrix(centro_c,centro_p)
-        dic[fichier]['centroid_child']=centroid_child
-        fichier=dic[fichier]['child']
-    dic[child]['centroid_parent']= centroid_parent 
-    if saving:
-        np.save(savingpath,dic)
-
-# Computing the closest point between two distributions
-@jit 
-def close_pt_matrix(points,cloud):
-    number_points=len(points)
-    number_cloud=len(cloud)
-    c_matrix=np.zeros((number_points,number_cloud))
-    for i in range(number_points):
-        for j in range(number_cloud):
-            c_matrix[i,j]=np.linalg.norm(points[i]-cloud[j])
-    result_p=np.zeros(number_points)
-    result_c=np.zeros(number_cloud)
-    for i in range(number_points):
-        result_p[i]=(np.argmin(c_matrix[i,:]))
-    for i in range(number_cloud):
-        result_c[i]=(np.argmin(c_matrix[:,i]))
-    return result_p,result_c
-
 
 
 ''' Computing the parent and child (and grand parent grand child) relations, we suppose that the first and the last images are both usable with defined masks
@@ -1086,7 +992,7 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
             
             mask_c=mask_transfert(mask_c,transfert)
             
-            angle=dic[fichier]['angle']-dic[child]['angle']  
+            angle=dic[child]['angle']-dic[fichier]['angle']
             
             if angle!=0:            #check on real data
                 dim1,dim2=np.shape(mask_p)
@@ -1094,8 +1000,8 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
                 mask_p=rotation_img(angle,mask_p,centerpoint)
             
             mask_parent , mask_child =comparision_mask(mask_c,mask_p,area_c,area_p,threshold)
-            dic[fichier]['mask_child']=mask_child
-            dic[child]['mask_parent']=mask_parent
+            dic[fichier]['mask_child']=mask_child.astype(int)
+            dic[child]['mask_parent']=mask_parent.astype(int)
             fichier=child
             
     #computing the grand parent and grand child relation
@@ -1127,8 +1033,8 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
             
                 
             mask_grand_parent , mask_grand_child =comparision_mask(mask_c,mask_p,area_c,area_p,threshold)
-            dic[fichier]['mask_grand_child']=mask_grand_child
-            dic[grand_child]['mask_grand_parent']=mask_grand_parent
+            dic[fichier]['mask_grand_child']=mask_grand_child.astype(int)
+            dic[grand_child]['mask_grand_parent']=mask_grand_parent.astype(int)
             fichier=dic[fichier]['child']
     if saving:
         np.save(savingpath,dic)
@@ -1157,70 +1063,7 @@ def comparision_mask(mask_c,mask_p,area_c,area_p,threshold):
             
 
 
-''' Creating a graph based on the relations relation_mask between parent and child. Add entry naiv_graph_values and  naiv_masks in the dictionnary'''
-def naiv_graph(dic,saving=False,savingpath='dict'):
-    #Initialisation
-    fichier=list(dic.keys())[0]
-    values=np.arange(1,np.max(dic[fichier]['masks'])+1,1)
-    dic[fichier]['naiv_graph_values']=values
-    dic[fichier]['naiv_masks']=np.copy(dic[fichier]['masks'])
-    
-    
-    while dic[fichier]['child']!='':
-        
-        child=dic[fichier]['child']
-        p_nb=np.max(dic[fichier]['masks']) #number of masks of the parent
-        c_nb=np.max(dic[child]['masks']) #number of masks of the child
-        dic[fichier]['naiv_graph']=[]
-        mat_ij=np.zeros((p_nb,c_nb)) # a matrix representing the links in the graph
-        
-        #constructing the link between the different states for the graph
-        for i in range(p_nb):
-            for j in range(c_nb):
-                if dic[fichier]['mask_child'][i]==j+1 or dic[child]['mask_parent'][j]==i+1:
-                    dic[fichier]['naiv_graph'].append([i+1,j+1])
-                    mat_ij[i,j]=1
-                    
-        #continuity of the values if a cell has one and only one child
-        new_values=update_values(values,p_nb,c_nb,mat_ij)
-        #constructing new masks for continuity
-        new_mask=update_masks(np.copy(dic[child]['masks']),new_values)
-        dic[child]['naiv_masks']=new_mask
-        
-        #updating all values
-        dic[child]['naiv_graph_values']=new_values
-        values=new_values
-        fichier=child
-        
-    if saving:
-        np.save(savingpath,dic)
 
-# returns a vector that represent the link between a mask and a value (integer), concerving a value if there is no division or fusion. The information comes from the matrix mat_ij
-@jit
-def update_values(values,p_nb,c_nb,mat_ij):
-    new_values=np.zeros(c_nb)
-    for i in range(p_nb):
-        for j in range(c_nb):
-            if mat_ij[i,j]==sum(mat_ij[:,j])==sum(mat_ij[i,:])==1:
-                new_values[j]=values[i]
-    #completing vector with other values
-    for i in range(c_nb):
-        if new_values[i]==0:
-            j=1
-            while j in new_values:
-                j+=1
-            new_values[i]=j
-    return new_values
-
-# creating a new mask with changed values
-@jit
-def update_masks(mask,new_values):
-    (l,L)=np.shape(mask)
-    for j in range(l):
-        for k in range(L):
-            if mask[j,k]!=0:
-                mask[j,k]=new_values[mask[j,k]-1]
-    return mask
 
     
 
@@ -1265,11 +1108,38 @@ def basic_graph(dic,saving=False,savingpath='dict'):
         dic[child]['basic_graph_values']=new_values
         values=new_values
         fichier=child
-        
+    
+    dic[fichier]['basic_graph']=[]
+    
     if saving:
         np.save(savingpath,dic)
 
+# returns a vector that represent the link between a mask and a value (integer), concerving a value if there is no division or fusion. The information comes from the matrix mat_ij
+@jit
+def update_values(values,p_nb,c_nb,mat_ij):
+    new_values=np.zeros(c_nb)
+    for i in range(p_nb):
+        for j in range(c_nb):
+            if mat_ij[i,j]==sum(mat_ij[:,j])==sum(mat_ij[i,:])==1:
+                new_values[j]=values[i]
+    #completing vector with other values
+    for i in range(c_nb):
+        if new_values[i]==0:
+            j=1
+            while j in new_values:
+                j+=1
+            new_values[i]=j
+    return new_values
 
+# creating a new mask with changed values
+@jit
+def update_masks(mask,new_values):
+    (l,L)=np.shape(mask)
+    for j in range(l):
+        for k in range(L):
+            if mask[j,k]!=0:
+                mask[j,k]=new_values[mask[j,k]-1]
+    return mask
 
 ''' Ploting the images, with the masks overlaid, the label of each mask (integer) and the relation with the following masks'''
 def plot_graph_masks(dic,graph_name,maskcol):
@@ -1292,22 +1162,22 @@ def plot_graph_masks(dic,graph_name,maskcol):
         line=dic[fichier]['centerlines']
         for i in range(len(centr)):
             #centroids
-            plt.plot(centr[i,0], centr[i,1], color='k',marker='o')
-            plt.annotate(str(int(dic[fichier][graph_name+'_graph_values'][i])), centr[i,:], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
+            plt.plot(centr[i,1], centr[i,0], color='k',marker='o')
+            plt.annotate(str(int(dic[fichier][graph_name+'_graph_values'][i])), centr[i,::-1], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
             #centerlines
             if len(line[i])>1:
                 plt.plot(line[i][:,1],line[i][:,0], color='k')
             
         main_centroid=dic[fichier]['main_centroid']
-        plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
+        plt.plot(main_centroid[1], main_centroid[0], color='w',marker='o')
             
         #plot the displacement of the centroid between two images
         next_centr=dic[dic[fichier]['child']]['centroid']
         for link in dic[fichier][graph_name+'_graph']:
-            if next_centr[link[1]-1][0]!=centr[link[0]-1][0] or next_centr[link[1]-1][1]!=centr[link[0]-1][1]:
-                plt.annotate("", xy=(next_centr[link[1]-1][0], next_centr[link[1]-1][1]), xycoords='data', xytext=(centr[link[0]-1][0], centr[link[0]-1][1]), textcoords='data', arrowprops=dict(arrowstyle="->", connectionstyle="arc3",color='w'))
+            if next_centr[link[1]-1][1]!=centr[link[0]-1][1] or next_centr[link[1]-1][0]!=centr[link[0]-1][0]:
+                plt.annotate("", xy=(next_centr[link[1]-1][1], next_centr[link[1]-1][0]), xycoords='data', xytext=(centr[link[0]-1][1], centr[link[0]-1][0]), textcoords='data', arrowprops=dict(arrowstyle="->", connectionstyle="arc3",color='w'))
             else :
-                plt.plot(next_centr[link[1]-1][0], next_centr[link[1]-1][1],color='w',marker='o', markersize=0.5)
+                plt.plot(next_centr[link[1]-1][1], next_centr[link[1]-1][0],color='w',marker='o', markersize=0.5)
         
         plt.show()
         fichier=dic[fichier]['child']
@@ -1329,13 +1199,14 @@ def plot_graph_masks(dic,graph_name,maskcol):
     line=dic[fichier]['centerlines']
     for i in range(len(centr)):
         #centroids
-        plt.plot(centr[i,0], centr[i,1], color='k',marker='o')
-        plt.annotate(str(int(dic[fichier][graph_name+'_graph_values'][i])), centr[i,:], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
+        plt.plot(centr[i,1], centr[i,0], color='k',marker='o')
+        plt.annotate(str(int(dic[fichier][graph_name+'_graph_values'][i])), centr[i,::-1], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
         #centerlines
         if len(line[i])>1:
             plt.plot(line[i][:,1],line[i][:,0], color='k')
     main_centroid=dic[fichier]['main_centroid']
-    plt.plot(main_centroid[0], main_centroid[1], color='w',marker='o')
+    plt.plot(main_centroid[1], main_centroid[0], color='w',marker='o')
+    plt.show()
 
 
 
@@ -1456,7 +1327,7 @@ def plot_graph(dic,graph_name,maskcol,binary=True):
 if __name__ == "__main__":
     
     '''Running the different functions'''
-    '''
+    ''''''
     print(Main_directory)
 
     data_prep(my_data,crop_up,crop_down,crop_left,crop_right,cropped_data,cropped_log,my_data,log_dir=data_log)
@@ -1470,58 +1341,83 @@ if __name__ == "__main__":
     run_cel(final_data,cel_gpu,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,dimension_data,batch_size=batch_size)
 
     print("step ",2)
-
+    
     main_dict=download_dict(final_data,cropped_log,segments_path)
 
     print("step ",3)
 
     main_parenting(main_dict)
-
+    
     print("step ",4)
 
     centroid_area(main_dict)
 
     print("step ",5)
 
-    clean_masks(ratio_erasing_masks, main_dict)
+    clean_masks(ratio_erasing_masks,ratio_saturation, main_dict)
 
     print("step ",6)
 
     centerline_mask(main_dict,centerline_crop_param,saving=True,savingpath=saving_path)
-
+    
     print("step ",7)
-
+    
     mask_displacement(main_dict,search_diameter)
 
     print("step ",8)
 
-    #convex_hull(main_dict,hull_point)
-
-    graph_centroid(main_dict)
+    relation_mask(main_dict,surface_thresh)
 
     print("step ",9)
 
-    relation_mask(main_dict,surface_thresh)
-
-    print("step ",10)
-
-    naiv_graph(main_dict)
-
-    print("step ",11)
-
     basic_graph(main_dict,saving=True,savingpath=saving_path)
 
-    print("step ",12)
-    '''
-
+    print("step ",10)
+    
+    
     #downloading main dictionnary and only ploting the results
 
     main_dict=np.load(saving_path+'.npy', allow_pickle=True).item()
-
     plot_graph(main_dict,'basic',colormask)
-
     plot_graph_masks(main_dict,'basic',colormask)
-
     
-
-
+    
+    angle=main_dict['03301923']['angle']-main_dict['03301911']['angle']
+    print(angle)
+    transfert=main_dict['03301911']['translation_vector']
+    print(transfert)
+    
+    img1 = cv2.imread(main_dict['03301911']['adress'],0)
+    img2 = cv2.imread(main_dict['03301923']['adress'],0)
+    img2=mask_transfert(img2,transfert)
+    dim1,dim2=np.shape(img1)
+    centerpoint=np.array([dim1//2,dim2//2],dtype=int)
+    
+    print(main_dict['03301911']['main_centroid'])
+    print(main_dict['03301923']['main_centroid'])
+    print(centerpoint)
+    variation=main_dict['03301911']['main_centroid']-centerpoint
+    print(variation)
+    fin_img=rotation_img(angle,img1,centerpoint)
+    plt.imshow(img1)
+    plt.plot(main_dict['03301911']['main_centroid'][1],main_dict['03301911']['main_centroid'][0], color='k',marker='o')
+    plt.plot(centerpoint[1],centerpoint[0], color='w',marker='o')
+    plt.show()
+    new_cent=rotation_vector(angle,main_dict['03301911']['main_centroid'],centerpoint)
+    print(new_cent)
+    plt.plot(new_cent[1],new_cent[0], color='k',marker='o')
+    plt.plot(centerpoint[1],centerpoint[0], color='w',marker='o')
+    plt.imshow(fin_img)
+    plt.show()
+    plt.imshow(img2)
+    plt.show()
+   
+    
+    '''
+    for data in data_set:
+        path=data+result_path+dic_name
+        dic=np.load(path, allow_pickle=True).item()
+        centerline_mask(dic,centerline_crop_param,saving=True,savingpath=path)
+        print(data)
+    
+    '''

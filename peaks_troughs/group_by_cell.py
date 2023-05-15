@@ -8,9 +8,13 @@ import tqdm
 from preprocess import preprocess_centerline
 
 
-def get_centerlines_by_cell(dataset):
+def get_centerlines_by_cell(dataset, progress_bar=True):
     path = os.path.join("data", "cells", dataset)
-    for cell_dirname in tqdm.tqdm(sorted(os.listdir(path))):
+    if progress_bar:
+        directories = tqdm.tqdm(sorted(os.listdir(path)))
+    else:
+        directories = sorted(os.listdir(path))
+    for cell_dirname in directories:
         centerlines = os.listdir(os.path.join(path, cell_dirname))
         cell = []
         for filename in centerlines:

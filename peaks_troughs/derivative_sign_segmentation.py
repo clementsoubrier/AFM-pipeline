@@ -3,20 +3,11 @@ import math
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from align import align_centerlines
-from group_by_cell import get_centerlines_by_cell
-from plots import plot_single_centerline, plot_cell_centerlines, \
-    plot_3d_centerlines
 from preprocess import preprocess_centerline
 
 
 PEAK = 0
 TROUGH = 1
-
-PLOT_NONE = 0
-PLOT_CENTERLINE = 1
-PLOT_CELL = 2
-PLOT_3D = 3
 
 
 def find_extrema(der):
@@ -144,68 +135,3 @@ def find_peaks_troughs(xs, ys, kernel_len, std_cut, window, min_depth,
             raise ValueError(f"Unknown feature {feature}, feature should be a"
                              f"peak {PEAK} or a trough {TROUGH}.")
     return xs, ys, peaks, troughs
-
-
-def areas_to_points(cell_areas, cell_centerlines, feature):
-    cell_points = []
-    if feature == PEAK:
-        extremum = max
-    elif feature == TROUGH:
-        extremum = min
-    else:
-        raise ValueError(f"Unknown feature {feature}, feature should "
-                            f"be a peak {PEAK} or a trough {TROUGH}.")
-    for areas, centerline in zip(cell_areas, cell_centerlines):
-        x_0 = centerline[0, 0]
-        ys = centerline[:, 1]
-        points = []
-        for l, r in areas:
-            i = math.ceil(l - x_0)
-            j = math.floor(r - x_0)
-            k = extremum(range(i, j + 1), key=ys.__getitem__)
-            x = k + x_0
-            y = ys[k]
-            points.append((x, y))
-        cell_points.append(np.array(points, dtype=np.float64))
-    return cell_points
-
-
-def main():
-    kernel_len = 3
-    std_cut = 2.5
-    window = 3
-    min_depth = 1.5
-    v_offset = 10
-
-    dataset = "05-02-2014"
-    plot_mode = PLOT_CENTERLINE
-
-    for cell, cell_id in get_centerlines_by_cell(dataset):
-        cell_centerlines = [preprocess_centerline(xs, ys, kernel_len, std_cut,
-                                                  window) for xs, ys in cell]
-        cell_centerlines = align_centerlines(*cell_centerlines)
-        cell_peaks = []
-        cell_troughs = []
-        for centerline in cell_centerlines:
-            xs = centerline[:, 0]
-            ys = centerline[:, 1]
-            xs, ys, peaks, troughs = find_peaks_troughs(xs, ys, kernel_len,
-                                                        std_cut, window,
-                                                        min_depth, False)
-            if plot_mode == PLOT_CENTERLINE:
-                plot_single_centerline(xs, ys, peaks, troughs)
-            cell_peaks.append(peaks)
-            cell_troughs.append(troughs)
-
-        cell_peaks = areas_to_points(cell_peaks, cell_centerlines, PEAK)
-        cell_troughs = areas_to_points(cell_troughs, cell_centerlines, TROUGH)
-        if plot_mode == PLOT_CELL:
-            plot_cell_centerlines(cell_centerlines, cell_peaks, cell_troughs,
-                                  v_offset, cell_id)
-        if plot_mode == PLOT_3D and len(cell_centerlines) > 1:
-            plot_3d_centerlines(cell_centerlines, cell_peaks, cell_troughs,
-                                cell_id)
-        
-
-if __name__ == "__main__":
-    main()

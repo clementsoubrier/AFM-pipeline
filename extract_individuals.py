@@ -7,17 +7,17 @@ Created on Thu May 11 13:07:51 2023
 
 import numpy as np
 
-#%% Load data
+#%% Load data for testing
 
-# Directory paths
-dictionary_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/Dic_dir/"
-img_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/final_data"
+# # Directory paths
+# dictionary_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/Dic_dir/"
+# img_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/final_data"
 
-# Load image dictionary, list of all masks, and adjacency matrix for binary trees
-main_dict = np.load(dictionary_dir + "Main_dictionnary.npy",allow_pickle=True).item()
-masks_list = np.load(dictionary_dir + "masks_list.npy",allow_pickle=True)
-link_mat = np.load(dictionary_dir + "Link_matrix.npy")
-adj_mat = np.load(dictionary_dir + "Bool_matrix.npy") #asymmetric adjacency matrix to represent binary tree
+# # Load image dictionary, list of all masks, and adjacency matrix for binary trees
+# main_dict = np.load(dictionary_dir + "Main_dictionnary.npy",allow_pickle=True).item()
+# masks_list = np.load(dictionary_dir + "masks_list.npy",allow_pickle=True)
+# link_mat = np.load(dictionary_dir + "Link_matrix.npy")
+# adj_mat = np.load(dictionary_dir + "Bool_matrix.npy") #asymmetric adjacency matrix to represent binary tree
 
 #%% Adjacency matrix to dictionary functions
 
@@ -117,7 +117,7 @@ def list2dict(individuals):
 
 def create_children(ROI_dic):
     """
-    Add "Children" key to complement "Parent" key for each ROI. Append empty
+    Add "Children" subkey to complement "Parent" subkey for each ROI. Append empty
     string if none.
     """
     for ROI in ROI_dic.keys():

@@ -17,17 +17,17 @@ def find_extrema(der):
     return intern_extrema
 
 
-def sort_and_add_edges(ys, extrema, values, classif):
+def sort_and_add_edges(ys, extrema, values, classif, min_width):
     argsort = sorted(range(len(extrema)), key=extrema.__getitem__)
     extrema = [extrema[i] for i in argsort]
     values = [values[i] for i in argsort]
     classif = [classif[i] for i in argsort]
-    if extrema and extrema[0] >= 2:
+    if extrema and extrema[0] >= min_width / 2:
         extrema.insert(0, 0)
         values.insert(0, ys[0])
     elif extrema:
         classif.pop(0)
-    if extrema and len(ys) - 1 - extrema[-1] >= 2:
+    if extrema and len(ys) - 1 - extrema[-1] >= min_width / 2:
         extrema.append(len(ys) - 1)
         values.append(ys[-1])
     elif extrema:
@@ -35,7 +35,7 @@ def sort_and_add_edges(ys, extrema, values, classif):
     return extrema, values, classif
 
 
-def resample_extrema(intern_extrema, ys):
+def resample_extrema(intern_extrema, ys, min_width):
     extrema = []
     values = []
     classif = []
@@ -51,7 +51,7 @@ def resample_extrema(intern_extrema, ys):
             classif.append(PEAK)
         else:
             classif.append(TROUGH)
-    return sort_and_add_edges(ys, extrema, values, classif)
+    return sort_and_add_edges(ys, extrema, values, classif, min_width)
 
 
 def build_areas(ys, extrema, values):
@@ -100,29 +100,31 @@ def remove_area(areas, classif, i):
     return areas, classif
 
 
-def filter_areas(ys, areas, min_depth, classif):
+def filter_areas(ys, areas, min_width, min_depth, classif):
     while areas:
         widths = [r - l for l, r in areas]
         i_min = min(range(len(widths)), key=widths.__getitem__)
         width = widths[i_min]
-        if width <= 4 or (width <= 12 and
-                          max_depth(ys, *areas[i_min]) < min_depth):
+        if width <= min_width or (width <= 3 * min_width and
+                                  max_depth(ys, *areas[i_min]) < min_depth):
             areas, classif = remove_area(areas, classif, i_min)
         else:
             break
     return areas, classif
 
 
-def find_peaks_troughs(xs, ys, kernel_len, std_cut, window, min_depth,
-                       smoothing=True):
+def find_peaks_troughs(xs, ys, kernel_len, std_cut, window, smooth_std,
+                       min_width, min_depth, smoothing=True):
     if smoothing:
         xs, ys = preprocess_centerline(xs, ys, kernel_len, std_cut, window)
-    ys_smooth = gaussian_filter1d(ys, 1.5, mode="nearest")
+    ys_smooth = gaussian_filter1d(ys, smooth_std, mode="nearest")
     der = ys_smooth[1:] - ys_smooth[:-1]
     intern_extrema = find_extrema(der)
-    extrema, values, classif = resample_extrema(intern_extrema, ys_smooth)
+    extrema, values, classif = resample_extrema(intern_extrema, ys_smooth,
+                                                min_width)
     areas = build_areas(ys_smooth, extrema, values)
-    areas, classif = filter_areas(ys_smooth, areas, min_depth, classif)
+    areas, classif = filter_areas(ys_smooth, areas, min_width, min_depth,
+                                  classif)
     peaks = []
     troughs = []
     for area, feature in zip(areas, classif):

@@ -4,22 +4,23 @@ import matplotlib.pyplot as plt
 
 from derivative_sign_segmentation import find_peaks_troughs
 from group_by_cell import get_centerlines_by_cell
+from preprocess import get_scaled_parameters
 
 
-def compute_stats(dataset, kernel_len, std_cut, window, min_depth):
+def compute_stats(dataset):
     peak_counter = Counter()
     trough_counter = Counter()
     peak_lengths = []
     trough_lengths = []
-    for cell, _ in get_centerlines_by_cell(dataset):
-        for xs, ys in cell:
-            _, _, peaks, troughs = find_peaks_troughs(xs, ys, kernel_len,
-                                                      std_cut, window,
-                                                      min_depth)
+    for cell, scales, _ in get_centerlines_by_cell(dataset):
+        for (xs, ys), (pixel_size, verti_scale) in zip(cell, scales):
+            params = get_scaled_parameters(pixel_size, verti_scale,
+                                           peaks_troughs=True)
+            _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
             peak_counter[len(peaks)] += 1
             trough_counter[len(troughs)] += 1
-            peak_lengths.extend(r - l for l, r in peaks)
-            trough_lengths.extend(r - l for l, r in troughs)
+            peak_lengths.extend((r - l) * pixel_size for l, r in peaks)
+            trough_lengths.extend((r - l) * pixel_size for l, r in troughs)
     return peak_counter, trough_counter, peak_lengths, trough_lengths
 
 
@@ -45,10 +46,10 @@ def plot_peak_trough_counters(dataset, peak_counter, trough_counter):
 
 
 def _plot_lengths_histogram(ax, lengths, feature, dataset):
-    xlabel = f"Length of the {feature}s"
+    xlabel = f"Length of the {feature}s (µm)"
     title = f"Probability density of the {feature} length ({dataset} | " \
             f"{len(lengths)} {feature}s)"
-    ax.hist(lengths, 50, density=True)
+    ax.hist(lengths, 40, density=True)
     ax.set(xlabel=xlabel, title=title)
 
 
@@ -66,14 +67,10 @@ def plot_stats(dataset, peak_counter, trough_counter, peak_lengths,
 
 
 def main():
-    kernel_len = 3
-    std_cut = 2.5
-    window = 3
-    min_depth = 1.5
     dataset = "05-02-2014"
-    
-    stats = compute_stats(dataset, kernel_len, std_cut, window, min_depth)
+    stats = compute_stats(dataset)
     plot_stats(dataset, *stats)
+
 
 if __name__ == "__main__":
     main()

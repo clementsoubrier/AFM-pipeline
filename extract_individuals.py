@@ -128,7 +128,7 @@ def create_children(ROI_dic):
 
 #%% Obtain full ROI dictionary from the adjacency matrix and save to specified directory
 
-extract_individuals(adj_mat,dictionary_dir,filename='ROI_dict')
+# extract_individuals(adj_mat,dictionary_dir,filename='ROI_dict')
 
 
 #%% Load and check ROI dictionary

@@ -1,5 +1,6 @@
 import itertools
 import numbers
+import os
 
 import matplotlib.colors as mplc
 import matplotlib.pyplot as plt
@@ -170,7 +171,7 @@ def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE),
 
 
 def main():
-    dataset = "30-03-2015"
+    dataset = os.path.join("WT_mc2_55", "30-03-2015")
     plot_mode = PLOT_CENTERLINE
 
     if plot_mode == TEST_PLOT_KYMOGRAPH:

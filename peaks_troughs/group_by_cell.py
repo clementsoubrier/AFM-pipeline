@@ -1,3 +1,4 @@
+import glob
 from math import dist
 import os
 from PIL import Image
@@ -11,7 +12,7 @@ from preprocess import get_scaled_parameters, keep_centerline
 def get_centerlines_by_cell(dataset, progress_bar=True, return_scale=True):
     path = os.path.join("data", "cells", dataset)
     if progress_bar:
-        directories = tqdm.tqdm(sorted(os.listdir(path)))
+        directories = tqdm.tqdm(sorted(os.listdir(path)), desc=dataset)
     else:
         directories = sorted(os.listdir(path))
     for cell_dirname in directories:
@@ -33,12 +34,12 @@ def get_centerlines_by_cell(dataset, progress_bar=True, return_scale=True):
 
 
 def load_data(dataset):
-    path = os.path.join("data", "WT_mc2_55", dataset, "Height", "Dic_dir",
+    path = os.path.join("data", "datasets", dataset, "Height", "Dic_dir",
                         "Main_dictionnary.npy")
     main_dict = np.load(path, allow_pickle=True).item()
     images = {}
     for img_name, img_dict in main_dict.items():
-        img_path = os.path.join("data", img_dict["adress"])
+        img_path = os.path.join("data", "datasets", img_dict["adress"])
         with Image.open(img_path) as img:
             images[img_name] = np.array(img)
     return main_dict, images
@@ -111,12 +112,12 @@ def save_cell(cell, cell_dirname, main_dict, images, seen):
     return 0
 
 
-def main():
-    dataset = "30-03-2015"
+def save_dataset(dataset):
     main_dict, images = load_data(dataset)
     cell_cnt = 0
     seen = set()
-    for img, img_dict in tqdm.tqdm(main_dict.items(), total=len(main_dict)):
+    for img, img_dict in tqdm.tqdm(main_dict.items(), total=len(main_dict),
+                                   desc=dataset):
         for mask_id in range(len(img_dict["centerlines"])):
             if (img, mask_id) in seen:
                 continue
@@ -124,6 +125,24 @@ def main():
                                         f"{cell_cnt:04d}")
             cell = img, mask_id
             cell_cnt += save_cell(cell, cell_dirname, main_dict, images, seen)
+
+
+def main():
+    datasets = None
+    dataset = None
+
+    if dataset is None:
+        if datasets is None:
+            datasets_dir = os.path.join("data", "datasets")
+            pattern = os.path.join(datasets_dir, "**", "Height", "")
+            datasets = glob.glob(pattern, recursive=True)
+            datasets = [os.path.dirname(os.path.relpath(path, datasets_dir))
+                        for path in datasets]
+    else:
+        datasets = [dataset]
+        
+    for dataset in datasets:
+        save_dataset(dataset)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,9 @@
 from collections import Counter
+import glob
+import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from derivative_sign_segmentation import find_peaks_troughs
 from group_by_cell import get_centerlines_by_cell
@@ -21,7 +24,9 @@ def compute_stats(dataset):
             trough_counter[len(troughs)] += 1
             peak_lengths.extend((r - l) * pixel_size for l, r in peaks)
             trough_lengths.extend((r - l) * pixel_size for l, r in troughs)
-    return peak_counter, trough_counter, peak_lengths, trough_lengths
+    stats = {"peak_counter": peak_counter, "trough_counter": trough_counter,
+             "peak_lengths": peak_lengths, "trough_lengths": trough_lengths}
+    return stats
 
 
 def _plot_counts_histogram(ax, counter, feature, dataset):
@@ -46,10 +51,17 @@ def plot_peak_trough_counters(dataset, peak_counter, trough_counter):
 
 
 def _plot_lengths_histogram(ax, lengths, feature, dataset):
+    mean = np.mean(lengths)
+    q1, med, q3 = np.percentile(lengths, [25, 50, 75])
     xlabel = f"Length of the {feature}s (µm)"
     title = f"Probability density of the {feature} length ({dataset} | " \
             f"{len(lengths)} {feature}s)"
-    ax.hist(lengths, 40, density=True)
+    ax.hist(lengths, 40, density=True, color="grey")
+    ax.axvline(mean, color="red", label="mean")
+    ax.axvline(med, color="blue", label="median")
+    ax.axvline(q1, color="green", label="quantiles")
+    ax.axvline(q3, color="green")
+    ax.legend()
     ax.set(xlabel=xlabel, title=title)
 
 
@@ -59,7 +71,7 @@ def plot_peak_trough_lengths(dataset, peak_lengths, trough_lengths):
     _plot_lengths_histogram(ax2, trough_lengths, "trough", dataset)
 
 
-def plot_stats(dataset, peak_counter, trough_counter, peak_lengths,
+def plot_stats(dataset, /, peak_counter, trough_counter, peak_lengths,
                trough_lengths):
     plot_peak_trough_counters(dataset, peak_counter, trough_counter)
     plot_peak_trough_lengths(dataset, peak_lengths, trough_lengths)
@@ -67,9 +79,22 @@ def plot_stats(dataset, peak_counter, trough_counter, peak_lengths,
 
 
 def main():
-    dataset = "05-02-2014"
-    stats = compute_stats(dataset)
-    plot_stats(dataset, *stats)
+    datasets = None
+    dataset = None
+
+    if dataset is None:
+        if datasets is None:
+            cells_dir = os.path.join("data", "cells")
+            pattern = os.path.join(cells_dir, "**", "0000", "")
+            datasets = glob.glob(pattern, recursive=True)
+            datasets = [os.path.dirname(os.path.relpath(path, cells_dir))
+                        for path in datasets]
+    else:
+        datasets = [dataset]
+    
+    for dataset in datasets:
+        stats = compute_stats(dataset)
+        plot_stats(dataset, **stats)
 
 
 if __name__ == "__main__":

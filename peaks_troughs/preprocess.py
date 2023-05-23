@@ -93,9 +93,13 @@ def derivative_cut(xs, ys, std_cut, window):
     start = is_steep[:window].argmax()
     while is_steep[start]:
         start += 1
+        if start == len(ys):
+            return xs, ys
     end = len(xs) - 2 - is_steep[: -window - 1: -1].argmax()
     while is_steep[end]:
         end -= 1
+        if end == -1:
+            return xs, ys
     return xs[start: end + 2], ys[start: end + 2]
 
 
@@ -113,6 +117,8 @@ def keep_centerline(xs, ys, min_len, kernel_len, std_cut, window, min_prep_len,
         return False
     corrupted = np.logical_or(ys <= 2, ys >= 253)
     if 40 * np.count_nonzero(corrupted) >= len(ys):
+        return False
+    if np.ptp(ys) <= 2.55e-10:
         return False
     xs_p, _ = preprocess_centerline(xs, ys, kernel_len, std_cut, window)
     if xs_p[-1] - xs_p[0] < min_prep_len:

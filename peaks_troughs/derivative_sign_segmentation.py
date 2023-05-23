@@ -62,9 +62,12 @@ def build_areas(ys, extrema, values):
         else:
             mid = (y_1 + y_2) / 2
             i = math.ceil(x_1)
-            while (ys[i + 1] - mid) * (y_1 - y_2) > 0:
-                i += 1
-            x = i + (ys[i] - mid) / (y_1 - y_2)
+            try:
+                while (ys[i + 1] - mid) * (y_1 - y_2) > 0:
+                    i += 1
+                x = i + (ys[i] - mid) / (y_1 - y_2)
+            except IndexError:
+                x = (x_1 + x_2) / 2
         limits.append(x)
     areas = list(zip(limits, limits[1:]))
     return areas

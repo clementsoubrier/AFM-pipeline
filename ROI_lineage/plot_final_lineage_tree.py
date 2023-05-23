@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from cellpose import plot
 import cv2
 import processing as pr
-import extract_individuals as exi
+import ROI_lineage.extract_individuals as exi
 
 Directory= 'delta_lamA_03-08-2018/2/'# "dataset/"
 

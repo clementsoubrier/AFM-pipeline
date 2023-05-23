@@ -19,42 +19,52 @@ import copy
 from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
 from PIL import Image #dealing with .tif images
+import scipy
 
 
 
 
 
 ''' Paths of the data and to save the results'''
-#Inputs
-#directory of the original dataset composed of a sequence of following pictures of the same bacterias, and with log files with .001 or no extension
-Main_directory="WT_mc2_55/30-03-2015/"
-dir_name=Main_directory+"Height/"             #name of dir
-my_data = "../data/"+dir_name       #path of dir
-#directory with the usefull information of the logs, None if there is no.
-data_log="../data/"+Main_directory+"log/"             #       #path and name
-
-#Temporary directories
-#directory of cropped data each image of the dataset is cropped to erase the white frame
-cropped_data=dir_name+"cropped_data/" 
-#directory with the usefull info extracted from the logs
-cropped_log=dir_name+"log_cropped_data/" 
-#directory for output data from cellpose 
-segments_path = dir_name+"cellpose_output/"
 
 
-#Outputs
-#directory of the processed images (every image has the same pixel size and same zoom)
-final_data=dir_name+"final_data/" 
-#dictionnary and dimension directory
-Dic_dir=dir_name+"Dic_dir/" 
-#Saving path for the dictionnary
-saving_path=Dic_dir+'Main_dictionnary'
-#dimension and scale of all the final data
-dimension_data=Dic_dir+'Dimension'
+# =============================================================================
+# #Inputs
+# #directory of the original dataset composed of a sequence of following pictures of the same bacterias, and with log files with .001 or no extension
+# Main_directory=   #the directory you chos to work on
+# dir_name=Main_directory+"Height/"             #name of dir
+# my_data = "../data/"+dir_name       #path of dir
+# #directory with the usefull information of the logs, None if there is no.
+# data_log="../data/"+Main_directory+"log/"             #       #path and name
+# 
+# #Temporary directories
+# #directory of cropped data each image of the dataset is cropped to erase the white frame
+# cropped_data=dir_name+"cropped_data/" 
+# #directory with the usefull info extracted from the logs
+# cropped_log=dir_name+"log_cropped_data/" 
+# #directory for output data from cellpose 
+# segments_path = dir_name+"cellpose_output/"
+# 
+# 
+# #Outputs
+# #directory of the processed images (every image has the same pixel size and same zoom)
+# final_data=dir_name+"final_data/" 
+# #dictionnary and dimension directory
+# Dic_dir=dir_name+"Dic_dir/" 
+# #Saving path for the dictionnary
+# saving_path=Dic_dir+'Main_dictionnary'
+# #dimension and scale of all the final data
+# dimension_data=Dic_dir+'Dimension'
+# =============================================================================
 
 
+Directory=  "dataset/"#"WT_mc2_55/30-03-2015/" #the directory you chose to work on
+# different type of datassets with their cropping parameter
+data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]   #Anti"WT_mc2_55/30-03-2015/","WT_mc2_55/05-02-2014/","WT_11-02-15/",      #Yes "delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"          #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","delta_LTD6_04-06-2017/"                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
 
-data_set=["delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/","WT_mc2_55/30-03-2015/","WT_mc2_55/05-02-2014/","WT_11-02-15/","delta parB/18-01-2015/","WT_mc2_55/04-06-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"  ]   #Anti"WT_mc2_55/30-03-2015/","WT_mc2_55/05-02-2014/","WT_11-02-15/",      #Yes "delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"          #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/"                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
+Bad_quality_data=[["WT_mc2_55/04-06-2016/1/",False],["WT_mc2_55/04-06-2016/2/",False],["WT_mc2_55/04-06-2016/3/",False],["Strep_pneumo_WT_29-06-2017/",True,False],["Strep_pneumo_WT_07-07-2017/",True]]
+
+Non_usable_data=["delta_murT","WT_mc2_55/03-09-2014"]
 
 result_path='Height/Dic_dir/'
 
@@ -62,55 +72,12 @@ dic_name='Main_dictionnary.npy'
 
 dim_name='Dimension.npy'
 
-
-
-''' Parameters'''
-#cropping parameters
-'''
-crop_up=1
-crop_down=1
-crop_left=1
-crop_right=1
-'''
-crop_up=27
-crop_down=1
-crop_left=30
-crop_right=101
+color_mask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
 
 
 
-#cellpose parameters
-cel_gpu=True
-cel_model_type='cyto'
-cel_channels=[0,0]  # define CHANNELS to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
-cel_diameter_param = 1 # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
-cel_flow_threshold = 0.9 
-cel_cellprob_threshold=0.0
-batch_size=8
 
 
-#erasing small masks that have a smaller relative size :
-ratio_erasing_masks=0.2
-#erasing masks that have a ratio of saturated surface bigger than :
-ratio_saturation=0.1
-
-#number of point of the approximated convex hull (at least 3)
-hull_point=4
-
-#fraction of the preserved area to consider child and parent relation for masks
-surface_thresh=0.6
-#searching distance (pixels) for the optimization algorithm to construct transtion vectors between pictures. 
-search_diameter =100 
-
-#minimum ratio of two brench length to erase the small branch
-centerline_crop_param=2
-
-#colors of the masks
-colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
-
-# different type of datasset with their quality
-
-dataset="WT_mc2_55/30-03-2015/" #["WT_11-02-15/","WT_mc2_55/30-03-2015/","WT_mc2_55/06-10-2015/","WT_mc2_55/05-10-2015/","WT_mc2_55/05-02-2014/","delta_3187/21-02-2019/","delta_3187/19-02-2019/","delta parB/03-02-2015/","delta parB/15-11-2014/","delta parB/18-11-2014/","delta_lamA_03-08-2018/1/","delta_lamA_03-08-2018/2/"]                #Maybe "delta parB/18-01-2015/","WT_mc2_55/04-06-2016/",                #No "delta ripA/14-10-2016/","delta ripA/160330_rip_A_no_inducer/","delta ripA/160407_ripA_stiffness_septum/","Strep_pneumo_WT_29-06-2017/","Strep_pneumo_WT_07-07-2017/"
 
 
 ''' main dictionnary main_dict: each image contain a dictionnary with
@@ -277,7 +244,7 @@ def dimension_def(croppeddata,log_dir,finaldata,dimensiondata,dimension_director
     prec=np.min(phys_dim[:,2:4])
     dim_height=int(np.max(phys_dim[:,0])/prec)
     dim_len=int(np.max(phys_dim[:,1])/prec)
-    
+    print('dimensions :'+str(dim_height)+', '+str(dim_len))
     np.save(dimensiondata,np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
     
     
@@ -349,10 +316,13 @@ def run_cel(data_file,gpuval,mod,chan,param_dia,thres,celp,seg,dimensiondata,bat
 
 
 
-''' Creation of a dictionnary with the entry : adress, time, mask, outlines, mask_error, angle, and erasing the temporary directories'''
-def download_dict(finaldata,log_dir,segmentspath):
+''' Creation of a dictionnary with the entry : adress, time, mask, mask_error, angle, and erasing the temporary directories'''
+def download_dict(finaldata,log_dir,segmentspath,dimensiondata):
     files = os.listdir(finaldata)
     dic={}
+    dimen=np.load(dimensiondata+'.npy')
+    
+    
     # Sort files by timepoint.
     files.sort(key = natural_keys)
     t=0
@@ -364,14 +334,16 @@ def download_dict(finaldata,log_dir,segmentspath):
         dic[fichier]['time']=t
         t+=1
         dic[fichier]['adress']=finaldata+fichier+'.png'
-        dic[fichier]['masks']=dat['masks'].astype(int)
+        dic[fichier]['masks']=dat['masks'].astype(np.int32)
         dic[fichier]['outlines']=utils.outlines_list(dat['masks'])
         dic[fichier]['masks_error']=(np.max(dic[fichier]['masks'])==0)
         dic[fichier]['angle']=np.load(log_dir+namelog)[-1]
+        dic[fichier]['resolution']=dimen[2]
         
     #deleting temporary dir
     rmtree(segmentspath)
     rmtree(log_dir)
+    os.remove(dimensiondata+'.npy')
     return dic
 
 
@@ -409,8 +381,8 @@ def centroid_area(dic):
 @jit
 def numba_centroid_area(masks):
     mask_number=np.max(masks)
-    centroid=np.zeros((mask_number,2))
-    area=np.zeros(mask_number)
+    centroid=np.zeros((mask_number,2),dtype=np.int32)
+    area=np.zeros(mask_number,dtype=np.int32)
     (l,L)=np.shape(masks)
     for i in range(mask_number):
         count=0
@@ -423,7 +395,7 @@ def numba_centroid_area(masks):
                     vec2+=k
                     count+=1
         area[i]=count
-        centroid[i,:]=np.array([vec2//count,vec1//count])
+        centroid[i,:]=np.array([vec2//count,vec1//count],dtype=np.int32)
     return(centroid,area)
 
 ''' Erasing too small masks (less than the fraction frac_mask of the largest mask), and mask with a ratio of saturated area superior to frac_satur . Creating the centroid of the union of acceptable  mask and saving as main_centroid'''
@@ -455,13 +427,13 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
                 if area[i]>=frac_mask*max_area and non_saturated[i]==1:
                     non_defect_count+=1
                     non_defect[i]=non_defect_count
-                    newoutlines.append(outlines[i])
+                    newoutlines.append(outlines[i][:,::-1].astype(np.int32))
                     
             #update the outlines
             dic[fichier]['outlines']=newoutlines
             #new value of the area and the centroid
-            area2=np.zeros(non_defect_count)
-            centroid2=np.zeros((non_defect_count,2))
+            area2=np.zeros(non_defect_count).astype(np.int32)
+            centroid2=np.zeros((non_defect_count,2),dtype=np.int32)
             for i in range(L):
                 if non_defect[i]!=0:
                     area2[int(non_defect[i]-1)]=area[i]
@@ -475,12 +447,16 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
             dic[fichier]['area']=area2
             dic[fichier]['centroid']=centroid2
             #constructing the main centroid
-            main_centroid0=0
-            main_centroid1=0
-            for i in range (non_defect_count):
-                main_centroid0+=area2[i]*centroid2[i,0]
-                main_centroid1+=area2[i]*centroid2[i,1]
-            dic[fichier]['main_centroid']=np.array([main_centroid0//sum(area2),main_centroid1//sum(area2)])
+            if sum(area2)>0:
+                main_centroid0=0
+                main_centroid1=0
+                for i in range (non_defect_count):
+                    main_centroid0+=area2[i]*centroid2[i,0]
+                    main_centroid1+=area2[i]*centroid2[i,1]
+                
+                dic[fichier]['main_centroid']=np.array([main_centroid0//sum(area2),main_centroid1//sum(area2)],dtype=np.int32)
+            else :
+                dic[fichier]['masks_error']=True
     if saving:
         np.save(savingpath,dic)
 
@@ -495,6 +471,26 @@ def satur_area(img,masks,number):
                 area+=1
     return area
  
+
+
+'''Contructing a list containing all the masks of the dataset with this structure : list_index,dataset, frame,mask_index'''
+
+def construction_mask_list(dic,dataset,listsavingpath):
+    index=0
+    final_list=[]
+    for fichier in dic.keys():
+        if not dic[fichier]['masks_error']:
+            masks=dic[fichier]['masks']
+            mask_number=np.max(masks)
+            list_index=[]
+            for i in range(mask_number):
+                final_list.append([index,dataset,fichier,i+1])
+                list_index.append(index)
+                index+=1
+            dic[fichier]["mask_list"]=list_index
+    np.save(listsavingpath,np.array(final_list,dtype=object))
+
+
 
 
 ''' Computing the centerline of each mask and saving them in the dictionnary'''
@@ -517,7 +513,7 @@ def centerline_mask(dic,alpha_erasing_branch,saving=False,savingpath='dict'):
 @jit
 def transfo_bin(mask,num):
     (dim1,dim2)=np.shape(mask)
-    newmask=np.zeros((dim1,dim2))
+    newmask=np.zeros((dim1,dim2),dtype=np.int32)
     for i in range(dim1):
         for j in range(dim2):
             if mask[i,j]==num:
@@ -535,17 +531,17 @@ def construc_center(mask,alpha):
     
     if len_int==0:
         if len_extr==1:
-            return np.array(extr_seg[0]).astype(int)
+            return np.array(extr_seg[0]).astype(np.int32)
         elif len_extr==2:
             compo1=extr_seg[0]
             compo2=extr_seg[1][-1::-1]
             if compo1[-1]==compo2[0]:
                 del compo1[-1]
             sol=compo1+list(linear_interpolation(compo1[-1],compo2[0]))+compo2
-            return np.array(sol).astype(int)
+            return np.array(sol).astype(np.int32)
         else:
-            print("Error skel format,len_int==0,len_extr>2")
-            return np.array([[]]).astype(int)
+            print("Error skel format,len_int==0,len_extr="+str(len_extr))
+            return np.array([[]],dtype=np.int32)
         
         
     elif len_int==1 and len_extr==2:
@@ -560,7 +556,7 @@ def construc_center(mask,alpha):
         if compo2[-1]==compo3[0]:
             del compo2[-1]
         sol=compo1+list(linear_interpolation(compo1[-1],compo2[0]))+compo2+list(linear_interpolation(compo2[-1],compo3[0]))+compo3
-        return np.array(sol).astype(int)
+        return np.array(sol).astype(np.int32)
     
         
     #we can do the case with 2 internal segments
@@ -587,35 +583,38 @@ def construc_center(mask,alpha):
             new_int_seg2=int1[1:]
         #simplifying by erasing the external branch linked to both internal branch
         for elem in extr_seg:
-            if elem[-1]==point:
+            if max(abs(elem[-1][0]-point[0]),abs(elem[-1][1]-point[1]))<=3:
                 extr_seg.remove(point)
         #previous case len_int==1 and len_extr==2
-        sol=extr_seg[0]
-        if sol[-1]==int_seg[0][0]:
-            sol+=int_seg[0][1:]
-        else:
-            sol+=int_seg[0][-2::-1]
-        sol+=extr_seg[1][-2::-1]
+        if max(abs(extr_seg[1][-1][0]-new_int_seg1[0][0]),abs(extr_seg[1][-1][1]-new_int_seg1[0][1]))<=3:
+            new_int_seg1,new_int_seg2=copy.deepcopy(new_int_seg2[::-1]),copy.deepcopy(new_int_seg1[::-1])
+        if extr_seg[0][-1]==new_int_seg1[0]:
+            del new_int_seg1[0]
+        if new_int_seg1[-1]==new_int_seg2[0]:
+            del new_int_seg2[0]
+        if new_int_seg2[-1]==extr_seg[1][-1]:
+            del extr_seg[1][-1]
+        sol=extr_seg[0]+list(linear_interpolation(extr_seg[0][-1],new_int_seg1[0]))+new_int_seg1+list(linear_interpolation(new_int_seg1[-1],new_int_seg2[0]))+new_int_seg2+list(linear_interpolation(new_int_seg2[-1],extr_seg[1][-1]))+extr_seg[1][::-1]
+        
         return np.array(sol)
     else:
-        print("Error skel format, too complex")
-        return np.array([[]]).astype(int)
+        print("Error skel format, len_int="+str(len_int)+"len_extr="+str(len_extr))
+        return np.array([[]],dtype=np.int32)
     
               #construct an integer line between 2 points in 2 D
 def linear_interpolation(point1,point2): 
-    print('used')
     len_list= max(np.abs(point1[0]-point2[0]),np.abs(point1[1]-point2[1]))-1
     if len_list<=0:
         return np.zeros(0)
     else :
         if np.abs(point1[0]-point2[0])+1==len_list:
-            val1=np.linspace(point1[0]+1,point2[0]-1,len_list,dtype=int)
-            val2=np.linspace(point1[1],point2[1],len_list,dtype=int)
+            val1=np.linspace(point1[0]+1,point2[0]-1,len_list,dtype=np.int32)
+            val2=np.linspace(point1[1],point2[1],len_list,dtype=np.int32)
         else:
-            val1=np.linspace(point1[0],point2[0],len_list,dtype=int)
-            val2=np.linspace(point1[1]+1,point2[1]-1,len_list,dtype=int)
+            val1=np.linspace(point1[0],point2[0],len_list,dtype=np.int32)
+            val2=np.linspace(point1[1]+1,point2[1]-1,len_list,dtype=np.int32)
         
-        final=np.zeros((len_list,2),dtype=int)
+        final=np.zeros((len_list,2),dtype=np.int32)
         final[:,0]=val1
         final[:,1]=val2
         return final
@@ -854,26 +853,23 @@ def fusion_erasing(extr_seg,ex,div,alpha):
 
 
 ''' Computing the translation vector between an image and its child and saving it under translation_vector'''
-def mask_displacement(dic,rad):
+def mask_displacement(dic):
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         child=dic[fichier]['child']
-        shape_1=np.shape(dic[fichier]['masks'])
-        shape_2=np.shape(dic[child]['masks'])
-        shape_f=(min(shape_1[0],shape_2[0]),min(shape_1[1],shape_2[1]))
-        mask_p=main_mask(dic[fichier]['masks'][:shape_f[0],:shape_f[1]])
-        mask_c=main_mask(dic[child]['masks'][:shape_f[0],:shape_f[1]])
+        mask_p=main_mask(dic[fichier]['masks'])
+        mask_c=main_mask(dic[child]['masks'])
         
         angle=dic[child]['angle']-dic[fichier]['angle']
         if angle==0:
-            vecguess=dic[fichier]['main_centroid']-dic[child]['main_centroid']
-            dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
+            #vecguess=dic[fichier]['main_centroid']-dic[child]['main_centroid']
+            dic[fichier]['translation_vector']=opt_trans_vec2(mask_p,mask_c)#,rad,vecguess
         else:
             dim1,dim2=np.shape(mask_p)
-            centerpoint=np.array([dim1//2,dim2//2],dtype=int)
-            vecguess=(rotation_vector(angle,dic[fichier]['main_centroid'],centerpoint)-dic[child]['main_centroid']).astype(int)
-            mask_p=rotation_img(angle,mask_p,centerpoint).astype(int)
-            dic[fichier]['translation_vector']=opt_trans_vec(mask_p,mask_c,rad,vecguess)
+            centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
+            #vecguess=(rotation_vector(angle,dic[fichier]['main_centroid'],centerpoint)-dic[child]['main_centroid']).astype(np.int32)
+            mask_p=rotation_img(angle,mask_p,centerpoint)
+            dic[fichier]['translation_vector']=opt_trans_vec2(mask_p,mask_c).astype(np.int32)#,rad,vecguess
         fichier=child
 
 # Tranform all masks into one shape (the main shape)
@@ -902,7 +898,7 @@ def score_mask(mask1,mask2):
 @jit 
 def mask_transfert(mask,vector):
     (l1,l2)=np.shape(mask)
-    new_mask=np.zeros((l1,l2))
+    new_mask=np.zeros((l1,l2),dtype=np.int32)
     for i in range(l1):
         for j in range(l2):
             if (0<=i+vector[0]<=l1-1) and (0<=j+vector[1]<=l2-1) and mask[i,j]>0:
@@ -943,7 +939,15 @@ def opt_trans_vec(mask1,mask2,rad,vec_guess):
             termination=True
     return arg
 
-#rotation of a vector around a point, the angle is in radian
+
+
+def opt_trans_vec2(img_1, img_2):
+    corr = scipy.signal.fftconvolve(img_1, img_2[::-1, ::-1])
+    argmax = np.unravel_index(corr.argmax(), corr.shape)
+    vec = np.array(argmax) - np.array(img_1.shape) + 1
+    return vec
+
+#rotation of a vector around a point, the angle is in radian (float as output)
 @jit 
 def rotation_vector(angle,vec,point):
     mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
@@ -951,11 +955,11 @@ def rotation_vector(angle,vec,point):
     var=np.array([mat[0,0]*newvec[0]+mat[0,1]*newvec[1],mat[1,0]*newvec[0]+mat[1,1]*newvec[1]])
     return point+var
 
-#rotation of an image around a point
+#rotation of an image around a point (int32 as input)
 @jit 
 def rotation_img(angle,img,point):
     dim1,dim2=np.shape(img)
-    new_img=np.zeros((dim1,dim2))
+    new_img=np.zeros((dim1,dim2),dtype=np.int32)
     for i in range(dim1):
         for j in range(dim2):
             trans_vec=rotation_vector(-angle,np.array([i,j]),point)#sign of the rotation : definition of the angle in the logs
@@ -965,7 +969,7 @@ def rotation_img(angle,img,point):
             if 0<=i_t<dim1-1 and 0<=j_t<dim2-1:
                 frac_i=i_n-i_t
                 frac_j=j_n-j_t
-                new_img[i,j]=frac_i*frac_j*img[i_t,j_t]+frac_i*(1-frac_j)*img[i_t,j_t+1]+(1-frac_i)*frac_j*img[i_t+1,j_t]+(1-frac_i)*(1-frac_j)*img[i_t+1,j_t+1]
+                new_img[i,j]=np.int32(frac_i*frac_j*img[i_t,j_t]+frac_i*(1-frac_j)*img[i_t,j_t+1]+(1-frac_i)*frac_j*img[i_t+1,j_t]+(1-frac_i)*(1-frac_j)*img[i_t+1,j_t+1])
     return new_img
 
 
@@ -996,12 +1000,12 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
             
             if angle!=0:            #check on real data
                 dim1,dim2=np.shape(mask_p)
-                centerpoint=np.array([dim1//2,dim2//2],dtype=int)
+                centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
                 mask_p=rotation_img(angle,mask_p,centerpoint)
             
             mask_parent , mask_child =comparision_mask(mask_c,mask_p,area_c,area_p,threshold)
-            dic[fichier]['mask_child']=mask_child.astype(int)
-            dic[child]['mask_parent']=mask_parent.astype(int)
+            dic[fichier]['mask_child']=mask_child
+            dic[child]['mask_parent']=mask_parent
             fichier=child
             
     #computing the grand parent and grand child relation
@@ -1028,13 +1032,13 @@ def relation_mask(dic,threshold,saving=False,savingpath='dict'):
             
             if angle!=0:            #check on real data sign of angle
                 dim1,dim2=np.shape(mask_p)
-                centerpoint=np.array([dim1//2,dim2//2],dtype=int)
+                centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
                 mask_p=rotation_img(angle,mask_p,centerpoint)
             
                 
             mask_grand_parent , mask_grand_child =comparision_mask(mask_c,mask_p,area_c,area_p,threshold)
-            dic[fichier]['mask_grand_child']=mask_grand_child.astype(int)
-            dic[grand_child]['mask_grand_parent']=mask_grand_parent.astype(int)
+            dic[fichier]['mask_grand_child']=mask_grand_child
+            dic[grand_child]['mask_grand_parent']=mask_grand_parent
             fichier=dic[fichier]['child']
     if saving:
         np.save(savingpath,dic)
@@ -1046,8 +1050,8 @@ def comparision_mask(mask_c,mask_p,area_c,area_p,threshold):
     number_mask_p=len(area_p)
     dim_c=np.shape(mask_c)
     dim_p=np.shape(mask_p)
-    result_p=np.zeros(number_mask_p)
-    result_c=np.zeros(number_mask_c)
+    result_p=np.zeros(number_mask_p,dtype=np.int32)
+    result_c=np.zeros(number_mask_c,dtype=np.int32)
     for i in range(1,number_mask_c+1):
         for j in range(1,number_mask_p+1):
             area=0
@@ -1142,7 +1146,7 @@ def update_masks(mask,new_values):
     return mask
 
 ''' Ploting the images, with the masks overlaid, the label of each mask (integer) and the relation with the following masks'''
-def plot_graph_masks(dic,graph_name,maskcol):
+def plot_graph_masks(dic,graph_name,maskcol,saving_video=False,video_path=''):
     #Initialisation
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
@@ -1155,6 +1159,7 @@ def plot_graph_masks(dic,graph_name,maskcol):
         colormask=(masknumber//numbercolor+1)*colormask
         colormask=np.array(colormask[:masknumber])
         mask_RGB = plot.mask_overlay(img,masks,colors=colormask)#image with masks
+        plt.title('time : '+str(dic[fichier]['time']))
         plt.imshow(mask_RGB)
         
         # plot the centroids and the centerlines
@@ -1178,6 +1183,8 @@ def plot_graph_masks(dic,graph_name,maskcol):
                 plt.annotate("", xy=(next_centr[link[1]-1][1], next_centr[link[1]-1][0]), xycoords='data', xytext=(centr[link[0]-1][1], centr[link[0]-1][0]), textcoords='data', arrowprops=dict(arrowstyle="->", connectionstyle="arc3",color='w'))
             else :
                 plt.plot(next_centr[link[1]-1][1], next_centr[link[1]-1][0],color='w',marker='o', markersize=0.5)
+        if saving_video:
+            plt.savefig(video_path+'Img'+fichier+'.png', format='png',bbox_inches='tight',dpi=500)
         
         plt.show()
         fichier=dic[fichier]['child']
@@ -1191,6 +1198,7 @@ def plot_graph_masks(dic,graph_name,maskcol):
     colormask=(masknumber//numbercolor+1)*colormask
     colormask=np.array(colormask[:masknumber])
     mask_RGB = plot.mask_overlay(img,masks,colors=colormask)#image with masks
+    plt.title('time : '+str(dic[fichier]['time']))
     plt.imshow(mask_RGB)
     
     
@@ -1323,101 +1331,161 @@ def plot_graph(dic,graph_name,maskcol,binary=True):
 
 
 
+''' Final function to run the whole pipeline on a dataset'''
+
+def run_one_dataset(Main_directory,dir_property="Height/",cropped=False, cel_gpu=True):
+    print(Main_directory)
+    
+    dir_name=Main_directory+dir_property            #name of dir
+    my_data = "../data/"+dir_name       #path of dir
+    #directory with the usefull information of the logs, None if there is no.
+    data_log="../data/"+Main_directory+"log/"             #       #path and name
+
+    #Temporary directories
+    #directory of cropped data each image of the dataset is cropped to erase the white frame
+    cropped_data=dir_name+"cropped_data/" 
+    #directory with the usefull info extracted from the logs
+    cropped_log=dir_name+"log_cropped_data/" 
+    #directory for output data from cellpose 
+    segments_path = dir_name+"cellpose_output/"
+
+
+    #Outputs
+    #directory of the processed images (every image has the same pixel size and same zoom)
+    final_data=dir_name+"final_data/" 
+    #dictionnary and dimension directory
+    Dic_dir=dir_name+"Dic_dir/" 
+    #Saving path for the dictionnary
+    saving_path=Dic_dir+'Main_dictionnary'
+    #dimension and scale of all the final data
+    dimension_data=Dic_dir+'Dimension'
+    #dimension and scale of all the final data
+    list_savingpath=Dic_dir+'masks_list'
+    
+
+
+    
+    ''' Parameters'''
+    #cropping parameters
+    if cropped:
+        crop_up=27
+        crop_down=1
+        crop_left=30
+        crop_right=101
+    else:
+        crop_up=1
+        crop_down=1
+        crop_left=1
+        crop_right=1
+    
+    
+    
+    
+    #cellpose parameters
+    
+    cel_model_type='cyto'
+    cel_channels=[0,0]  # define CHANNELS to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
+    cel_diameter_param = 1 # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
+    cel_flow_threshold = 0.9 
+    cel_cellprob_threshold=0.0
+    batch_size=8
+    
+    
+    #erasing small masks that have a smaller relative size :
+    ratio_erasing_masks=0.2
+    #erasing masks that have a ratio of saturated surface bigger than :
+    ratio_saturation=0.1
+    
+    
+    #fraction of the preserved area to consider child and parent relation for masks
+    surface_thresh=0.6
+    
+    #minimum ratio of two brench length to erase the small branch
+    centerline_crop_param=2
+    
+    #colors of the masks
+    color_mask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
+
+    
+
+    data_prep(my_data,crop_up,crop_down,crop_left,crop_right,cropped_data,cropped_log,my_data,log_dir=data_log)
+    
+    print("data_prep",0)
+
+    dimension_def(cropped_data,cropped_log,final_data,dimension_data,Dic_dir)
+
+    print("dimension_def",1)
+
+    run_cel(final_data,cel_gpu,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,dimension_data,batch_size=batch_size)
+
+    print("run_cel",2)
+    
+    main_dict=download_dict(final_data,cropped_log,segments_path,dimension_data)
+
+    print("download_dict",3)
+
+    main_parenting(main_dict)
+    
+    print("main_parenting",4)
+
+    centroid_area(main_dict)
+
+    print("centroid_area",5)
+
+    clean_masks(ratio_erasing_masks,ratio_saturation, main_dict)
+    
+    print("clean_masks",6)
+    
+    main_parenting(main_dict) #re-run in case all masks in a frame are erased
+
+    print("main_parenting",7)
+    
+    construction_mask_list(main_dict,Main_directory,list_savingpath)
+    
+    print("construction_mask_list",8)
+
+    centerline_mask(main_dict,centerline_crop_param,saving=True,savingpath=saving_path)
+    
+    print("centerline_mask",9)
+    '''
+    mask_displacement(main_dict)
+
+    print("mask_displacement",10)
+
+    relation_mask(main_dict,surface_thresh)
+
+    print("relation_mask",11)
+
+    basic_graph(main_dict,saving=True,savingpath=saving_path)
+
+    print("basic_graph",12)
+    plot_graph(main_dict,'basic',color_mask)
+    plot_graph_masks(main_dict,'basic',color_mask)
+    '''
+
+
 
 if __name__ == "__main__":
     
     '''Running the different functions'''
     ''''''
-    print(Main_directory)
-
-    data_prep(my_data,crop_up,crop_down,crop_left,crop_right,cropped_data,cropped_log,my_data,log_dir=data_log)
-
-    print("step ",0)
-
-    dimension_def(cropped_data,cropped_log,final_data,dimension_data,Dic_dir)
-
-    print("step ",1)
-
-    run_cel(final_data,cel_gpu,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,dimension_data,batch_size=batch_size)
-
-    print("step ",2)
-    
-    main_dict=download_dict(final_data,cropped_log,segments_path)
-
-    print("step ",3)
-
-    main_parenting(main_dict)
-    
-    print("step ",4)
-
-    centroid_area(main_dict)
-
-    print("step ",5)
-
-    clean_masks(ratio_erasing_masks,ratio_saturation, main_dict)
-
-    print("step ",6)
-
-    centerline_mask(main_dict,centerline_crop_param,saving=True,savingpath=saving_path)
-    
-    print("step ",7)
-    
-    mask_displacement(main_dict,search_diameter)
-
-    print("step ",8)
-
-    relation_mask(main_dict,surface_thresh)
-
-    print("step ",9)
-
-    basic_graph(main_dict,saving=True,savingpath=saving_path)
-
-    print("step ",10)
+    run_one_dataset(Directory,cropped=True)
     
     
-    #downloading main dictionnary and only ploting the results
+    
+    # for elem in data_set:
+    #     if len(elem)==2:
+    #         run_one_dataset(elem[0],cropped=elem[1])
+    #     elif len(elem)==3:
+    #         run_one_dataset(elem[0],cropped=elem[1],cel_gpu=elem[2])
+        
+        
+        
+    # color_mask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
 
-    main_dict=np.load(saving_path+'.npy', allow_pickle=True).item()
-    plot_graph(main_dict,'basic',colormask)
-    plot_graph_masks(main_dict,'basic',colormask)
-    
-    
-    angle=main_dict['03301923']['angle']-main_dict['03301911']['angle']
-    print(angle)
-    transfert=main_dict['03301911']['translation_vector']
-    print(transfert)
-    
-    img1 = cv2.imread(main_dict['03301911']['adress'],0)
-    img2 = cv2.imread(main_dict['03301923']['adress'],0)
-    img2=mask_transfert(img2,transfert)
-    dim1,dim2=np.shape(img1)
-    centerpoint=np.array([dim1//2,dim2//2],dtype=int)
-    
-    print(main_dict['03301911']['main_centroid'])
-    print(main_dict['03301923']['main_centroid'])
-    print(centerpoint)
-    variation=main_dict['03301911']['main_centroid']-centerpoint
-    print(variation)
-    fin_img=rotation_img(angle,img1,centerpoint)
-    plt.imshow(img1)
-    plt.plot(main_dict['03301911']['main_centroid'][1],main_dict['03301911']['main_centroid'][0], color='k',marker='o')
-    plt.plot(centerpoint[1],centerpoint[0], color='w',marker='o')
-    plt.show()
-    new_cent=rotation_vector(angle,main_dict['03301911']['main_centroid'],centerpoint)
-    print(new_cent)
-    plt.plot(new_cent[1],new_cent[0], color='k',marker='o')
-    plt.plot(centerpoint[1],centerpoint[0], color='w',marker='o')
-    plt.imshow(fin_img)
-    plt.show()
-    plt.imshow(img2)
-    plt.show()
-   
-    
-    '''
-    for data in data_set:
-        path=data+result_path+dic_name
-        dic=np.load(path, allow_pickle=True).item()
-        centerline_mask(dic,centerline_crop_param,saving=True,savingpath=path)
-        print(data)
-    
-    '''
+    # path=Directory+result_path+dic_name
+    # list_path=Directory+result_path+'masks_list'+'.npy'
+    # masks_list=np.load(list_path, allow_pickle=True)
+    # main_dict=np.load(path, allow_pickle=True).item()
+    # plot_graph(main_dict,'basic',color_mask)
+    # plot_graph_masks(main_dict,'basic',color_mask,saving_video=False,video_path='Video/')

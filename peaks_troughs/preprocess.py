@@ -114,15 +114,15 @@ def preprocess_centerline(xs, ys, kernel_len, std_cut, window):
 def keep_centerline(xs, ys, min_len, kernel_len, std_cut, window, min_prep_len,
                     max_der_std, max_der):
     if xs[-1] - xs[0] < min_len:
-        return False
+        return np.bool_(False)
     corrupted = np.logical_or(ys <= 2, ys >= 253)
     if 40 * np.count_nonzero(corrupted) >= len(ys):
-        return False
+        return np.bool_(False)
     if np.ptp(ys) <= 2.55e-10:
-        return False
+        return np.bool_(False)
     xs_p, _ = preprocess_centerline(xs, ys, kernel_len, std_cut, window)
     if xs_p[-1] - xs_p[0] < min_prep_len:
-        return False
+        return np.bool_(False)
     start = np.searchsorted(xs, xs_p[0], "right") - 1
     end = np.searchsorted(xs, xs_p[-1], "left") + 1
     dx = xs[start + 1: end] - xs[start: end - 1]
@@ -132,5 +132,5 @@ def keep_centerline(xs, ys, min_len, kernel_len, std_cut, window, min_prep_len,
     std = np.std(der)
     abnormal_variation = abs(der - mean) >= min(max_der_std * std, max_der)
     if 40 * np.count_nonzero(abnormal_variation) >= len(ys):
-        return False
-    return True
+        return np.bool_(False)
+    return np.bool_(True)

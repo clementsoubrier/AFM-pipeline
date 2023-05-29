@@ -1,3 +1,4 @@
+from enum import IntEnum, auto
 import math
 
 import numpy as np
@@ -6,8 +7,9 @@ from scipy.ndimage import gaussian_filter1d
 from preprocess import preprocess_centerline
 
 
-PEAK = 0
-TROUGH = 1
+class Feature(IntEnum):
+    PEAK = auto()
+    TROUGH = auto()
 
 
 def find_extrema(der):
@@ -48,9 +50,9 @@ def resample_extrema(intern_extrema, ys, min_width):
         extrema.append(x)
         values.append(y)
         if a < 0:
-            classif.append(PEAK)
+            classif.append(Feature.PEAK)
         else:
-            classif.append(TROUGH)
+            classif.append(Feature.TROUGH)
     return sort_and_add_edges(ys, extrema, values, classif, min_width)
 
 
@@ -132,11 +134,12 @@ def find_peaks_troughs(xs, ys, kernel_len, std_cut, window, smooth_std,
     troughs = []
     for area, feature in zip(areas, classif):
         area = np.array(area, dtype=np.float64) + xs[0]
-        if feature == PEAK:
-            peaks.append(area)
-        elif feature == TROUGH:
-            troughs.append(area)
-        else:
-            raise ValueError(f"Unknown feature {feature}, feature should be a"
-                             f"peak {PEAK} or a trough {TROUGH}.")
+        match feature:
+            case Feature.PEAK:
+                peaks.append(area)
+            case Feature.TROUGH:
+                troughs.append(area)
+            case _:
+                raise ValueError(f"Unknown feature {feature}, feature should "
+                                 f"be a {Feature.PEAK} or a {Feature.TROUGH}.")
     return xs, ys, peaks, troughs

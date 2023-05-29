@@ -15,10 +15,12 @@ def compute_stats(dataset):
     trough_counter = Counter()
     peak_lengths = []
     trough_lengths = []
-    for cell, scales, _ in get_centerlines_by_cell(dataset):
-        for (xs, ys), (pixel_size, verti_scale) in zip(cell, scales):
-            params = get_scaled_parameters(pixel_size, verti_scale,
-                                           peaks_troughs=True)
+    for _, cell in get_centerlines_by_cell(dataset):
+        for frame_data in cell:
+            xs = frame_data["xs"]
+            ys = frame_data["ys"]
+            pixel_size = frame_data["pixel_size"]
+            params = get_scaled_parameters(pixel_size, peaks_troughs=True)
             _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
             peak_counter[len(peaks)] += 1
             trough_counter[len(troughs)] += 1
@@ -85,10 +87,10 @@ def main():
     if dataset is None:
         if datasets is None:
             cells_dir = os.path.join("data", "cells")
-            pattern = os.path.join(cells_dir, "**", "0000", "")
+            pattern = os.path.join(cells_dir, "**", "ROI *", "")
             datasets = glob.glob(pattern, recursive=True)
-            datasets = [os.path.dirname(os.path.relpath(path, cells_dir))
-                        for path in datasets]
+            datasets = {os.path.dirname(os.path.relpath(path, cells_dir))
+                        for path in datasets}
     else:
         datasets = [dataset]
     

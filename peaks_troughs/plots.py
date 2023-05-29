@@ -1,3 +1,4 @@
+from enum import IntEnum, auto
 import itertools
 import numbers
 import os
@@ -7,28 +8,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from align import align_centerlines
-from derivative_sign_segmentation import find_peaks_troughs, PEAK, TROUGH
+from derivative_sign_segmentation import find_peaks_troughs, Feature
 from group_by_cell import get_centerlines_by_cell
 from preprocess import get_scaled_parameters, preprocess_centerline, \
     REF_PIXEL_SIZE, REF_VERTI_SCALE
 
 
-TEST_PLOT_KYMOGRAPH = -1
-PLOT_NONE = 0
-PLOT_CENTERLINE = 1
-PLOT_CELL = 2
-PLOT_3D = 3
+class PlotMode(IntEnum):
+    PLOT_NONE = auto()
+    TEST_MULTI_KYMOGRAPH = auto()
+    CENTERLINE = auto()
+    CELL = auto()
+    KYMOGRAPH = auto()
 
 
 def areas_to_points(cell_areas, cell_centerlines, feature):
     cell_points = []
-    if feature == PEAK:
-        extremum = max
-    elif feature == TROUGH:
-        extremum = min
-    else:
-        raise ValueError(f"Unknown feature {feature}, feature should "
-                         f"be a peak {PEAK} or a trough {TROUGH}.")
+    match feature:
+        case Feature.PEAK:
+            extremum = max
+        case Feature.TROUGH:
+            extremum = min
+        case _:
+            raise ValueError(f"Unknown feature {feature}, feature should "
+                             f"be a {Feature.PEAK} or a trough "
+                             f"{Feature.TROUGH}.")
     for areas, centerline in zip(cell_areas, cell_centerlines):
         xs = centerline[:, 0]
         ys = centerline[:, 1]
@@ -162,8 +166,9 @@ def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE),
             troughs = [(l * pixel_size, r * pixel_size) for l, r in troughs]
             cell_peaks.append(peaks)
             cell_troughs.append(troughs)
-        all_peaks = areas_to_points(cell_peaks, all_centerlines, PEAK)
-        all_troughs = areas_to_points(cell_troughs, all_centerlines, TROUGH)
+        all_peaks = areas_to_points(cell_peaks, all_centerlines, Feature.PEAK)
+        all_troughs = areas_to_points(cell_troughs, all_centerlines,
+                                      Feature.TROUGH)
     else:
         all_peaks = None
         all_troughs = None
@@ -172,17 +177,19 @@ def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE),
 
 def main():
     dataset = os.path.join("WT_mc2_55", "30-03-2015")
-    plot_mode = PLOT_CENTERLINE
+    plot_mode = PlotMode.CENTERLINE
 
-    if plot_mode == TEST_PLOT_KYMOGRAPH:
+    if plot_mode is PlotMode.TEST_MULTI_KYMOGRAPH:
         cells = []
-        for cell, scales, cell_id in get_centerlines_by_cell(dataset, False):
-            if cell_id == 5:
+        for _, cell in get_centerlines_by_cell(dataset, False):
+            if len(cells) == 3:
                 break
             cell_centerlines = []
-            for (xs, ys), (pixel_size, verti_scale) in zip(cell, scales):
-                params = get_scaled_parameters(pixel_size, verti_scale,
-                                               misc=True)
+            for frame_data in cell:
+                xs = frame_data["xs"]
+                ys = frame_data["ys"]
+                pixel_size = frame_data["pixel_size"]
+                params = get_scaled_parameters(pixel_size, misc=True)
                 max_translation = params.pop("max_translation")
                 del params["v_offset"]
                 centerline = preprocess_centerline(xs, ys, **params)
@@ -196,44 +203,45 @@ def main():
         plot_kymograph(*cells, title="smoothing", smooth=True)
         return
 
-    for cell, scales, cell_id in get_centerlines_by_cell(dataset):
+    for cell_id, cell in get_centerlines_by_cell(dataset):
         cell_centerlines = []
-        for (xs, ys), (pixel_size, verti_scale) in zip(cell, scales):
-            params = get_scaled_parameters(pixel_size, verti_scale,
-                                           misc=True)
+        pixel_sizes = []
+        for frame_data in cell:
+            xs = frame_data["xs"]
+            ys = frame_data["ys"]
+            pixel_size = frame_data["pixel_size"]
+            params = get_scaled_parameters(pixel_size, misc=True)
             max_translation = params.pop("max_translation")
             v_offset = params.pop("v_offset")
             centerline = preprocess_centerline(xs, ys, **params)
             cell_centerlines.append(centerline)
+            pixel_sizes.append(pixel_size)
         cell_centerlines = align_centerlines(*cell_centerlines,
                                              max_translation=max_translation)
         cell_peaks = []
         cell_troughs = []
-        for centerline, (pixel_size, verti_scale) in zip(cell_centerlines,
-                                                         scales):
+        for centerline, pixel_size in zip(cell_centerlines, pixel_sizes):
             xs = centerline[:, 0]
             ys = centerline[:, 1]
-            params = get_scaled_parameters(pixel_size, verti_scale,
-                                           peaks_troughs=True)
+            params = get_scaled_parameters(pixel_size, peaks_troughs=True)
             xs, ys, peaks, troughs = find_peaks_troughs(xs, ys, **params,
                                                         smoothing=False)
-            if verti_scale is None:
-                verti_scale = REF_VERTI_SCALE
             xs *= pixel_size
-            ys *= verti_scale
             peaks = [(l * pixel_size, r * pixel_size) for l, r in peaks]
             troughs = [(l * pixel_size, r * pixel_size) for l, r in troughs]
-            if plot_mode == PLOT_CENTERLINE:
+            if plot_mode is PlotMode.CENTERLINE:
                 plot_single_centerline(xs, ys, peaks, troughs)
             cell_peaks.append(peaks)
             cell_troughs.append(troughs)
 
-        cell_peaks = areas_to_points(cell_peaks, cell_centerlines, PEAK)
-        cell_troughs = areas_to_points(cell_troughs, cell_centerlines, TROUGH)
-        if plot_mode == PLOT_CELL:
+        cell_peaks = areas_to_points(cell_peaks, cell_centerlines,
+                                     Feature.PEAK)
+        cell_troughs = areas_to_points(cell_troughs, cell_centerlines,
+                                       Feature.TROUGH)
+        if plot_mode is PlotMode.CELL:
             plot_cell_centerlines(cell_centerlines, cell_peaks, cell_troughs,
                                   v_offset, cell_id)
-        if plot_mode == PLOT_3D and len(cell_centerlines) > 1:
+        if plot_mode is PlotMode.KYMOGRAPH and len(cell_centerlines) > 1:
             plot_3d_centerlines(cell_centerlines, cell_peaks, cell_troughs,
                                 cell_id)
 

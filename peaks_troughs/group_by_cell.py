@@ -1,6 +1,7 @@
 from enum import IntEnum
 import glob
 import math
+import operator
 import os
 from PIL import Image
 import statistics
@@ -17,28 +18,46 @@ class Orientation(IntEnum):
     NEW_POLE_OLD_POLE = 2
 
 
+def load_cell(cell_name, dataset=None, return_defects=False):
+    match (cell_name, dataset):
+        case (str() | bytes() | os.PathLike(), None):
+            dataset = ""
+        case (int(), str() | bytes() | os.PathLike()):
+            cell_name = f"ROI {cell_name}"
+        case (str() | bytes() | os.PathLike(),
+              str() | bytes() | os.PathLike()):
+            pass
+        case _:
+            raise ValueError(f"The combination ({cell_name}, {dataset}) does "
+                             "not describe a ROI.")
+    roi_dirname = os.path.join("data", "cells", dataset, cell_name)
+    centerlines = os.listdir(roi_dirname)
+    roi = []
+    for filename in centerlines:
+        filename = os.path.join(roi_dirname, filename)
+        with np.load(filename) as centerline:
+            xs = centerline["xs"]
+            ys = centerline["ys"]
+            timestamp = centerline["timestamp"].item()
+            pixel_size = centerline["pixel_size"].item()
+            no_defect = centerline["no_defect"].item()
+            orientation = centerline["orientation"].item()
+            frame_data = {"xs": xs, "ys": ys, "timestamp": timestamp,
+                          "pixel_size": pixel_size,
+                          "orientation": Orientation(orientation)}
+        if no_defect or return_defects:
+            roi.append(frame_data)
+    roi.sort(key=operator.itemgetter("timestamp"))
+    return roi
+
+
 def get_centerlines_by_cell(dataset, progress_bar=True, return_defects=False):
     path = os.path.join("data", "cells", dataset)
     directories = os.listdir(path)
     if progress_bar:
         directories = tqdm.tqdm(directories, desc=dataset)
     for roi_dirname in directories:
-        centerlines = os.listdir(os.path.join(path, roi_dirname))
-        roi = []
-        for filename in centerlines:
-            filename = os.path.join(path, roi_dirname, filename)
-            with np.load(filename, allow_pickle=True) as centerline:
-                xs = centerline["xs"]
-                ys = centerline["ys"]
-                timestamp = centerline["timestamp"].item()
-                pixel_size = centerline["pixel_size"].item()
-                no_defect = centerline["no_defect"].item()
-                orientation = centerline["orientation"].item()
-                frame_data = {"xs": xs, "ys": ys, "timestamp": timestamp,
-                              "pixel_size": pixel_size,
-                              "orientation": Orientation(orientation)}
-            if no_defect or return_defects:
-                roi.append(frame_data)
+        roi = load_cell(roi_dirname, dataset, return_defects)
         roi_id = int(roi_dirname.split("ROI ")[-1])
         if roi:
             yield roi_id, roi
@@ -137,6 +156,7 @@ def save_roi(roi, reference, masks_list, main_dict, images, roi_dirname):
 def save_dataset(dataset):
     main_dict, masks_list, roi_dict, images = load_data(dataset)
     references = {}
+    # TODO: topological ordering
     for roi_name, roi in tqdm.tqdm(roi_dict.items(), desc=dataset,
                                    total=len(roi_dict)):
         roi_dirname = os.path.join("data", "cells", dataset, roi_name)

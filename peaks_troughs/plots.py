@@ -82,7 +82,7 @@ def plot_cell_centerlines(cell_centerlines, cell_peaks=None, cell_troughs=None,
     plt.scatter(troughs_x, troughs_y, c="green")
     if cell_id is not None:
         plt.title(str(cell_id))
-    plt.show()
+    # plt.show()
 
 
 def plot_3d_centerlines(cell_centerlines, cell_peaks=None, cell_troughs=None,
@@ -172,7 +172,9 @@ def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE),
     else:
         all_peaks = None
         all_troughs = None
-    plot_3d_centerlines(all_centerlines, all_peaks, all_troughs, title)
+    plot_cell_centerlines(all_centerlines, all_peaks, all_troughs,
+                          10, None)
+    # plot_3d_centerlines(all_centerlines, all_peaks, all_troughs, title)
 
 
 def main():

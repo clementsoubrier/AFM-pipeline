@@ -10,7 +10,7 @@ Created on Tue Apr  4 09:22:13 2023
 
 #import matplotlib.pyplot as plt
 import numpy as np
-from numba import jit
+from numba import njit
 import cv2
 from numba.typed import List
 
@@ -51,7 +51,7 @@ def distancematrix(dataset,resultpath,dicname,min_size,window,epsilon,ratio,max_
 
 
 
-@jit
+@njit
 def Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,max_iter):
     dim_matrix=len(size_list)
     dist_matrix=np.zeros((dim_matrix,dim_matrix))
@@ -87,7 +87,7 @@ def count_and_order_centerline(dataset,resultpath,dicname,min_size):
             line=dic[fichier]['centerlines'][masknumber-1]
             if len(line)*size>min_size:
                 center_list.append([count,data,i])
-                img=cv2.imread(dic[fichier]['adress'],0)
+                img=np.load(dic[fichier]['adress'])['Height_fwd']
                 line_data=dist_centerline(line,img)
                 height_list.append(line_data[0])
                 dist_list.append(line_data[1])
@@ -96,7 +96,7 @@ def count_and_order_centerline(dataset,resultpath,dicname,min_size):
     return center_list, height_list, dist_list, size_list
 
 
-@jit 
+@njit 
 def dist_centerline(center1,im1):
     n1=len(center1)
     dist1=np.zeros(n1)
@@ -108,7 +108,7 @@ def dist_centerline(center1,im1):
     return(height1,dist1)
 
 
-@jit               #The result is given by (delta,res,inverted): res the minimal distance, inverted if the second centerline has to be flipped, delta the translation of the beginning of centerline 2 to do (after inversion)
+@njit               #The result is given by (delta,res,inverted): res the minimal distance, inverted if the second centerline has to be flipped, delta the translation of the beginning of centerline 2 to do (after inversion)
 def comparison_centerline(height1,height2,dist1,dist2,size1,size2,window,epsilon,ratio,max_iter):
     
     (phy_height1,phy_height2,pix_len1,pix_len2)=scaling_centerlines(height1,height2,dist1,dist2,size1,size2)
@@ -135,7 +135,7 @@ def comparison_centerline(height1,height2,dist1,dist2,size1,size2,window,epsilon
 
     
     
-@jit
+@njit
 def scaling_centerlines(height1,height2,dist1,dist2,size1,size2):
    
     size=min(size1,size2)
@@ -163,7 +163,7 @@ def scaling_centerlines(height1,height2,dist1,dist2,size1,size2):
         i+=1
     return (phy_height1,phy_height2,pix_len1,pix_len2)
 
-@jit
+@njit
 def norm(line):
     res=0
     for i in range(len(line)):
@@ -174,7 +174,7 @@ def norm(line):
 
 
 
-@jit   #first element is the longest return the drift, the result, if the second line has to be inverted
+@njit   #first element is the longest return the drift, the result, if the second line has to be inverted
 def optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=False):
     if not signed:
         (delta_plus,res_plus,plus)=optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=True)
@@ -219,7 +219,7 @@ def optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=Fal
 
 
 
-@jit   #first element is the longest
+@njit   #first element is the longest
 def L2_score(n1,fun1,n2,fun2,delta,epsilon):
         if delta<0:
             domain=n2+delta

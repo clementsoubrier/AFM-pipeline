@@ -12,34 +12,38 @@ from numba import njit
 from copy import deepcopy
 import tqdm
 
-Directory=  "dataset/"#'delta_lamA_03-08-2018/2/'#"delta_parB/18-01-2015/"#"dataset/" #the directory you chose to work on
+Directory=  "WT_mc2_55/30-03-2015/" #the directory you chose to work on
 # different type of datassets with their quality
 
 data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]
 
+
+data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+
 result_path=''
 
-dic_name='Main_dictionnary.npy'
+dic_name='Main_dictionnary.npz'
 
-list_name='masks_list.npy'
+list_name='masks_list.npz'
 
-depth_search=50 # max time distance between two comparable frames, in minutes
+depth_search=50 # max time (minutes) between two comparable frames
 
 
 #fraction of the preserved area to consider child and parent relation for masks (should be less than 0.5 to take into account the division)
-surface_thresh=0.34
+surface_thresh= 0.34
 #fraction of the preserved area to consider child and parent relation for masks (fusioning of 2 masks after division)
-final_thresh=0.8
+final_thresh=0.6 #0.8
 
 
 
 
 def trans_vector_matrix(dic,max_diff_time):
-    fichier=list(dic.keys())[-1]
+    dic_list=list(dic.keys())
+    fichier=dic_list[-1]
     maxtime=dic[fichier]['time']
     mat_vec=np.zeros((maxtime+1,2*max_diff_time+1,2),dtype=np.int32)
     mat_ang=np.zeros((maxtime+1,2*max_diff_time+1))
-    dic_list=list(dic.keys())
+    
     for number in tqdm.trange(len(dic_list)):
         fichier1=dic_list[number]
         if number<len(dic_list)-1 :
@@ -63,7 +67,7 @@ def trans_vector_matrix(dic,max_diff_time):
             
     return mat_vec, mat_ang
 
-#@jit()
+
 def update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,main_centr1,time1,masks2,angle2,main_centr2,timer,max_diff_time):      #enlever le rayon et le vecguess
     angle=angle2-angle1
     if angle==0:
@@ -89,8 +93,9 @@ def lineage_matrix(dic,maskslist,mat_vec,mat_ang,max_diff_time,threshold):
 
     mat_dim=len(maskslist)
     mat=np.zeros((mat_dim,mat_dim))
-    fichier= list(dic.keys())[0]
-    while dic[fichier]['child']!='':
+    diclist=list(dic.keys())
+    for i in tqdm.trange(len(diclist)-1):
+        fichier=diclist[i]
         #print(fichier)
         base_time=dic[fichier]['time']
         child_fichier=dic[fichier]['child']
@@ -128,7 +133,6 @@ def lineage_matrix(dic,maskslist,mat_vec,mat_ang,max_diff_time,threshold):
                 break
             timer=dic[child_fichier]['time']
             
-        fichier=dic[fichier]['child']
     return mat
 
 @njit 
@@ -154,7 +158,7 @@ def comparision_mask_score(mask_c,mask_p,area_c,area_p,threshold):
 def clean_matrix(lin_mat,dic,maskslist,max_diff_time,thres):
     mat_dim=len(maskslist)
     newmat=np.zeros((mat_dim,mat_dim),dtype=np.int8)
-    for i in range(mat_dim):
+    for i in tqdm.trange(mat_dim):
         base_time=dic[maskslist[i][2]]['time']
         time_list=[]
         for k in range(max_diff_time):
@@ -174,8 +178,8 @@ def clean_matrix(lin_mat,dic,maskslist,max_diff_time,thres):
                         newmat[i,element[0]]= index+1
                         newmat[i,element[1]]= index+1
 
-    finalmatrix=Bool_from_linkmatrix(newmat,mat_dim,max_diff_time) #
-    return finalmatrix,newmat
+     #
+    return newmat
 
 
 '''         First naive version of the boolean matrix
@@ -205,11 +209,14 @@ Deriving the boolean matrix from the link matrix. The bollean matrix maximizes t
 
 '''
 
-def Bool_from_linkmatrix(linkmat,dim,max_diff_time):
+def Bool_from_linkmatrix(linkmat,max_diff_time):
+    dim=len(linkmat)
     newmat=np.zeros((dim,dim),dtype=bool)
+    print('Roots and links detection')
     forwardlinks,backwardlinks,rootslist=detekt_roots(linkmat,dim) #detekts roots and transform the matrix into an adjacence list
+    print('Leafs detection')
     endpoints=detekt_end_leafs(forwardlinks,backwardlinks,linkmat,dim,max_diff_time)
-    #print(endpoints)
+    print('Computing longest paths')
     final_links=longuest_path(forwardlinks,backwardlinks,rootslist,dim)
     for point in endpoints:
         update_bool_mat(final_links[point],newmat)
@@ -241,7 +248,7 @@ def detekt_roots(linkmat,dim):
     rootslist=[]
     
     
-    for i in range(dim):
+    for i in tqdm.trange(dim):
         if np.max(linkmat[i,:])>0:
             for j in range(i+1,dim):
                 if linkmat[i,j]>0:
@@ -257,14 +264,14 @@ def detekt_roots(linkmat,dim):
 
 def detekt_end_leafs(forwardlinks,backwardlinks,linkmat,dim,depth):
     res=[]
-    for i in range(dim):
+    for i in tqdm.trange(dim):
         
         
         if forwardlinks[i]==[] and backwardlinks[i]!=[]:
             #print(i)
-            ancestors=list_ancestors(i,backwardlinks,linkmat,2*depth)
+            ancestors=list_ancestors(i,backwardlinks,linkmat,depth)
             #print(ancestors)
-            children=list_children(ancestors,forwardlinks,linkmat,2*depth+1)
+            children=list_children(ancestors,forwardlinks,linkmat,2*depth)
             #print(children)
             if len(ancestors) >= 2 and not max(children)>i:          #checking that a real division has been detected
                 res.append(i)
@@ -325,7 +332,7 @@ def longuest_path(forwardlinks,backwardlinks,rootslist,dim):
         value[root]=1
         
         
-    for iteration in range(dim):
+    for iteration in tqdm.trange(dim):
         value_iter,path_iter=update_longest_path(iteration,backwardlinks,value,path)
         value[iteration]=value_iter
         path[iteration]=path_iter
@@ -353,14 +360,19 @@ def update_longest_path(iteration,backwardlinks,value,path):
 
 
 def Final_lineage_tree(direc,resultpath,dicname,listname,max_diff_time,surfthresh,finthres):
-    masks_list=np.load(direc+resultpath+listname, allow_pickle=True)
-    main_dict=np.load(direc+resultpath+dicname, allow_pickle=True).item()
+    masks_list=np.load(direc+resultpath+listname, allow_pickle=True)['arr_0']
+    #print(masks_list)
+    main_dict=np.load(direc+resultpath+dicname, allow_pickle=True)['arr_0'].item()
+    #print(main_dict)
+    print('trans_vector_matrix 1')
     vector_matrix, angle_matrix=trans_vector_matrix(main_dict,max_diff_time) #translation vector and rotation angle between the different frames
-    
+    print('lineage_matrix 2')
     lin_mat=lineage_matrix(main_dict,masks_list,vector_matrix, angle_matrix,max_diff_time,surfthresh)
-    
-    Bool_mat,Link_mat=clean_matrix(lin_mat,main_dict,masks_list,max_diff_time,finthres)
-    
+    print('Link_matrix 3')
+    Link_mat=clean_matrix(lin_mat,main_dict,masks_list,max_diff_time,finthres)
+    print('Bool_matrix  4')
+    Bool_mat=Bool_from_linkmatrix(Link_mat,max_diff_time)
+    print('saving 5')
     np.save(direc+resultpath+'Bool_matrix',Bool_mat)
     np.save(direc+resultpath+'Link_matrix',Link_mat)
     np.save(direc+resultpath+'non_trig_Link_matrix',lin_mat)
@@ -368,22 +380,13 @@ def Final_lineage_tree(direc,resultpath,dicname,listname,max_diff_time,surfthres
     
 
 if __name__ == "__main__":
-    # A=np.load(Directory+result_path+'Bool_matrix.npy',).astype(int)
-    # B=np.load(Directory+result_path+'Link_matrix.npy')
-    # C=np.load(Directory+result_path+'ROI_dict.npy',allow_pickle=True).item()
-    # D=np.load(Directory+result_path+'non_trig_Link_matrix.npy')
-    # masks_list=np.load(Directory+result_path+list_name, allow_pickle=True)
-    # main_dict=np.load(Directory+result_path+dic_name, allow_pickle=True).item()
-    # Bool_mat,Link_mat,final_links=clean_matrix(D,main_dict,masks_list,depth_search*3,final_thresh)
-    # np.save(Directory+result_path+'Bool_matrix.npy',Bool_mat)
-    
     
 
     
-    Final_lineage_tree("WT_mc2_55/30-03-2015/",result_path,dic_name,list_name,depth_search,surface_thresh,final_thresh)#Directory
-    # for direc in data_set:
-    #     print(direc[0])
-    #     Final_lineage_tree(direc[0],result_path,dic_name,list_name,depth_search,surface_thresh,final_thresh)
+    # Final_lineage_tree(Directory,result_path,dic_name,list_name,depth_search,surface_thresh,final_thresh)#Directory
+    for direc in data_set2:
+        print(direc)
+        Final_lineage_tree(direc,result_path,dic_name,list_name,depth_search,surface_thresh,final_thresh)
 
 
 

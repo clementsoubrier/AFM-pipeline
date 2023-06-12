@@ -9,7 +9,7 @@ import numpy as np
 
 #%% Load data for testing
 
-# Directory paths
+# # Directory paths
 # dictionary_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/Dic_dir/"
 # img_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/final_data"
 
@@ -35,10 +35,9 @@ def extract_individuals(adj_mat,save_dir,filename='ROI_dict'):
         individuals = get_ROIs(adj_mat,root,ROI_num=starting_num,root=root)[0]
         ROI_dict.update(list2dict(individuals))
         starting_num = int(list(ROI_dict.keys())[-1].split()[-1])+1 # make sure next tree's first ROI is latest ROI ID# + 1
-        
-    create_children(ROI_dict) # add Children subkey to each dictionary item
-    ROI_dict = {int("".join([c for c in k if c.isdigit()])):v for k,v in ROI_dict.items()} # change ROI key from string to hashable int
-    np.save(save_dir+filename,ROI_dict)
+    
+    create_children(ROI_dict) # add Children key to each dictionary item
+    np.savez_compressed(save_dir+filename,ROI_dict)
     # print(ROI_dict)
     return ROI_dict
     
@@ -127,12 +126,11 @@ def create_children(ROI_dic):
         if ROI_dic[ROI]['Parent']!='':
           ROI_dic[ROI_dic[ROI]['Parent']]['Children'].append(ROI)
 
-#%% Obtain full ROI dictionary from the adjacency matrix and save to specified directory (for testing)
+#%% Obtain full ROI dictionary from the adjacency matrix and save to specified directory
 
 # extract_individuals(adj_mat,dictionary_dir,filename='ROI_dict')
 
 
-#%% Load and check ROI dictionary (for testing)
+#%% Load and check ROI dictionary
 # ROI_dict = np.load(dictionary_dir + "ROI_dict.npy",allow_pickle=True).item()
 # print(ROI_dict)
-

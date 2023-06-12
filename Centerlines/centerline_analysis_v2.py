@@ -100,7 +100,7 @@ def count_and_order_centerline(dataset,resultpath,dicname,min_size):
 def dist_centerline(center1,im1):
     n1=len(center1)
     dist1=np.zeros(n1)
-    height1=np.zeros(n1,dtype=np.uint8)
+    height1=np.zeros(n1)
     for i in range(n1):
         height1[i]=im1[center1[i,0],center1[i,1]]
         if i>0:

@@ -10,17 +10,15 @@ Created on Fri Oct 21 11:18:29 2022
 
 import os
 import datetime
-import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 from numba import njit
 import tqdm
-from cellpose import utils, io, models, plot
+from cellpose import utils, io, models
 import re
 import copy
 from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
-from PIL import Image #dealing with .tif images
 import scipy
 import pySPM
 
@@ -61,15 +59,13 @@ import pySPM
 # =============================================================================
 
 
-Directory=  "WT_mc2_55/30-03-2015/" #the directory you chose to work on     "dataset/"#
+Directory=  'delta_lamA_03-08-2018/' #the directory you chose to work on     "dataset/"#
 # different type of datassets with their cropping parameter
 
-data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_11-02-2015/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/05-02-2014/","WT_mc2_55/03-09-2014/",'WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/','WT_INH_700min_2014/']
+data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
+problem=['WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
-dic_name='Main_dictionnary.npy'
-
-dim_name='Dimension.npy'
 
 color_mask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
 
@@ -160,9 +156,10 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                         name='Height'
                     else:
                         name=channel
-                    
-                    data_array=Scan.get_channel(channel,lazy=False,backward=(1-backward))
-                    
+                    try:
+                        data_array=Scan.get_channel(channel,lazy=False,backward=(1-backward))
+                    except:
+                        data_array=Scan.get_channel(channel,lazy=False,backward=backward)
                     if name in thres_scars_direc.keys():
                         image=filter_scars_removal(data_array.pixels[::-1,:], thres_scars_direc[name])
                     else:
@@ -176,7 +173,7 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                     unitdic[name]=str(data_array.zscale)
                 
                 filename=re.split(r'\W+',files[i])[0]# taking care of extensions in the filename
-                np.savez_compressed(dir_im+filename,**subdic)
+                np.savez_compressed(dir_im+filename,subdic)
                 
                 
                 #extracting the angle
@@ -306,8 +303,110 @@ def get_channel_list(elem,encoding='latin1'):
             result = re.match( r'([^ ]+) \[([^\]]*)\] "([^"]*)"', layer_name).groups()
             channellist.append(result[2])
     return np.array(channellist,dtype=str)
-    
-    
+
+
+
+#copy of function in Bruker (fixed errors concerning certain log files)
+def get_channel(self, channel="Height Sensor", backward=False, corr=None, debug=False, encoding='latin1',
+                lazy=True):
+    """
+    Load the SPM image contained in a channel
+    adapted from pySPM library
+    """
+    for i in range(len(self.layers)):
+        layer_name = self.layers[i][b'@2:Image Data'][0].decode(encoding)
+        result = re.match(
+            r'([^ ]+) \[([^\]]*)\] "([^"]*)"', layer_name).groups()
+        if result[2] == channel:
+            if debug:
+                print("channel " + channel + " Found!")
+            bck = False
+            try:
+                if self.layers[i][b'Line Direction'][0] == b'Retrace':
+                    bck = True
+            except:
+                if self.layers[i][b'Line direction'][0] == b'Retrace':
+                    bck = True
+            if bck == backward:
+                if debug:
+                    print("Direction found")
+                var = self.layers[i][b'@2:Z scale'][0].decode(encoding)
+                if debug:
+                    print("@2:Z scale", var)
+                if '[' in var:
+                    result = re.match(r'[A-Z]+\s+\[([^\]]+)\]\s+\(-?[0-9\.]+ .*?\)\s+(-?[0-9\.]+)\s+(.*?)$',
+                                      var).groups()
+                    if debug:
+                        print(result)
+                    bpp = int(self.layers[i][b'Bytes/pixel'][0])
+                    if debug:
+                        print("BPP", bpp)
+                    # scale = float(result[1])
+                    scale = float(result[1]) / 256 ** bpp
+
+                    result2 = self.scanners[0][b'@' + result[0].encode(encoding)][0].split()
+                    if debug:
+                        print("result2", result2)
+                    scale2 = float(result2[1])
+                    if len(result2) > 2:
+                        zscale = result2[2]
+                    else:
+                        zscale = result2[0]
+                    if b'/V' in zscale:
+                        zscale = zscale.replace(b'/V', b'')
+                    if debug:
+                        print("scale: {:.3e}".format(scale))
+                        print("scale2: {:.3e}".format(scale2))
+                        print("zscale: " + str(zscale))
+                    var = self.layers[i][b'@2:Z offset'][0].decode(encoding)
+                    result = re.match(r'[A-Z]+\s+\[[^\]]+\]\s+\(-?[0-9\.]+ .*?\)\s+(-?[0-9\.]+)\s+.*?$',
+                                      var).groups()
+                    offset = float(result[0])
+                else:
+                    if debug:
+                        print("mode 2")
+                    result = re.match(r'[A-Z]+ \(-?[0-9\.]+ [^\)]+\)\s+(-?[0-9\.]+) [\w]+', var).groups()
+                    scale = float(result[0]) / 65536.0
+                    scale2 = 1
+                    zscale = b'V'
+                    result = re.match(r'[A-Z]+ \(-?[0-9\.]+ .*?\)\s+(-?[0-9\.]+) .*?',
+                                      self.layers[i][b'@2:Z offset'][0].decode(encoding)).groups()
+                    offset = float(result[0])
+                if debug:
+                    print("Offset:", offset)
+                data = self._get_raw_layer(i, debug=debug) * scale * scale2
+                xres = int(self.layers[i][b"Samps/line"][0])
+                yres = int(self.layers[i][b"Number of lines"][0])
+                if debug:
+                    print("xres/yres", xres, yres)
+                try:
+                    scan_size = self.layers[i][b'Scan Size'][0].split()
+                except:
+                    scan_size = self.layers[i][b'Scan size'][0].split()
+                try :
+                    aspect_ratio = [int(x) for x in self.layers[i][b'Aspect Ratio'][0].split(b":")]
+                except:
+                    aspect_ratio = [int(x) for x in self.layers[i][b'Aspect ratio'][0].split(b":")]
+                if debug:
+                    print("aspect ratio", aspect_ratio)
+                if scan_size[2][0] == 126:
+                    scan_size[2] = b'u' + scan_size[2][1:]
+                size = {
+                    'x': float(scan_size[0]) / aspect_ratio[1],
+                    'y': float(scan_size[1]) / aspect_ratio[0],
+                    'unit': scan_size[2].decode(encoding)}
+                image = pySPM.SPM_image(
+                    channel=[channel, 'Topography'][channel == 'Height Sensor'],
+                    BIN=data,
+                    real=size,
+                    _type='Bruker AFM',
+                    zscale=zscale.decode(encoding),
+                    corr=corr)
+                return image
+    if lazy:
+        return self.get_channel(channel=channel, backward=not backward, corr=corr, debug=debug, encoding=encoding,
+                                lazy=False)
+    raise Exception("Channel {} not found".format(channel))
     
 #%%Preparation of the data so that each image has the same dimension 
 def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the images, dir of the numpy info of logs
@@ -318,9 +417,11 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the ima
     for file in os.listdir(temp_dir_info):
         if file[-8:]=='dimp.npy':
             log_para=np.load(temp_dir_info+file)
+            if log_para[0]==0 or log_para[1]==0:
+                raise TypeError('Error in file '+file+', please exculde of dataset')
             phys_dim.append([log_para[0],log_para[1],log_para[0]/log_para[2],log_para[1]/log_para[3]])#format : physical y len, physical x len, resolution y, resolution x
     phys_dim=np.array(phys_dim)
-    prec=np.min(phys_dim[:,2:4])
+    prec=np.min(phys_dim[:,2:4][phys_dim[:,2:4]>0])
     dim_height=int(np.max(phys_dim[:,0])/prec)
     dim_len=int(np.max(phys_dim[:,1])/prec)
     print('dimensions :'+str(dim_height)+', '+str(dim_len))
@@ -330,8 +431,8 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the ima
     listdir=os.listdir(dir_im)
     for i in tqdm.trange(len(listdir)):
         filez=listdir[i]
-        datadir=np.load(dir_im+filez)
-        newdir={}
+        datadir=np.load(dir_im+filez,allow_pickle=True)['arr_0'].item()
+        
         for channel in datadir.keys():
             log_para=np.load(temp_dir_info+filez[:-4]+'dimp.npy')
             if not 'Error' in channel:
@@ -343,8 +444,8 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the ima
             else :
                 newimg=datadir[channel]
                 
-            newdir[channel]=bili_scale_image(newimg,log_para[0]/log_para[2],log_para[1]/log_para[3],dim_height,dim_len,prec,prec)
-        np.savez_compressed(dir_im+filez,**newdir)
+            datadir[channel]=bili_scale_image(newimg,log_para[0]/log_para[2],log_para[1]/log_para[3],dim_height,dim_len,prec,prec)
+        np.savez_compressed(dir_im+filez,datadir)
 
 
 
@@ -369,8 +470,8 @@ def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dim
         log_para=np.load(temp_dir_info+filez[:-4]+'dimp.npy')
         dimi=int(log_para[0])/scale
         dimj=int(log_para[1])/scale
-        datadir=np.load(dir_im+filez)
-        newdir={}
+        datadir=np.load(dir_im+filez,allow_pickle=True)['arr_0'].item()
+        
         keys=datadir.keys()
         if "Height_fwd" in keys and "Peak Force Error_fwd" in keys and "Peak Force Error_bwd" in keys:
             img=renorm_img(datadir["Height_fwd"])/3*2+renorm_img(np.maximum(datadir["Peak Force Error_fwd"],np.zeros(np.shape(datadir["Peak Force Error_fwd"])))+np.maximum(datadir["Peak Force Error_bwd"],np.zeros(np.shape(datadir["Peak Force Error_bwd"]))))/3
@@ -407,16 +508,16 @@ def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dim
                 dim1,dim2=np.shape(maskheight)
                 maskheight=np.logical_and(maskheight,falseframe(dim1,dim2,dimi,dimj))
                 goodimg=correct_plane(datadir[channel], mask=maskheight)
-                if np.min(falseframe(dim1,dim2,dimi,dimj))!=1:
+                if np.max(falseframe(dim1,dim2,dimi,dimj))==0:
+                    cst_val=np.max(datadir[channel])
+                elif np.min(falseframe(dim1,dim2,dimi,dimj))!=1:
                     cst_val=min(np.max(datadir[channel][np.logical_not(falseframe(dim1,dim2,dimi,dimj))]),np.min(datadir[channel][falseframe(dim1,dim2,dimi,dimj)]))
                 else:
                     cst_val=np.min(datadir[channel][falseframe(dim1,dim2,dimi,dimj)])
                 goodimg[np.logical_not(falseframe(dim1,dim2,dimi,dimj))]=cst_val*np.ones((dim1,dim2))[np.logical_not(falseframe(dim1,dim2,dimi,dimj))]
-                newdir[channel]=goodimg
+                datadir[channel]=goodimg
 
-            else:
-                newdir[channel]=datadir[channel]
-        np.savez_compressed(dir_im+filez,**newdir)
+        np.savez_compressed(dir_im+filez,**datadir)
 
 @njit    
 def renorm_img(img):
@@ -424,10 +525,13 @@ def renorm_img(img):
     newimg=np.zeros((dim1,dim2))
     maxi=np.max(img)
     mini=np.min(img)
-    for i in range(dim1):
-        for j in range(dim2):
-            newimg[i,j]=(img[i,j]-mini)/(maxi-mini)
-    return newimg
+    if maxi==mini:
+        return newimg
+    else:
+        for i in range(dim1):
+            for j in range(dim2):
+                newimg[i,j]=(img[i,j]-mini)/(maxi-mini)
+        return newimg
 
 @njit 
 def falseframe(dim1,dim2,dimi,dimj):
@@ -472,7 +576,7 @@ def download_dict_logs_only(dir_im,temp_dir_info,segmentspath,dimensiondata,year
     rmtree(segmentspath)
     rmtree(temp_dir_info)
     if saving:
-        np.save(savingpath,dic)
+        np.savez_compressed(savingpath,dic)
     return dic
 
 
@@ -621,7 +725,7 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
         else :
             del dic[fichier]
     if saving:
-        np.save(savingpath,dic)
+        np.savez_compressed(savingpath,dic)
 
 
 @njit
@@ -663,7 +767,7 @@ def construction_mask_list(dic,dataset,listsavingpath):
             list_index.append(index)
             index+=1
         dic[fichier]["mask_list"]=list_index
-   np.save(listsavingpath,np.array(final_list,dtype=object))
+   np.savez_compressed(listsavingpath,np.array(final_list,dtype=object))
 
 
 
@@ -683,7 +787,7 @@ def centerline_mask(dic,alpha_erasing_branch,saving=False,savingpath='dict'):
             centerlines.append(construc_center(mask_i,alpha_erasing_branch))
         dic[fichier]['centerlines']=centerlines
     if saving:
-        np.save(savingpath,dic)
+        np.savez_compressed(savingpath,dic,allow_pickle=True)
 
 #isolating the mask with number num
 @njit
@@ -953,21 +1057,24 @@ def division_path_detek(skel):#computing the different segment composing the ske
 
 #simplify a segment into a 1D line (so that each pixel has at most 2 neighbour), we suppose that the segment goes in one direction ( it can't go back to point where it was, but can stay one the same pixel). This function is only used in simple_fusion
 def one_D_line(seg) : 
-    #selecting the two first element
-    newseg=[seg[0],seg[1]]
-    if 2<len(seg):
-        for j in range(2,len(seg)):
-            parent=newseg[-1]
-            grandparent=newseg[-2]
-            child=seg[j]
-            if max(abs(child[0]-parent[0]),abs(child[1]-parent[1]),abs(child[0]-grandparent[0]),abs(child[1]-grandparent[1]))<=1:
-                del newseg[-1]
-                newseg.append(child)
-            else :
-                newseg.append(child)
-    if newseg[-1]==newseg[-2]:
-        del newseg[-1]
-    return newseg
+    if len(seg)<2:
+        return seg
+    else:
+        #selecting the two first element
+        newseg=[seg[0],seg[1]]
+        if 2<len(seg):
+            for j in range(2,len(seg)):
+                parent=newseg[-1]
+                grandparent=newseg[-2]
+                child=seg[j]
+                if max(abs(child[0]-parent[0]),abs(child[1]-parent[1]),abs(child[0]-grandparent[0]),abs(child[1]-grandparent[1]))<=1:
+                    del newseg[-1]
+                    newseg.append(child)
+                else :
+                    newseg.append(child)
+        if newseg[-1]==newseg[-2]:
+            del newseg[-1]
+        return newseg
  
 # Erasing the shortest branch if it is alpha>1 shorter than the longuest. Else fusioning two external segments linked to the same division point to get just a 1D line, works on simple cases only
 def fusion_erasing(extr_seg,ex,div,alpha):
@@ -1178,7 +1285,7 @@ def run_one_dataset_logs_only(Main_directory):
     
     
     
-    main_dict=np.load(saving_path+'.npy', allow_pickle=True).item()
+    # main_dict=np.load(saving_path+'.npz', allow_pickle=True)['arr_0']
     
     print("main_parenting",4)
 
@@ -1215,12 +1322,15 @@ if __name__ == "__main__":
     
     '''Running the different functions'''
     ''''''
-    # run_one_dataset(Directory,cropped=True)
+    print(1)
+    for direc in data_set2:
+        for elem in ['Main_dictionnary.npy','masks_list.npy','ROI_dict.npy','masks_ROI_list.npy']:
+            if os.path.exists(direc+elem):
+                os.remove(direc+elem)
     # run_one_dataset_logs_only(Directory)
     
     
     
-    for direc in data_set2:
-            run_one_dataset_logs_only(direc)
-        
+    # for direc in data_set2:
+    #         run_one_dataset_logs_only(direc)
         

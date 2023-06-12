@@ -6,22 +6,22 @@ Created on Wed May 10 14:34:34 2023
 @author: c.soubrier
 """
 import re
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from cellpose import plot
-import cv2
 import processing as pr
-import ROI_lineage.extract_individuals as exi
+import extract_individuals as exi
 
 Directory= "WT_mc2_55/30-03-2015/"#"dataset/"# 'delta_lamA_03-08-2018/2/'
 
-result_path=''
 
-dic_name='Main_dictionnary.npy'
 
-list_name='masks_list.npy'
+dic_name='Main_dictionnary.npz'
 
-ROI_dictionary='ROI_dict.npy'
+list_name='masks_list.npz'
+
+ROI_dictionary='ROI_dict.npz'
 
 final_thresh=0.8
 
@@ -31,16 +31,20 @@ lin_mat_name='non_trig_Link_matrix.npy'
 
 Bool_mat_name="Bool_matrix.npy"
 
-index_list_name='masks_ROI_list.npy'
+Link_mat='Link_matrix.npy'
 
-min_len_ROI=3
+index_list_name='masks_ROI_list.npz'
+
+min_len_ROI=3 #minimum number of element in an ROI
 
 data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]
+
+data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
 
 colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
 
-ROI_name='ROI_dict.npy' 
+ROI_name='ROI_dict.npz' 
 
 #Dictionnary of the ROIs with the ROI name as entry and as argument : Parent ROI (string, if not ''), Child1 ROI (string, if not ''), Child2 ROI (string, if not ''), list of masks (int), ROI index, Roi color_index
 
@@ -52,25 +56,6 @@ ROI_name='ROI_dict.npy'
 
 
 
-def construct_ROI(dirname,resultpath,bool_name,saving=True,ROIname=ROI_name):
-    
-    bool_mat=np.load(dirname+result_path+bool_name)
-    ROI_dict = {} # initialize dictionary
-
-    roots = exi.get_roots(bool_mat) # get all roots and start new tree traversal for each one 
-    starting_num = 1 # initial ROI ID number is 1
-
-    for root in roots:
-        individuals = exi.get_individuals(bool_mat,root,ROI_num=starting_num,root=root)[0]
-        ROI_dict.update(exi.list2dict(individuals))
-        starting_num = int(list(ROI_dict.keys())[-1].split()[-1])+1 # make sure next tree's first ROI is latest ROI ID# + 1
-
-    create_children(ROI_dict) # add Children subkey to each dictionary item
-
-    #print(ROI_dict)
-    if saving:
-        np.save(dirname+resultpath + ROIname,ROI_dict)
-    return ROI_dict
 
 
 
@@ -162,7 +147,7 @@ def intensity_lineage(index):
 
 
 
-def plot_lineage_tree(ROI_dic,masks_list,main_dic,maskcol):
+def plot_lineage_tree(ROI_dic,masks_list,main_dic,maskcol,directory):
     
     for ROI in ROI_dic.keys():
         if ROI_dic[ROI]['Parent']!='':
@@ -189,7 +174,7 @@ def plot_lineage_tree(ROI_dic,masks_list,main_dic,maskcol):
         
         plot_col=(col[0]/255,col[1]/255,col[2]/255)
         plt.plot([t1,t2],[value1,value1],color=plot_col)
-        
+        plt.title('Lineage tree'+directory)
     plt.show()
     
 def extract_roi_list_from_dic(ROI_dic,masks_list):
@@ -227,7 +212,7 @@ def plot_image_one_ROI(ROI,ROI_dic,masks_list,dic):
         
 
 
-def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist):
+def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist,directory):
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         # plot image with masks overlaid
@@ -251,9 +236,10 @@ def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist):
             else:
                 col_ind_list[i]=col_ind_list[i]%len_col+1
         masks=pr.update_masks(masks,col_ind_list)
+        
         colormask=np.array(maskcol)
-        mask_RGB = plot.mask_overlay(img,masks,colors=colormask)#image with masks
-        plt.title('time : '+str(dic[fichier]['time']))
+        mask_RGB = plot.mask_overlay(pr.renorm_img(img),masks,colors=colormask)#image with masks
+        plt.title(directory+', time : '+str(dic[fichier]['time']))
         plt.imshow(mask_RGB)
         
         # plot the centroids and the centerlines
@@ -394,9 +380,9 @@ def change_root_index(ROI,ROI_dic,newindex,indexlist):
         change_root_index(child,ROI_dic,newindex,indexlist)
 
 
-def manually_regluing(direc,resultpath,ROIdict,indexlistname,parent,child,division=True):
-    ROI_dict=np.load(direc+resultpath+ROIdict,allow_pickle=True).item()
-    indexlist=np.load(direc+resultpath+indexlistname,allow_pickle=True)
+def manually_regluing(direc,ROIdict,indexlistname,parent,child,division=True):
+    ROI_dict=np.load(direc+ROIdict,allow_pickle=True)['arr_0'].item()
+    indexlist=np.load(direc+indexlistname,allow_pickle=True)['arr_0']
     parentROI=''
     childROI=''
     for ROI in ROI_dict.keys():
@@ -434,8 +420,8 @@ def manually_regluing(direc,resultpath,ROIdict,indexlistname,parent,child,divisi
                     indexlist[mask,2]=parentROI
     else:
         raise NameError('No ROI with following index :'+(parentROI=='')*parent+' '+(childROI=='')*child)
-    np.save(direc+resultpath+ROIdict,ROI_dict)
-    np.save(direc+resultpath+indexlistname,indexlist)
+    np.savez_compressed(direc+ROIdict,ROI_dict,allow_pickle=True)
+    np.savez_compressed(direc+indexlistname,indexlist,allow_pickle=True)
             
                 
     
@@ -443,15 +429,16 @@ def manually_regluing(direc,resultpath,ROIdict,indexlistname,parent,child,divisi
     
     
     
-def run_whole_lineage_tree(direc,resultpath,dicname,listname,ROIdict,indexlistname,maskcol,linmatname,boolmatname,thres,min_number,thresmin):
+def run_whole_lineage_tree(direc,dicname,listname,ROIdict,indexlistname,maskcol,linmatname,boolmatname,linkmatname,thres,min_number,thresmin):
     
-    masks_list=np.load(direc+resultpath+listname, allow_pickle=True)
-    main_dict=np.load(direc+resultpath+dicname, allow_pickle=True).item()
+    masks_list=np.load(direc+listname, allow_pickle=True)['arr_0']
+    main_dict=np.load(direc+dicname, allow_pickle=True)['arr_0'].item()
+    Bool_matrix=np.load(direc+boolmatname)
 
     
-    ROI_dict=construct_ROI(direc,resultpath,boolmatname)
+    ROI_dict=exi.extract_individuals(Bool_matrix, direc)
     
-    linmatrix=np.load(direc+resultpath+linmatname)
+    linmatrix=np.load(direc+linmatname)
     
     newdic=filter_good_ROI_dic(ROI_dict,min_number)
     
@@ -459,35 +446,39 @@ def run_whole_lineage_tree(direc,resultpath,dicname,listname,ROIdict,indexlistna
     
     indexlist=detect_bad_div(newdic,linmatrix,masks_list,thres,thresmin)
 
-    plot_lineage_tree(newdic,masks_list,main_dict,maskcol)
-    plot_image_lineage_tree(newdic,masks_list,main_dict,maskcol,indexlist)
-    np.save(direc+resultpath+ROIdict,newdic,allow_pickle=True)
-    np.save(direc+resultpath+indexlistname,indexlist)
-    return newdic,indexlist
+    plot_lineage_tree(newdic,masks_list,main_dict,maskcol,direc)
+    plot_image_lineage_tree(newdic,masks_list,main_dict,maskcol,indexlist,direc)
+    np.savez_compressed(direc+ROIdict,newdic,allow_pickle=True)
+    np.savez_compressed(direc+indexlistname,indexlist,allow_pickle=True)
+    
+    
+    # os.remove(direc+linmatname)
+    # os.remove(direc+boolmatname)
+    # os.remove(direc+linkmatname)
+    # return newdic,indexlist
     
     
 
 if __name__ == "__main__":
-    #manually_regluing(Directory,result_path,ROI_dictionary,index_list_name,'1/100','5/',division=False)
     
-    # index_list=np.load(Directory+result_path+index_list_name, allow_pickle=True)
-    # List_of_masks=np.load(Directory+result_path+list_name, allow_pickle=True)
-    # main_dict=np.load(Directory+result_path+dic_name, allow_pickle=True).item()
-    # newdic=np.load(Directory+result_path+ROI_dictionary, allow_pickle=True).item()
-    
-    # plot_image_one_ROI('ROI 10',newdic,List_of_masks,main_dict)
-    
-    # plot_lineage_tree(newdic,List_of_masks,main_dict,colormask)
-    # plot_image_lineage_tree(newdic,List_of_masks,main_dict,colormask,index_list)
-    
-#%%    
-    run_whole_lineage_tree(Directory,result_path,dic_name,list_name,ROI_dictionary,index_list_name,colormask,lin_mat_name,Bool_mat_name,final_thresh,min_len_ROI,thres_min_division)
+    # manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)
+
+   
+    run_whole_lineage_tree(Directory,dic_name,list_name,ROI_dictionary,index_list_name,colormask,lin_mat_name,Bool_mat_name,Link_mat,final_thresh,min_len_ROI,thres_min_division)
 
 
-    # for direc in data_set:
-    #     print(direc[0])
-    #     run_whole_lineage_tree(direc[0],result_path,dic_name,list_name,ROI_dictionary,index_list_name,colormask,lin_mat_name,Bool_mat_name,final_thresh,min_len_ROI,thres_min_division)
-    
+    # for direct in data_set2:
+    #     print(direct)
+        
+    #     # run_whole_lineage_tree(direc,dic_name,list_name,ROI_dictionary,index_list_name,colormask,lin_mat_name,Bool_mat_name,Link_mat,final_thresh,min_len_ROI,thres_min_division)
+        
+        
+    #     index_list=np.load(direct+index_list_name, allow_pickle=True)['arr_0']
+    #     List_of_masks=np.load(direct+list_name, allow_pickle=True)['arr_0']
+    #     main_dict=np.load(direct+dic_name, allow_pickle=True)['arr_0'].item()
+    #     newdic=np.load(direct+ROI_dictionary, allow_pickle=True)['arr_0'].item()
+    #     plot_lineage_tree(newdic,List_of_masks,main_dict,colormask,direct)
+    #     plot_image_lineage_tree(newdic,List_of_masks,main_dict,colormask,index_list,direct)
     
 
 

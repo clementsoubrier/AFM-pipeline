@@ -64,102 +64,101 @@ def dda_line(end_segment, mask):
 
 #%% Wrapper function (accepts dictionary or directory input argument) #########
 
-def complete_centerlines(main_dict=None, dic_dir=None):
-    """
-    Extend the midlines of binarized images in a dictionary of masks and centerlines.
+# def complete_centerlines(main_dict=None, dic_dir=None):
+#     """
+#     Extend the midlines of binarized images in a dictionary of masks and centerlines.
 
-    Parameters:
-        main_dict (dict, optional): A dictionary with keys representing file names and subkeys 'masks' 
-                                   and 'centerlines'. The 'masks' key should contain 2D numpy arrays 
-                                   of binarized images with masks over the regions of interest (ROIs). 
-                                   The 'centerlines' key should contain lists of numpy arrays that 
-                                   represent the y-x- coordinates of pixels making up the midlines of 
-                                   the masks. Default is None.
-        dic_dir (str, optional): The directory path to the dictionary. Default is None.
-                                 The dictionary can be optionally loaded from this path.
+#     Parameters:
+#         main_dict (dict, optional): A dictionary with keys representing file names and subkeys 'masks' 
+#                                    and 'centerlines'. The 'masks' key should contain 2D numpy arrays 
+#                                    of binarized images with masks over the regions of interest (ROIs). 
+#                                    The 'centerlines' key should contain lists of numpy arrays that 
+#                                    represent the y-x- coordinates of pixels making up the midlines of 
+#                                    the masks. Default is None.
+#         dic_dir (str, optional): The directory path to the dictionary. Default is None.
+#                                  The dictionary can be optionally loaded from this path.
 
-    Returns:
-        main_dict: A modified dictionary with extended midlines. The 'centerlines' subkey of each 
-                  file entry will contain the updated numpy arrays with additional coordinates.
-    """
+#     Returns:
+#         main_dict: A modified dictionary with extended midlines. The 'centerlines' subkey of each 
+#                   file entry will contain the updated numpy arrays with additional coordinates.
+#     """
     
-    if dic_dir:
-        main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
+#     if dic_dir:
+#         main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
         
         
-    for file_name in list(main_dict.keys()):
+#     for file_name in list(main_dict.keys()):
         
-        print("file name: ", file_name)
+#         print("file name: ", file_name)
     
-        masks_arr = np.copy(main_dict[file_name]['masks'])
-        centerlines_arr = main_dict[file_name]['centerlines']
+#         masks_arr = np.copy(main_dict[file_name]['masks'])
+#         centerlines_arr = main_dict[file_name]['centerlines']
     
-        for ff in np.unique(masks_arr)[:-1]:
+#         for ff in np.unique(masks_arr)[:-1]:
             
-            # print("mask label: ",ff+1)
+#             # print("mask label: ",ff+1)
             
-            mask = np.copy(masks_arr)
-            mask[masks_arr==ff+1] = 255
-            mask[mask!=255] = 0
+#             mask = np.copy(masks_arr)
+#             mask[masks_arr==ff+1] = 255
+#             mask[mask!=255] = 0
             
-            centerline = np.copy(centerlines_arr[ff])
+#             centerline = np.copy(centerlines_arr[ff])
             
-            if len(centerline)<5: # skip if the centerline is too small or absent
-                # print("skipped mask: centerline too small or missing")
-                continue
+#             if len(centerline)<5: # skip if the centerline is too small or absent
+#                 # print("skipped mask: centerline too small or missing")
+#                 continue
                 
-            end_points = find_extremal_div_pts(centerline)[0]
-            end_points = [list(e)for e in end_points]
+#             end_points = find_extremal_div_pts(centerline)[0]
+#             end_points = [list(e)for e in end_points]
             
-            if len(end_points)!=2: # skip if there are fewer or more than 2 terminal pixels in the centerline
-                # print("skipped mask: fewer than 2 (looped) or more than 2 (branched) centerline terminal pixels")
-                continue
+#             if len(end_points)!=2: # skip if there are fewer or more than 2 terminal pixels in the centerline
+#                 # print("skipped mask: fewer than 2 (looped) or more than 2 (branched) centerline terminal pixels")
+#                 continue
             
-            extended_centerline = np.copy(centerline)
-            centerline_copy = np.ndarray.tolist(np.copy(centerline))
+#             extended_centerline = np.copy(centerline)
+#             centerline_copy = np.ndarray.tolist(np.copy(centerline))
             
-            for end in end_points:
-                end_segment = [end]
-                centerline_copy.remove(end)
+#             for end in end_points:
+#                 end_segment = [end]
+#                 centerline_copy.remove(end)
                 
-                for ii in range(5):
-                    neighbor = get_neighbors(end,centerline_copy)
+#                 for ii in range(5):
+#                     neighbor = get_neighbors(end,centerline_copy)
                     
-                    if len(neighbor)!=1: # stop adding coordinates to the end segment if discontinuous or branched centerline
-                        # print("end segment branched or broken")
-                        break
-                    else:
-                        neighbor = list(neighbor[0])
+#                     if len(neighbor)!=1: # stop adding coordinates to the end segment if discontinuous or branched centerline
+#                         # print("end segment branched or broken")
+#                         break
+#                     else:
+#                         neighbor = list(neighbor[0])
                     
-                    # print(neighbor)
-                    end_segment.append(neighbor)
-                    # print(end_segment)
-                    centerline_copy.remove(neighbor)
-                    end = neighbor
+#                     # print(neighbor)
+#                     end_segment.append(neighbor)
+#                     # print(end_segment)
+#                     centerline_copy.remove(neighbor)
+#                     end = neighbor
                     
-                end_segment = end_segment[::-1]
+#                 end_segment = end_segment[::-1]
                 
-                if len(end_segment)>1: # extrapolate the end line segment if a slope can be calculated
-                    line = dda_line(end_segment, mask)
-                else:
-                    # print("end segment too short for extrapolation")
-                    break
+#                 if len(end_segment)>1: # extrapolate the end line segment if a slope can be calculated
+#                     line = dda_line(end_segment, mask)
+#                 else:
+#                     # print("end segment too short for extrapolation")
+#                     break
                 
-                if len(line)>0: # extend the centerline if the extension exists
-                    extended_centerline = np.concatenate((extended_centerline, np.array(line)))
-                # else: 
-                    # print("centerline not extended from one end")
+#                 if len(line)>0: # extend the centerline if the extension exists
+#                     extended_centerline = np.concatenate((extended_centerline, np.array(line)))
+#                 # else: 
+#                     # print("centerline not extended from one end")
             
-            # for cc in extended_centerline:
-            #     masks_arr[cc[0],cc[1]] = 0
+#             # for cc in extended_centerline:
+#             #     masks_arr[cc[0],cc[1]] = 0
             
-            centerlines_arr[ff] = extended_centerline
+#             centerlines_arr[ff] = extended_centerline
         
-    return main_dict
+#     return main_dict
 
 
 #%% Alternative wrapper function (accepts one centerline numpy array and corresponding binarized mask numpy array)
-
 
 def complete_one_centerline(centerline, mask):
     
@@ -185,10 +184,10 @@ def complete_one_centerline(centerline, mask):
         # print("Warning: fewer than 2 (looped) or more than 2 (branched) centerline terminal pixels")
     
     extended_centerline = np.copy(centerline)
-    centerline_copy = np.ndarray.tolist(np.copy(centerline))
     
     for end in end_points:
         end_segment = [end]
+        centerline_copy = np.ndarray.tolist(np.copy(centerline))
         centerline_copy.remove(end)
         
         for ii in range(5):
@@ -222,36 +221,20 @@ def complete_one_centerline(centerline, mask):
     # for cc in extended_centerline:
     #     masks_arr[cc[0],cc[1]] = 0
     
+    # Sort coordinates of extended centerline
+    centerline_copy = np.copy(extended_centerline).tolist()
+    terminal_coordinates = find_extremal_div_pts(centerline_copy)[0][0]
+    centerline_copy.remove(terminal_coordinates)
+    reordered = [terminal_coordinates]
+    for cc in range(len(centerline_copy)):
+        neighbor = list(get_neighbors(reordered[-1],centerline_copy)[0])
+        # print(neighbor)
+        reordered.append(neighbor)
+        centerline_copy.remove(neighbor)
+    
+    extended_centerline = np.array(reordered)
+    
     return extended_centerline
-
-
-#%% Test alternative wrapper function #########################################
-
-# dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/stiffness_test/03-09-2014/"
-# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
-
-# file_name = list(main_dict.keys())[0]
-# ff = 4
-
-# centerline = main_dict[file_name]['centerlines'][ff]
-
-# mask = np.copy(main_dict[file_name]['masks'].astype(np.uint8))
-# mask[mask==ff+1] = 255
-# mask[mask!=255] = 0
-
-# for cc in centerline:
-#     mask[cc[0],cc[1]] = 0
-    
-# Image.fromarray(mask).show()
-
-
-
-# extended_centerline = complete_one_centerline(centerline, mask)
-
-# for cc in extended_centerline:
-#     mask[cc[0],cc[1]] = 128
-    
-# Image.fromarray(mask).show()
 
 
 #%% Load dictionary for testing ###############################################
@@ -260,102 +243,89 @@ def complete_one_centerline(centerline, mask):
 # main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
 
 
-#%% Main loop for testing first 2 keys ########################################
+# dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/delta_parB_03-02-2015/"
+# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
 
-# save_path = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/stiffness_test/test_dict.npz"
 
-# for file_name in list(main_dict.keys())[0:2]:
+# dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/delta_parB_15-11-2014/"
+# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
+
+#%% Troubleshooting, try frames 46 and 47
+
+# file_names = list(main_dict.keys())
+
+# file = file_names[46]
+# masks_arr = main_dict[file]['masks']
+# mask_labels = (np.unique(masks_arr)+1).tolist()
+# centerlines = main_dict[file]['centerlines']
+
+# fig, ax = plt.subplots()
+# ax.imshow(masks_arr, cmap='binary')
+
+# test = np.copy(masks_arr)
+# test[test!=0] = 255
+
+# for ii in range(len(centerlines)):
+#     mask = np.copy(masks_arr)
+#     mask[mask!=ii+1] = 0
+#     mask[mask==ii+1] = 255
     
-#     print("file name: ", file_name)
-
-#     masks_arr = np.copy(main_dict[file_name]['masks'])
-#     centerlines_arr = main_dict[file_name]['centerlines']
-
-#     for ff in np.unique(masks_arr)[:-1]:
-        
-#         print("mask label: ",ff+1)
-        
-#         mask = np.copy(masks_arr)
-#         mask[masks_arr==ff+1] = 255
-#         mask[mask!=255] = 0
-        
-#         centerline = np.copy(centerlines_arr[ff])
-        
-#         if len(centerline)<5: # skip if the centerline is too small or absent
-#             print("skipped mask: centerline too small or missing")
-#             continue
-            
-#         end_points = find_extremal_div_pts(centerline)[0]
-#         end_points = [list(e)for e in end_points]
-        
-#         if len(end_points)!=2: # skip if there are fewer or more than 2 terminal pixels in the centerline
-#             print("skipped mask: fewer than 2 (looped) or more than 2 (branched) centerline terminal pixels")
-#             continue
-        
-#         extended_centerline = np.copy(centerline)
-#         centerline_copy = np.ndarray.tolist(np.copy(centerline))
-        
-#         for end in end_points:
-#             end_segment = [end]
-#             centerline_copy.remove(end)
-            
-#             for ii in range(5):
-#                 neighbor = get_neighbors(end,centerline_copy)
-                
-#                 if len(neighbor)!=1: # stop adding coordinates to the end segment if discontinuous or branched centerline
-#                     print("end segment branched or broken")
-#                     break
-#                 else:
-#                     neighbor = list(neighbor[0])
-                
-#                 # print(neighbor)
-#                 end_segment.append(neighbor)
-#                 # print(end_segment)
-#                 centerline_copy.remove(neighbor)
-#                 end = neighbor
-                
-#             end_segment = end_segment[::-1]
-            
-#             if len(end_segment)>1: # extrapolate the end line segment if a slope can be calculated
-#                 line = dda_line(end_segment, mask)
-#             else:
-#                 print("end segment too short for extrapolation")
-#                 break
-            
-#             if len(line)>0: # extend the centerline if the extension exists
-#                 extended_centerline = np.concatenate((extended_centerline, np.array(line)))
-#             else: 
-#                 print("centerline not extended from one end")
-        
-#         for cc in extended_centerline:
-#             masks_arr[cc[0],cc[1]] = 0
-        
-#         centerlines_arr[ff] = extended_centerline
-
-    # masks_arr[masks_arr!=0] = 255
-    # Image.fromarray(masks_arr.astype(np.uint8)).show()
+#     centerline = centerlines[ii]    
+#     outline = main_dict[file]['outlines'][ii]
     
-# np.savez(save_path, **main_dict)
+#     extended_centerline = complete_one_centerline(centerline, mask)
+#     x_coords = [cc[1] for cc in extended_centerline]
+#     y_coords = [cc[0] for cc in extended_centerline]
+#     # ax.plot(x_coords, y_coords, 'r.', markersize=5)
+#     plt.plot(x_coords, y_coords)
 
+# plt.show()
 
-#%% Load saved modified main_dict for testing #################################
-
-# save_path = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/stiffness_test/test_dict.npz"
-# main_dict = np.load(save_path, allow_pickle=True)['arr_0'].item()
-
-
-#%% For viewing specific masks ################################################
-# test = np.copy(mask)
-
-# for cc in extended_centerline:
-#     test[cc[0],cc[1]] = 128
-
-# for cc in centerline:
-#     test[cc[0],cc[1]] = 0
+#     for cc in extended_centerline:
+#         test[cc[0],cc[1]] = 128
+    
+#     for cc in centerline:
+#         test[cc[0],cc[1]] = 0
+        
+#     for cc in outline:
+#         test[cc[0],cc[1]] = 0
+    
+#     # Image.fromarray(mask.astype(np.uint8)).show()
 
 # Image.fromarray(test.astype(np.uint8)).show()
 
+# check_masks = np.copy(masks_arr)
+# check_masks[masks_arr!=0] = 255
+# Image.fromarray(check_masks.astype(np.uint8)).show()
 
 
+#%% Test 3rd centerline (index 2) of file 11152317 of dataset "delta_parB/15-11-2014/"
 
+# file = "11152317"
+# masks_arr = main_dict[file]['masks']
+# mask_labels = (np.unique(masks_arr)+1).tolist()
+# centerlines = main_dict[file]['centerlines']
+
+# fig, ax = plt.subplots()
+# ax.imshow(masks_arr, cmap='binary')
+
+# # test = np.copy(masks_arr)
+# # test[test!=0] = 255
+
+# for ii in range(0,3):
+#     mask = np.copy(masks_arr)
+#     mask[mask!=ii+1] = 0
+#     mask[mask==ii+1] = 255
     
+#     # centerline = main_dict[file]['centerlines'][label-1]
+#     centerline = centerlines[ii]    
+#     outline = main_dict[file]['outlines'][ii]
+    
+    
+#     extended_centerline = complete_one_centerline(centerline, mask)
+#     x_coords = [cc[1] for cc in extended_centerline]
+#     y_coords = [cc[0] for cc in extended_centerline]
+#     ax.plot(x_coords, y_coords, 'r.', markersize=5)
+
+# plt.show()
+

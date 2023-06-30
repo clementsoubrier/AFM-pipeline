@@ -138,8 +138,25 @@ def stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname):
         mask_surf.append(area*resolution**2)
     return(centerlen,mask_surf)
 
+def plotstat(data,title,bar_num=40):
+    res=np.array(data)
+    mean=np.average(res)
+    med=np.median(res)
+    q1=np.percentile(res, 25)
+    q3=np.percentile(res, 75)
+    plt.hist(res, bar_num, density=True, color="grey")
+    plt.axvline(mean, color="red", label="mean"+str(mean))
+    plt.axvline(med, color="blue", label="median"+str(med))
+    plt.axvline(q1, color="green", label="quantiles")
+    plt.axvline(q3, color="green")
+    plt.legend()
+    plt.title(title)
+    plt.savefig('stats_'+title, format='jpg')
+    plt.show()
 
 def totale_stats(direct_list,ROIdicname,dicname,masklistname):
+    
+    
     wholeROI,rootsonly,leafonly, nonconnected,numberdivision=classifying_ROI(direct_list,ROIdicname)
     
     
@@ -150,169 +167,13 @@ def totale_stats(direct_list,ROIdicname,dicname,masklistname):
     
     print('complete ROI : ',len(wholeROI),' roots only : ', len(rootsonly),' leaf only : ',len(leafonly),' non connected : ', len(nonconnected))
     print('number_division',numberdivision)
+    stat_list=[[[i for elem in centerlen for i in elem],'Centerlines'],[[i for elem in mask_surf for i in elem],'Surfaces'],[[elem[0] for elem in centerlen]+[elem for elem in begincenterlen],'Centerlines after div'],[[elem[0] for elem in mask_surf]+[elem for elem in beginmask_surf],'Surfaces after div'],[[elem[-1] for elem in centerlen]+[elem for elem in endcenterlen],'Centerlines before div'],[[elem[-1] for elem in mask_surf]+[elem for elem in endmask_surf],'Surfaces before div'],[[elem[-1]/elem[0] for elem in centerlen ],'Centerlines len ratio between 2 div'],[[elem[-1]/elem[0] for elem in  mask_surf],'Surface len ratio between 2 div'],[[np.average(np.array(elem)) for elem in centerlen],'ROI AVG Centerlines'],[[np.average(np.array(elem)) for elem in mask_surf],'ROI AVG Surface']]
     
-    tot_centerlen=[i for elem in centerlen for i in elem]
-    #print(tot_centerlen)
-    res=np.array(tot_centerlen)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Centerlines'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    tot_surf=[i for elem in mask_surf for i in elem]
-    res=np.array(tot_surf)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Surfaces'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    beglen=[elem[0] for elem in centerlen]+[elem for elem in begincenterlen]
-    res=np.array(beglen)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Centerlines after div'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    begsurf=[elem[0] for elem in mask_surf]+[elem for elem in beginmask_surf]
-    res=np.array(begsurf)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Surfaces after div'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    endlen=[elem[-1] for elem in centerlen]+[elem for elem in endcenterlen]
-    res=np.array(endlen)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Centerlines before div'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    endsurf=[elem[-1] for elem in mask_surf]+[elem for elem in endmask_surf]
-    res=np.array(endsurf)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Surfaces before div'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    center_ratio=[elem[-1]/elem[0] for elem in centerlen ]
-    res=np.array(center_ratio)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Centerlines len ratio between 2 div'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    surf_grow=[elem[-1]/elem[0] for elem in  mask_surf]
-    res=np.array(surf_grow)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='Surface len ratio between 2 div'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    avg_centerlen=[np.average(np.array(elem)) for elem in centerlen]
-    res=np.array(avg_centerlen)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='ROI AVG Centerlines'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-    avh_surf=[np.average(np.array(elem)) for elem in mask_surf]
-    res=np.array(avh_surf)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='ROI AVG Surface'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
+    for elem in stat_list:
+        plotstat(elem[0],elem[1])
     
+  
+
     
    
     
@@ -379,41 +240,10 @@ def stats_time_evol(direct_list,ROIdicname,dicname,masklistname):
                     print(direct)
                     
                     
-                    
-    res=np.array(centerratio)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    plt.xlim((0, 0.05))
-    plt.axvline(mean, color="red", label="mean "+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='centerline growth rate'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
+    plotstat(centerratio ,'centerline growth rate')
+    plotstat(surfratio ,'surface growth rate')
     
-    res=np.array(surfratio)
-    mean=np.average(res)
-    med=np.median(res)
-    q1=np.percentile(res, 25)
-    q3=np.percentile(res, 75)
-    plt.hist(res, 40, density=True, color="grey")
-    
-    plt.axvline(mean, color="red", label="mean"+str(mean))
-    plt.axvline(med, color="blue", label="median"+str(med))
-    plt.axvline(q1, color="green", label="quantiles")
-    plt.axvline(q3, color="green")
-    plt.legend()
-    title='surface growth rate'
-    plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
-            
+
         
 
     

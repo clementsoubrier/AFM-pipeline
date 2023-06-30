@@ -21,6 +21,7 @@ from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
 import scipy
 import pySPM
+from  complete_centerlines import  complete_one_centerline
 
 
 
@@ -59,10 +60,10 @@ import pySPM
 # =============================================================================
 
 
-Directory=  'delta_lamA_03-08-2018/' #the directory you chose to work on     "dataset/"#
+Directory= "WT_mc2_55/30-03-2015/" #the directory you chose to work on    
 # different type of datassets with their cropping parameter
 
-data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+data_set2=['WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #'delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",
 
 problem=['WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
@@ -777,14 +778,24 @@ def construction_mask_list(dic,dataset,listsavingpath):
 def centerline_mask(dic,alpha_erasing_branch,saving=False,savingpath='dict'):
 
     diclist=list(dic.keys())
-    for i in tqdm.trange(len(diclist)):
-        fichier=diclist[i]
+    for j in tqdm.trange(len(diclist)):
+        fichier=diclist[j]
+        
         masks=dic[fichier]['masks']
         mask_number=np.max(masks)
         centerlines=[]
         for i in range(mask_number):
             mask_i=transfo_bin(masks,i+1) #isolating the i+1-th mask
-            centerlines.append(construc_center(mask_i,alpha_erasing_branch))
+            first_line=construc_center(mask_i,alpha_erasing_branch)
+            if len(first_line)>5:          #avoiding too short centerlines
+                try:
+                    extended_line=complete_one_centerline(first_line, mask_i)
+                except:
+                    print('error complete centerline ' ,fichier,i)
+                    extended_line=first_line
+            else:
+                extended_line=first_line
+            centerlines.append(extended_line)
         dic[fichier]['centerlines']=centerlines
     if saving:
         np.savez_compressed(savingpath,dic,allow_pickle=True)
@@ -811,14 +822,14 @@ def construc_center(mask,alpha):
     
     if len_int==0:
         if len_extr==1:
-            return np.array(extr_seg[0]).astype(np.int32)
+            return np.array(one_D_line(fil_gaps_1D(extr_seg[0]))).astype(np.int32)
         elif len_extr==2:
             compo1=extr_seg[0]
             compo2=extr_seg[1][-1::-1]
             if compo1[-1]==compo2[0]:
                 del compo1[-1]
-            sol=compo1+list(linear_interpolation(compo1[-1],compo2[0]))+compo2
-            return np.array(sol).astype(np.int32)
+            sol=compo1+compo2
+            return np.array(one_D_line(fil_gaps_1D(sol))).astype(np.int32)
         else:
             print("Error skel format,len_int==0,len_extr="+str(len_extr))
             return np.array([[]],dtype=np.int32)
@@ -826,7 +837,7 @@ def construc_center(mask,alpha):
         
     elif len_int==1 and len_extr==2:
         compo1=extr_seg[0]
-        compo3=extr_seg[0][::-1]
+        compo3=extr_seg[1][::-1]
         if max(abs(compo1[-1][0]-int_seg[0][0][0]),abs(compo1[-1][1]-int_seg[0][0][1]))<=3:
             compo2=int_seg[0]
         else:
@@ -835,8 +846,8 @@ def construc_center(mask,alpha):
             del compo1[-1]
         if compo2[-1]==compo3[0]:
             del compo2[-1]
-        sol=compo1+list(linear_interpolation(compo1[-1],compo2[0]))+compo2+list(linear_interpolation(compo2[-1],compo3[0]))+compo3
-        return np.array(sol).astype(np.int32)
+        sol=compo1+compo2+compo3
+        return np.array(one_D_line(fil_gaps_1D(sol))).astype(np.int32)
     
         
     #we can do the case with 2 internal segments
@@ -874,9 +885,9 @@ def construc_center(mask,alpha):
             del new_int_seg2[0]
         if new_int_seg2[-1]==extr_seg[1][-1]:
             del extr_seg[1][-1]
-        sol=extr_seg[0]+list(linear_interpolation(extr_seg[0][-1],new_int_seg1[0]))+new_int_seg1+list(linear_interpolation(new_int_seg1[-1],new_int_seg2[0]))+new_int_seg2+list(linear_interpolation(new_int_seg2[-1],extr_seg[1][-1]))+extr_seg[1][::-1]
+        sol=extr_seg[0]+new_int_seg1+new_int_seg2+extr_seg[1][::-1]
         
-        return np.array(sol)
+        return np.array(one_D_line(fil_gaps_1D(sol))).astype(np.int32)
     else:
         print("Error skel format, len_int="+str(len_int)+"len_extr="+str(len_extr))
         return np.array([[]],dtype=np.int32)
@@ -886,19 +897,56 @@ def linear_interpolation(point1,point2):
     len_list= max(np.abs(point1[0]-point2[0]),np.abs(point1[1]-point2[1]))-1
     if len_list<=0:
         return np.zeros(0)
-    else :
-        if np.abs(point1[0]-point2[0])+1==len_list:
+    elif np.abs(point1[0]-point2[0])!=np.abs(point1[1]-point2[1]):
+        if point1[0]-point2[0]-1==len_list:
+            val1=np.linspace(point1[0]-1,point2[0]+1,len_list,dtype=np.int32)
+            val2=np.linspace(point1[1],point2[1],len_list,dtype=np.int32)
+
+        elif point2[0]-point1[0]-1==len_list:
             val1=np.linspace(point1[0]+1,point2[0]-1,len_list,dtype=np.int32)
             val2=np.linspace(point1[1],point2[1],len_list,dtype=np.int32)
+
+        elif point1[1]-point2[1]-1==len_list:
+            val1=np.linspace(point1[0],point2[0],len_list,dtype=np.int32)
+            val2=np.linspace(point1[1]-1,point2[1]+1,len_list,dtype=np.int32)
+
         else:
             val1=np.linspace(point1[0],point2[0],len_list,dtype=np.int32)
             val2=np.linspace(point1[1]+1,point2[1]-1,len_list,dtype=np.int32)
+    else:
+        i=1-2*(point1[0]>point2[0])
+        j=1-2*(point1[1]>point2[1])
+        val1=np.linspace(point1[0]+i,point2[0]-i,len_list,dtype=np.int32)
+        val2=np.linspace(point1[1]+j,point2[1]-j,len_list,dtype=np.int32)
         
-        final=np.zeros((len_list,2),dtype=np.int32)
-        final[:,0]=val1
-        final[:,1]=val2
-        return final
+    final=np.zeros((len_list,2),dtype=np.int32)
+    final[:,0]=val1
+    final[:,1]=val2
+    return final
 
+def fil_gaps_1D(line):
+    if len(line)<2:
+        return line
+    else:
+        oldelem=line[0]
+        newseg=[oldelem]
+        for j in range(1,len(line)):
+            newelem=line[j]
+            if oldelem!=newelem:
+                if max(abs(oldelem[0]-newelem[0]),abs(oldelem[1]-newelem[1]))==1:
+                    newseg.append(newelem)
+                    oldelem=newelem
+                else:
+                    newseg+=list(linear_interpolation(oldelem,newelem))
+                    newseg.append(newelem)
+                    oldelem=newelem
+        return newseg
+            
+            
+            
+            
+            
+            
 # skeletonization algorithm
 def padskel(mask):
     ''' 
@@ -1060,7 +1108,7 @@ def one_D_line(seg) :
     if len(seg)<2:
         return seg
     else:
-        #selecting the two first element
+        #selecting the two first element, by construction, the two first elements should always be different
         newseg=[seg[0],seg[1]]
         if 2<len(seg):
             for j in range(2,len(seg)):
@@ -1072,7 +1120,7 @@ def one_D_line(seg) :
                     newseg.append(child)
                 else :
                     newseg.append(child)
-        if newseg[-1]==newseg[-2]:
+        if newseg[-1][0]==newseg[-2][0] and newseg[-1][1]==newseg[-2][1]:
             del newseg[-1]
         return newseg
  
@@ -1285,7 +1333,7 @@ def run_one_dataset_logs_only(Main_directory):
     
     
     
-    # main_dict=np.load(saving_path+'.npz', allow_pickle=True)['arr_0']
+    # main_dict=np.load(saving_path+'.npz', allow_pickle=True)['arr_0'].item()
     
     print("main_parenting",4)
 
@@ -1323,14 +1371,46 @@ if __name__ == "__main__":
     '''Running the different functions'''
     ''''''
     print(1)
-    for direc in data_set2:
-        for elem in ['Main_dictionnary.npy','masks_list.npy','ROI_dict.npy','masks_ROI_list.npy']:
-            if os.path.exists(direc+elem):
-                os.remove(direc+elem)
+    # for direc in data_set2:
+    #     for elem in ['Main_dictionnary.npy','masks_list.npy','ROI_dict.npy','masks_ROI_list.npy']:
+    #         if os.path.exists(direc+elem):
+    #             os.remove(direc+elem)
     # run_one_dataset_logs_only(Directory)
     
     
     
     # for direc in data_set2:
     #         run_one_dataset_logs_only(direc)
+    
+
+    for direc in data_set2:
+        print(direc)
+        main_dict=np.load(direc+'Main_dictionnary.npz', allow_pickle=True)['arr_0'].item()
+        for fichier in main_dict.keys():
+            masks=main_dict[fichier]['masks']
+            mask_number=np.max(masks)
+            centerlines=main_dict[fichier]['centerlines']
+            for i in range(1,len(centerlines)):
+                if centerlines[i-1] is centerlines[i]:
+                    print(direc,fichier,i)
+                    mask_i=transfo_bin(masks,i+1)
+                    centerlines[i]=construc_center(mask_i,2)
+        np.savez_compressed(direc+'Main_dictionnary.npz',main_dict, allow_pickle=True)
+        #complete_centerlines(main_dict=main_dict)
+        #np.savez_compressed(direc+'Main_dictionnary',main_dict,allow_pickle=True)
+        #centerline_mask(main_dict,2,saving=True,savingpath=direc+'Main_dictionnary')
         
+        '''
+        fichier='11152317'
+        masks=main_dict[fichier]['masks']
+        mask_number=np.max(masks)
+        centerlines=[]
+        for i in range(mask_number):
+            print(i)
+            mask_i=transfo_bin(masks,i+1) #isolating the i+1-th mask
+            first_line=construc_center(mask_i,2)
+            if len(first_line)>=5:          #avoiding too short centerlines
+                extended_line=complete_one_centerline(first_line, mask_i)
+            else:
+                extended_line=first_line
+        '''

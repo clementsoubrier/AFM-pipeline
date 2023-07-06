@@ -45,6 +45,8 @@ def load_cell(cell_name, dataset=None, return_defects=False):
             timestamp = centerline["timestamp"].item()
             orientation = centerline["orientation"].item()
             no_defect = centerline["no_defect"].item()
+            peaks = centerline["peaks"]
+            troughs = centerline["troughs"]
             frame_data = {
                 "line": line,
                 "xs": xs,
@@ -52,6 +54,8 @@ def load_cell(cell_name, dataset=None, return_defects=False):
                 "timestamp": timestamp,
                 "orientation": Orientation(orientation),
                 "no_defect": no_defect,
+                "peaks": peaks,
+                "troughs": troughs,
             }
         if no_defect or return_defects:
             roi.append(frame_data)

@@ -195,6 +195,8 @@ def save_mask(
     )
     params = get_scaled_parameters(pixel_size, peaks_troughs=True)
     _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params, resolution=pixel_size)
+    peaks = np.array(peaks).reshape((len(peaks), 2))
+    troughs = np.array(troughs).reshape((len(troughs), 2))
     mask_num = len(os.listdir(roi_dirname))
     filename = f"{mask_num:03d}.npz"
     path = os.path.join(roi_dirname, filename)

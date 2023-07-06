@@ -1,10 +1,9 @@
-from enum import IntEnum, auto
 import math
+from enum import IntEnum, auto
 
 import numpy as np
-from scipy.ndimage import gaussian_filter1d
-
 from preprocess import preprocess_centerline
+from scipy.ndimage import gaussian_filter1d
 
 
 class Feature(IntEnum):
@@ -46,7 +45,7 @@ def resample_extrema(intern_extrema, ys, min_width):
         b = (ys[i + 1] - ys[i - 1]) / 2
         c = ys[i]
         x = i - b / (2 * a)
-        y = c - b ** 2 / (4 * a)
+        y = c - b**2 / (4 * a)
         extrema.append(x)
         values.append(y)
         if a < 0:
@@ -58,7 +57,7 @@ def resample_extrema(intern_extrema, ys, min_width):
 
 def build_areas(ys, extrema, values):
     limits = []
-    for (x_1, y_1, x_2, y_2) in zip(extrema, values, extrema[1:], values[1:]):
+    for x_1, y_1, x_2, y_2 in zip(extrema, values, extrema[1:], values[1:]):
         if x_2 - x_1 <= 1.5:
             x = (x_1 + x_2) / 2
         else:
@@ -92,16 +91,16 @@ def max_depth(ys, x_l, x_r):
         dist = abs(dx * (y_l - ys[i]) - dy * (x_l - i))
         max_dist = max(max_dist, dist)
     return max_dist
-    
+
 
 def remove_area(areas, classif, i):
     if i == 0:
         return areas[1:], classif[1:]
     if i == len(areas) - 1:
-        return areas[: -1], classif[: -1]
+        return areas[:-1], classif[:-1]
     area = (areas[i - 1][0], areas[i + 1][1])
-    areas = areas[: i - 1] + [area] + areas[i + 2:]
-    classif = classif[: i - 1] + classif[i + 1:]
+    areas = areas[: i - 1] + [area] + areas[i + 2 :]
+    classif = classif[: i - 1] + classif[i + 1 :]
     return areas, classif
 
 
@@ -110,26 +109,35 @@ def filter_areas(ys, areas, min_width, min_depth, classif):
         widths = [r - l for l, r in areas]
         i_min = min(range(len(widths)), key=widths.__getitem__)
         width = widths[i_min]
-        if width <= min_width or (width <= 3 * min_width and
-                                  max_depth(ys, *areas[i_min]) < min_depth):
+        if width <= min_width or (
+            width <= 3 * min_width and max_depth(ys, *areas[i_min]) < min_depth
+        ):
             areas, classif = remove_area(areas, classif, i_min)
         else:
             break
     return areas, classif
 
 
-def find_peaks_troughs(xs, ys, kernel_len, std_cut, window, smooth_std,
-                       min_width, min_depth, smoothing=True):
+def find_peaks_troughs(
+    xs,
+    ys,
+    kernel_len,
+    std_cut,
+    window,
+    smooth_std,
+    min_width,
+    min_depth,
+    smoothing=True,
+    resolution=None,
+):
     if smoothing:
-        xs, ys = preprocess_centerline(xs, ys, kernel_len, std_cut, window)
+        xs, ys = preprocess_centerline(xs, ys, kernel_len, std_cut, window, resolution)
     ys_smooth = gaussian_filter1d(ys, smooth_std, mode="nearest")
     der = ys_smooth[1:] - ys_smooth[:-1]
     intern_extrema = find_extrema(der)
-    extrema, values, classif = resample_extrema(intern_extrema, ys_smooth,
-                                                min_width)
+    extrema, values, classif = resample_extrema(intern_extrema, ys_smooth, min_width)
     areas = build_areas(ys_smooth, extrema, values)
-    areas, classif = filter_areas(ys_smooth, areas, min_width, min_depth,
-                                  classif)
+    areas, classif = filter_areas(ys_smooth, areas, min_width, min_depth, classif)
     peaks = []
     troughs = []
     for area, feature in zip(areas, classif):
@@ -140,6 +148,8 @@ def find_peaks_troughs(xs, ys, kernel_len, std_cut, window, smooth_std,
             case Feature.TROUGH:
                 troughs.append(area)
             case _:
-                raise ValueError(f"Unknown feature {feature}, feature should "
-                                 f"be a {Feature.PEAK} or a {Feature.TROUGH}.")
+                raise ValueError(
+                    f"Unknown feature {feature}, feature should "
+                    f"be a {Feature.PEAK} or a {Feature.TROUGH}."
+                )
     return xs, ys, peaks, troughs

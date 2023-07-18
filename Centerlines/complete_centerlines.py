@@ -247,66 +247,43 @@ def complete_one_centerline(centerline, mask):
 # dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/delta_parB_03-02-2015/"
 # dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/delta_parB_15-11-2014/"
 # dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/WT_INH_700min_2014/"
-dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/WT_CCCP_irrigation_2016/"
+# dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/WT_CCCP_irrigation_2016/"
 
-main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
+# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
 
 
 #%% Test specific ROIs
 
 
 
-file = "03030810"
-masks_arr = main_dict[file]['masks']
-mask_labels = (np.unique(masks_arr)+1).tolist()
-centerlines = main_dict[file]['centerlines']
+# file = "03030810"
+# masks_arr = main_dict[file]['masks']
+# mask_labels = (np.unique(masks_arr)+1).tolist()
+# centerlines = main_dict[file]['centerlines']
 
-fig, ax = plt.subplots()
-ax.imshow(masks_arr, cmap='binary')
+# fig, ax = plt.subplots()
+# ax.imshow(masks_arr, cmap='binary')
 
-# test = np.copy(masks_arr)
-# test[test!=0] = 255
+# # test = np.copy(masks_arr)
+# # test[test!=0] = 255
 
-for ii in range(22,23):
-    mask = np.copy(masks_arr)
-    mask[mask!=ii+1] = 0
-    mask[mask==ii+1] = 255
+# for ii in range(22,23):
+#     mask = np.copy(masks_arr)
+#     mask[mask!=ii+1] = 0
+#     mask[mask==ii+1] = 255
     
-    # centerline = main_dict[file]['centerlines'][label-1]
-    centerline = centerlines[ii]    
-    outline = main_dict[file]['outlines'][ii]
+#     # centerline = main_dict[file]['centerlines'][label-1]
+#     centerline = centerlines[ii]    
+#     outline = main_dict[file]['outlines'][ii]
     
     
-    extended_centerline = complete_one_centerline(centerline, mask)
-    x_coords = [cc[1] for cc in extended_centerline]
-    y_coords = [cc[0] for cc in extended_centerline]
-    plt.plot(x_coords, y_coords)
+#     extended_centerline = complete_one_centerline(centerline, mask)
+#     x_coords = [cc[1] for cc in extended_centerline]
+#     y_coords = [cc[0] for cc in extended_centerline]
+#     plt.plot(x_coords, y_coords)
 
-plt.show()
+# plt.show()
 
-
-#%%
-test = np.copy(masks_arr)
-test[test!=5] = 0
-test[test==5] = 255
-
-
-centerline = centerlines[4]
-
-for cc in extended_centerline:
-    test[cc[0],cc[1]] = 64
-
-for cc in centerline:
-    test[cc[0],cc[1]] = 128
-
-# test[end_points[0][0],end_points[0][1]] = 0
-# test[end_points[1][0],end_points[1][1]] = 0
-
-
-# for cc in end_segment:
-#     test[cc[0],cc[1]] = 64
-
-Image.fromarray(test.astype(int)).show()
 
 
 

@@ -16,7 +16,7 @@ from PIL import Image #dealing with .tif images
 
 def get_neighbors(coords,coords_lst):
     neighborhood = coords + np.array([[-1, -1],[-1, 0],[-1, 1],[0, -1],[0, 1],[1, -1],[1, 0],[1, 1]]) # get the possible neighbors of the current node
-    neighbors = [tuple(nn) for nn in neighborhood for cc in coords_lst if np.all(nn==cc)] # get a list of all the neighbors 
+    neighbors = [list(nn) for nn in neighborhood for cc in coords_lst if np.all(nn==cc)] # get a list of all the neighbors 
     return neighbors
 
 
@@ -218,20 +218,24 @@ def complete_one_centerline(centerline, mask):
         # else: 
             # print("Warning: centerline not extended from one end")
     
-    # for cc in extended_centerline:
-    #     masks_arr[cc[0],cc[1]] = 0
-    
-    # Sort coordinates of extended centerline
     centerline_copy = np.copy(extended_centerline).tolist()
     terminal_coordinates = find_extremal_div_pts(centerline_copy)[0][0]
     centerline_copy.remove(terminal_coordinates)
     reordered = [terminal_coordinates]
-    for cc in range(len(centerline_copy)):
-        neighbor = list(get_neighbors(reordered[-1],centerline_copy)[0])
-        # print(neighbor)
-        reordered.append(neighbor)
-        centerline_copy.remove(neighbor)
-    
+    while len(centerline_copy)>0:
+        neighbors = list(get_neighbors(reordered[-1],centerline_copy))
+        if len(neighbors)>1:
+            for n in neighbors:
+                next_neighbors = get_neighbors(n, centerline_copy)
+                centerline_copy.remove(n)
+                if np.any([nn for nn in next_neighbors if nn not in neighbors]):
+                    reordered.append(n)
+        elif len(neighbors)==0:
+            break
+        else:
+            reordered.append(neighbors[0])
+            centerline_copy.remove(neighbors[0])
+            
     extended_centerline = np.array(reordered)
     
     return extended_centerline
@@ -240,92 +244,69 @@ def complete_one_centerline(centerline, mask):
 #%% Load dictionary for testing ###############################################
 
 # dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/stiffness_test/03-09-2014/"
-# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
-
-
 # dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/delta_parB_03-02-2015/"
-# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
-
-
 # dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/delta_parB_15-11-2014/"
-# main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
+# dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/WT_INH_700min_2014/"
+dic_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/centerline_tests/WT_CCCP_irrigation_2016/"
 
-#%% Troubleshooting, try frames 46 and 47
+main_dict = np.load(dic_dir + "Main_dictionnary.npz", allow_pickle=True)['arr_0'].item()
 
-# file_names = list(main_dict.keys())
 
-# file = file_names[46]
-# masks_arr = main_dict[file]['masks']
-# mask_labels = (np.unique(masks_arr)+1).tolist()
-# centerlines = main_dict[file]['centerlines']
+#%% Test specific ROIs
 
-# fig, ax = plt.subplots()
-# ax.imshow(masks_arr, cmap='binary')
+
+
+file = "03030810"
+masks_arr = main_dict[file]['masks']
+mask_labels = (np.unique(masks_arr)+1).tolist()
+centerlines = main_dict[file]['centerlines']
+
+fig, ax = plt.subplots()
+ax.imshow(masks_arr, cmap='binary')
 
 # test = np.copy(masks_arr)
 # test[test!=0] = 255
 
-# for ii in range(len(centerlines)):
-#     mask = np.copy(masks_arr)
-#     mask[mask!=ii+1] = 0
-#     mask[mask==ii+1] = 255
+for ii in range(22,23):
+    mask = np.copy(masks_arr)
+    mask[mask!=ii+1] = 0
+    mask[mask==ii+1] = 255
     
-#     centerline = centerlines[ii]    
-#     outline = main_dict[file]['outlines'][ii]
-    
-#     extended_centerline = complete_one_centerline(centerline, mask)
-#     x_coords = [cc[1] for cc in extended_centerline]
-#     y_coords = [cc[0] for cc in extended_centerline]
-#     # ax.plot(x_coords, y_coords, 'r.', markersize=5)
-#     plt.plot(x_coords, y_coords)
-
-# plt.show()
-
-#     for cc in extended_centerline:
-#         test[cc[0],cc[1]] = 128
-    
-#     for cc in centerline:
-#         test[cc[0],cc[1]] = 0
-        
-#     for cc in outline:
-#         test[cc[0],cc[1]] = 0
-    
-#     # Image.fromarray(mask.astype(np.uint8)).show()
-
-# Image.fromarray(test.astype(np.uint8)).show()
-
-# check_masks = np.copy(masks_arr)
-# check_masks[masks_arr!=0] = 255
-# Image.fromarray(check_masks.astype(np.uint8)).show()
-
-
-#%% Test 3rd centerline (index 2) of file 11152317 of dataset "delta_parB/15-11-2014/"
-
-# file = "11152317"
-# masks_arr = main_dict[file]['masks']
-# mask_labels = (np.unique(masks_arr)+1).tolist()
-# centerlines = main_dict[file]['centerlines']
-
-# fig, ax = plt.subplots()
-# ax.imshow(masks_arr, cmap='binary')
-
-# # test = np.copy(masks_arr)
-# # test[test!=0] = 255
-
-# for ii in range(0,3):
-#     mask = np.copy(masks_arr)
-#     mask[mask!=ii+1] = 0
-#     mask[mask==ii+1] = 255
-    
-#     # centerline = main_dict[file]['centerlines'][label-1]
-#     centerline = centerlines[ii]    
-#     outline = main_dict[file]['outlines'][ii]
+    # centerline = main_dict[file]['centerlines'][label-1]
+    centerline = centerlines[ii]    
+    outline = main_dict[file]['outlines'][ii]
     
     
-#     extended_centerline = complete_one_centerline(centerline, mask)
-#     x_coords = [cc[1] for cc in extended_centerline]
-#     y_coords = [cc[0] for cc in extended_centerline]
-#     ax.plot(x_coords, y_coords, 'r.', markersize=5)
+    extended_centerline = complete_one_centerline(centerline, mask)
+    x_coords = [cc[1] for cc in extended_centerline]
+    y_coords = [cc[0] for cc in extended_centerline]
+    plt.plot(x_coords, y_coords)
 
-# plt.show()
+plt.show()
+
+
+#%%
+test = np.copy(masks_arr)
+test[test!=5] = 0
+test[test==5] = 255
+
+
+centerline = centerlines[4]
+
+for cc in extended_centerline:
+    test[cc[0],cc[1]] = 64
+
+for cc in centerline:
+    test[cc[0],cc[1]] = 128
+
+# test[end_points[0][0],end_points[0][1]] = 0
+# test[end_points[1][0],end_points[1][1]] = 0
+
+
+# for cc in end_segment:
+#     test[cc[0],cc[1]] = 64
+
+Image.fromarray(test.astype(int)).show()
+
+
 

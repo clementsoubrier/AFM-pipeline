@@ -7,11 +7,10 @@ from enum import IntEnum
 
 import numpy as np
 import tqdm
-
-from peaks_troughs.align import align_with_reference
-from peaks_troughs.derivative_sign_segmentation import find_peaks_troughs
-from peaks_troughs.preprocess import keep_centerline
-from peaks_troughs.scaled_parameters import get_scaled_parameters
+from align import align_with_reference
+from derivative_sign_segmentation import find_peaks_troughs
+from preprocess import keep_centerline
+from scaled_parameters import get_scaled_parameters
 
 
 class Orientation(IntEnum):
@@ -93,13 +92,12 @@ def load_data(dataset, log_progress):
     roi_dict = np.load(roi_dict_path, allow_pickle=True)["arr_0"].item()
     if log_progress:
         print(" Done.")
-    frame_dicts = main_dict.items()
+    frame_dicts = main_dict.values()
     if log_progress:
         frame_dicts = tqdm.tqdm(
             frame_dicts, total=len(main_dict), desc="Loading images"
         )
-    images = {}
-    for img_name, img_dict in frame_dicts:
+    for img_dict in frame_dicts:
         img_path = os.path.join("..", "data", "datasets", img_dict["adress"])
         contents = np.load(img_path)
         fwd_img = contents["Height_fwd"]
@@ -107,8 +105,29 @@ def load_data(dataset, log_progress):
             bwd_img = contents["Height_bwd"]
         except KeyError:
             bwd_img = None
-        images[img_name] = (fwd_img, bwd_img)
-    return main_dict, masks_list, roi_dict, images
+        pixel_size = img_dict["resolution"]
+        height_profiles_fwd = []
+        height_profiles_bwd = []
+        for centerline in img_dict["centerlines"]:
+            if centerline.size:
+                xs_fwd, ys_fwd = extract_height_profile(centerline, fwd_img, pixel_size)
+                if bwd_img is None:
+                    xs_bwd = None
+                    ys_bwd = None
+                else:
+                    xs_bwd, ys_bwd = extract_height_profile(
+                        centerline, bwd_img, pixel_size
+                    )
+            else:
+                xs_fwd = np.array([]).reshape((0, 2))
+                ys_fwd = np.array([]).reshape((0, 2))
+                xs_bwd = np.array([]).reshape((0, 2))
+                ys_bwd = np.array([]).reshape((0, 2))
+            height_profiles_fwd.append((xs_fwd, ys_fwd))
+            height_profiles_bwd.append((xs_bwd, ys_bwd))
+        img_dict["height_profiles_fwd"] = height_profiles_fwd
+        img_dict["height_profiles_bwd"] = height_profiles_bwd
+    return main_dict, masks_list, roi_dict
 
 
 def topological_sort(roi_dict):
@@ -128,7 +147,7 @@ def topological_sort(roi_dict):
     return order
 
 
-def use_same_direction(reference, line):
+def use_same_direction(reference, line, xs, ys, xs_bwd, ys_bwd):
     diffs = reference[:, np.newaxis] - line[np.newaxis]
     dists_sq = np.sum(diffs**2, axis=-1)
     if len(line) <= len(reference):
@@ -137,7 +156,12 @@ def use_same_direction(reference, line):
         order = dists_sq.argmin(axis=1)
     if statistics.linear_regression(range(len(order)), order).slope < 0:
         line = line[::-1]
-    return line
+        xs = xs[-1] - xs[::-1]
+        ys = ys[::-1]
+        if xs_bwd is not None:
+            xs_bwd = xs_bwd[-1] - xs_bwd[::-1]
+            ys_bwd = ys_bwd[::-1]
+    return line, xs, ys, xs_bwd, ys_bwd
 
 
 def determine_orientation(reference, line):
@@ -165,8 +189,6 @@ def extract_height_profile(centerline, img, pixel_size):
 
 def save_mask(
     img_dict,
-    fwd_img,
-    bwd_img,
     mask_id,
     reference_line,
     reference_xs,
@@ -175,19 +197,21 @@ def save_mask(
     roi_dirname,
 ):
     line = img_dict["centerlines"][mask_id]
+    xs, ys = img_dict["height_profiles_fwd"][mask_id]
+    xs_bwd, ys_bwd = img_dict["height_profiles_bwd"][mask_id]
     if not line.size:
         return reference_line, reference_xs, reference_ys, orientation
     if reference_line is not None:
-        line = use_same_direction(reference_line, line)
+        line, xs, ys, xs_bwd, ys_bwd = use_same_direction(
+            reference_line, line, xs, ys, xs_bwd, ys_bwd
+        )
     if orientation is None:
         orientation = determine_orientation(reference_line, line)
     timestamp = img_dict["time"]
     pixel_size = img_dict["resolution"]
     params = get_scaled_parameters(pixel_size, filtering=True)
-    xs, ys = extract_height_profile(line, fwd_img, pixel_size)
     no_defect = keep_centerline(xs, ys, pixel_size, **params)
-    if not no_defect and bwd_img is not None:
-        xs_bwd, ys_bwd = extract_height_profile(line, bwd_img, pixel_size)
+    if not no_defect and xs_bwd is not None:
         no_defect_bwd = keep_centerline(xs_bwd, ys_bwd, pixel_size, **params)
         if no_defect_bwd:
             xs = xs_bwd
@@ -235,7 +259,6 @@ def save_roi(
     reference_ys,
     masks_list,
     main_dict,
-    images,
     roi_dirname,
 ):
     os.makedirs(roi_dirname)
@@ -247,11 +270,8 @@ def save_roi(
     for mask in masks:
         _, _, frame, mask_label = masks_list[mask]
         img_dict = main_dict[frame]
-        fwd_img, bwd_img = images[frame]
         reference_line, reference_xs, reference_ys, orientation = save_mask(
             img_dict,
-            fwd_img,
-            bwd_img,
             mask_label - 1,
             reference_line,
             reference_xs,
@@ -265,7 +285,7 @@ def save_roi(
 def save_dataset(dataset, log_progress):
     if log_progress:
         print("Processing dataset", dataset)
-    main_dict, masks_list, roi_dict, images = load_data(dataset, log_progress)
+    main_dict, masks_list, roi_dict = load_data(dataset, log_progress)
     roi_names = topological_sort(roi_dict)
     if log_progress:
         roi_names = tqdm.tqdm(roi_names, desc="Processing ROIs")
@@ -274,7 +294,7 @@ def save_dataset(dataset, log_progress):
         roi = roi_dict[roi_name]
         roi_dir = os.path.join("..", "data", "cells", dataset, roi_name)
         reference = references.pop(roi_name, (None, None, None))
-        reference = save_roi(roi, *reference, masks_list, main_dict, images, roi_dir)
+        reference = save_roi(roi, *reference, masks_list, main_dict, roi_dir)
         for child in roi["Children"]:
             references[child] = reference
     if log_progress:

@@ -17,6 +17,7 @@ import tqdm
 from cellpose import utils, io, models
 import re
 import copy
+import matplotlib.pyplot as plt
 from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
 import scipy
@@ -60,15 +61,14 @@ from  complete_centerlines import  complete_one_centerline
 # =============================================================================
 
 
-Directory= "WT_mc2_55/30-03-2015/" #the directory you chose to work on    
+Directory= 'WT_INH_700min_2014/'#the directory you chose to work on    
 # different type of datassets with their cropping parameter
 
-data_set2=['WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #'delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",
+data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #
 
 problem=['WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
 
-color_mask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
 
 
 
@@ -174,7 +174,9 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                     unitdic[name]=str(data_array.zscale)
                 
                 filename=re.split(r'\W+',files[i])[0]# taking care of extensions in the filename
-                np.savez_compressed(dir_im+filename,subdic)
+                
+                newsubdic=realign_bwd_fwd_images(subdic)  #aligning backward and forward pictures
+                np.savez_compressed(dir_im+filename,newsubdic)
                 
                 
                 #extracting the angle
@@ -201,7 +203,24 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
             
             except:
                 continue
+
+
+
+def realign_bwd_fwd_images(subdic):
+    # aligning the forward and backward pictures to counter piezo sensor hysteresis
+    if "Height_bwd" in subdic.keys():
+        fwd_img=subdic["Height_fwd"].astype(np.float32)
         
+        bwd_img=subdic["Height_bwd"].astype(np.float32)
+        init_mat=np.eye(2,M=3, dtype=np.float32)
+        warpMatrix=cv2.findTransformECC(bwd_img,fwd_img,init_mat,motionType=0)[1]
+        
+        for channel in subdic.keys():
+            if channel[-3:]=='bwd':
+                subdic[channel]=cv2.warpAffine(subdic[channel],warpMatrix,np.shape(subdic[channel])[::-1])
+    return subdic
+    
+    
         
 def natural_keys(text):
     '''
@@ -450,6 +469,7 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the ima
 
 
 
+    
 
 #%% Running cellpose and saving the results
 def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dimensiondata,gpuval=False):
@@ -495,7 +515,6 @@ def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dim
         else :
             model = models.Cellpose(gpu=False, model_type=mod)
             masks, flows, st, diams = model.eval(img, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
-
 
         # save results
         io.masks_flows_to_seg(img, masks, flows, diams, seg+filez[:-4], chan)
@@ -733,12 +752,17 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
 def satur_area(img,masks,number,thres=0.95):
     score=-np.inf
     non_zero=np.nonzero(masks==number)
+    tot_sum=0
+    count=0
     for i,j in zip(non_zero[0],non_zero[1]):
-        if img[i,j]>score:          #selecting the values in the mask of label number
+        tot_sum+=img[i,j]
+        count+=1
+        if img[i,j]>score:          #selecting the maximum value in the mask of label number
             score=img[i,j]
+    avg_val=tot_sum/count
     area=0
     for i,j in zip(non_zero[0],non_zero[1]):
-            if masks[i,j]==number and img[i,j]>=thres*score:
+            if masks[i,j]==number and img[i,j]>=thres*(score-avg_val)+avg_val:
                 area+=1
     return area
  
@@ -1312,51 +1336,49 @@ def run_one_dataset_logs_only(Main_directory):
     #minimum ratio of two brench length to erase the small branch
     centerline_crop_param=2
     
-    
+    step=0
     ''''''
     
-    print("data_prep",0)
+    print("data_prep",step)
+    step+=1
     data_prep_logs_only(my_data,final_data,temp_dir_info,threshold_scars_directory)
     
-    print("dimension_def",1)
-    
+    print("dimension_def",step)
+    step+=1
     dimension_def_logs_only(final_data,temp_dir_info,dimension_data)
     
-    print("run_cel",2)
-
+    print("run_cel",step)
+    step+=1
     run_cel_logs_only(final_data,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,temp_dir_info,dimension_data,gpuval=cell_gpu)
     
-
-    print("download_dict",3)
-    
+    print("download_dict",step)
+    step+=1
     main_dict=download_dict_logs_only(final_data,temp_dir_info,segments_path,dimension_data,year,saving=True,savingpath=saving_path)
-    
-    
     
     # main_dict=np.load(saving_path+'.npz', allow_pickle=True)['arr_0'].item()
     
-    print("main_parenting",4)
-
+    print("main_parenting",step)
+    step+=1
     main_parenting(main_dict)
     
-    print("centroid_area",5)
-    
+    print("centroid_area",step)
+    step+=1
     centroid_area(main_dict)
 
-    print("clean_masks",6)
-
+    print("clean_masks",step)
+    step+=1
     clean_masks(ratio_erasing_masks,ratio_saturation, main_dict)
     
-    print("main_parenting",7)
-    
+    print("main_parenting",step)
+    step+=1
     main_parenting(main_dict) #re-run in case all masks in a frame are erased
 
-    print("construction_mask_list",8)
-    
+    print("construction_mask_list",step)
+    step+=1
     construction_mask_list(main_dict,Main_directory,list_savingpath)
     
-    print("centerline_mask",9)
-
+    print("centerline_mask",step)
+    step+=1
     centerline_mask(main_dict,centerline_crop_param,saving=True,savingpath=saving_path)
     
     
@@ -1369,48 +1391,11 @@ def run_one_dataset_logs_only(Main_directory):
 if __name__ == "__main__":
     
     '''Running the different functions'''
-    ''''''
-    print(1)
-    # for direc in data_set2:
-    #     for elem in ['Main_dictionnary.npy','masks_list.npy','ROI_dict.npy','masks_ROI_list.npy']:
-    #         if os.path.exists(direc+elem):
-    #             os.remove(direc+elem)
+    
     # run_one_dataset_logs_only(Directory)
     
-    
-    
-    # for direc in data_set2:
-    #         run_one_dataset_logs_only(direc)
-    
 
-    for direc in data_set2:
-        print(direc)
-        main_dict=np.load(direc+'Main_dictionnary.npz', allow_pickle=True)['arr_0'].item()
-        for fichier in main_dict.keys():
-            masks=main_dict[fichier]['masks']
-            mask_number=np.max(masks)
-            centerlines=main_dict[fichier]['centerlines']
-            for i in range(1,len(centerlines)):
-                if centerlines[i-1] is centerlines[i]:
-                    print(direc,fichier,i)
-                    mask_i=transfo_bin(masks,i+1)
-                    centerlines[i]=construc_center(mask_i,2)
-        np.savez_compressed(direc+'Main_dictionnary.npz',main_dict, allow_pickle=True)
-        #complete_centerlines(main_dict=main_dict)
-        #np.savez_compressed(direc+'Main_dictionnary',main_dict,allow_pickle=True)
-        #centerline_mask(main_dict,2,saving=True,savingpath=direc+'Main_dictionnary')
-        
-        '''
-        fichier='11152317'
-        masks=main_dict[fichier]['masks']
-        mask_number=np.max(masks)
-        centerlines=[]
-        for i in range(mask_number):
-            print(i)
-            mask_i=transfo_bin(masks,i+1) #isolating the i+1-th mask
-            first_line=construc_center(mask_i,2)
-            if len(first_line)>=5:          #avoiding too short centerlines
-                extended_line=complete_one_centerline(first_line, mask_i)
-            else:
-                extended_line=first_line
-        '''
+    for direc in data_set:
+            run_one_dataset_logs_only(direc)
+    
+    

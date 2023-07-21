@@ -12,29 +12,29 @@ from numba import njit
 from copy import deepcopy
 import tqdm
 
-Directory=  "WT_mc2_55/30-03-2015/" #the directory you chose to work on
-# different type of datassets with their quality
-
-data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]
 
 
-data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+Directory=  "WT_mc2_55/30-03-2015/"  #the directory you chose to work on
 
-result_path=''
 
-dic_name='Main_dictionnary.npz'
+data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
-list_name='masks_list.npz'
 
-depth_search=50 # max time (minutes) between two comparable frames
 
+
+''' Parameters '''
+# max time (minutes) between two comparable frames
+depth_search=70 
 
 #fraction of the preserved area to consider child and parent relation for masks (should be less than 0.5 to take into account the division)
 surface_thresh= 0.34
+
 #fraction of the preserved area to consider child and parent relation for masks (fusioning of 2 masks after division)
-final_thresh=0.6 #0.8
+final_thresh= 0.8   #0.6
 
 
+
+''' Functions'''
 
 
 def trans_vector_matrix(dic,max_diff_time):
@@ -165,7 +165,7 @@ def clean_matrix(lin_mat,dic,maskslist,max_diff_time,thres):
             time_list.append([])
         if i<mat_dim:
             for j in range(i+1,mat_dim):
-                if lin_mat[i,j]>thres/2:      #no to put 0, float precision problem can appear
+                if lin_mat[i,j]>thres/4:      #no to put 0, float precision problem can appear
                     time_list[dic[maskslist[j][2]]['time']-base_time-1].append(j)
             
             for index in range(len(time_list)):
@@ -178,29 +178,11 @@ def clean_matrix(lin_mat,dic,maskslist,max_diff_time,thres):
                         newmat[i,element[0]]= index+1
                         newmat[i,element[1]]= index+1
 
-     #
+     
     return newmat
 
 
-'''         First naive version of the boolean matrix
-@jit
-def updateclean_matrix(newmat,mat_dim):
-    tot_max=np.max(newmat)+1
-    finalmat=np.zeros((mat_dim,mat_dim),dtype=np.bool_)
-    for i in range(mat_dim):
-        for j in range(mat_dim):
-            if newmat[i,j]==0:
-                newmat[i,j]=tot_max
-    for i in range(mat_dim):
-        min_col=np.min(newmat[i,:])
-        for j in range (i+1,mat_dim):
-            finalmat[i,j]=(newmat[i,j]==min_col and min_col<tot_max)        
-    for i in range(mat_dim):
-        for j in range(mat_dim):
-            if newmat[i,j]==tot_max:
-                newmat[i,j]=0
-    return finalmat
-'''   
+
 
 
 '''
@@ -356,13 +338,24 @@ def update_longest_path(iteration,backwardlinks,value,path):
         path[iteration]=finalpath+[iteration]
         return value[iteration],path[iteration]
         
+#%% running the whole lineage tree algorithm    
+
+
+def Final_lineage_tree(direc,max_diff_time=depth_search,surfthresh=surface_thresh,finthres=final_thresh):
     
+    dicname='Main_dictionnary.npz'
 
+    listname='masks_list.npz'
+    
+    linmatname='non_trig_Link_matrix.npy'
 
-def Final_lineage_tree(direc,resultpath,dicname,listname,max_diff_time,surfthresh,finthres):
-    masks_list=np.load(direc+resultpath+listname, allow_pickle=True)['arr_0']
+    boolmatname="Bool_matrix.npy"
+
+    linkmatname='Link_matrix.npy'
+    
+    masks_list=np.load(direc+listname, allow_pickle=True)['arr_0']
     #print(masks_list)
-    main_dict=np.load(direc+resultpath+dicname, allow_pickle=True)['arr_0'].item()
+    main_dict=np.load(direc+dicname, allow_pickle=True)['arr_0'].item()
     #print(main_dict)
     print('trans_vector_matrix 1')
     vector_matrix, angle_matrix=trans_vector_matrix(main_dict,max_diff_time) #translation vector and rotation angle between the different frames
@@ -373,20 +366,23 @@ def Final_lineage_tree(direc,resultpath,dicname,listname,max_diff_time,surfthres
     print('Bool_matrix  4')
     Bool_mat=Bool_from_linkmatrix(Link_mat,max_diff_time)
     print('saving 5')
-    np.save(direc+resultpath+'Bool_matrix',Bool_mat)
-    np.save(direc+resultpath+'Link_matrix',Link_mat)
-    np.save(direc+resultpath+'non_trig_Link_matrix',lin_mat)
-    #return lin_mat,Bool_mat,Link_mat
+    np.save(direc+boolmatname,Bool_mat)
+    np.save(direc+linkmatname,Link_mat)
+    np.save(direc+linmatname,lin_mat)
+    
     
 
 if __name__ == "__main__":
     
 
     
-    # Final_lineage_tree(Directory,result_path,dic_name,list_name,depth_search,surface_thresh,final_thresh)#Directory
-    for direc in data_set2:
+
+    # Final_lineage_tree(Directory)
+    
+    
+    for direc in data_set:
         print(direc)
-        Final_lineage_tree(direc,result_path,dic_name,list_name,depth_search,surface_thresh,final_thresh)
+        Final_lineage_tree(direc)
 
 
 

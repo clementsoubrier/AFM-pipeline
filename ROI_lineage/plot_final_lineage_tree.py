@@ -13,52 +13,32 @@ from cellpose import plot
 import processing as pr
 import extract_individuals as exi
 
-Directory= "WT_mc2_55/30-03-2015/"#"dataset/"# 'delta_lamA_03-08-2018/2/'
+
+Directory="WT_mc2_55/30-03-2015/" #"dataset/"# 'delta_lamA_03-08-2018/2/'
+
+data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
 
 
-dic_name='Main_dictionnary.npz'
+''' Parameters '''
 
-list_name='masks_list.npz'
+#minimal threshold to consider a daughter-mother relation
+final_thresh=0.85 #0.8
 
-ROI_dictionary='ROI_dict.npz'
+#threshold to consider that there is a division and not just a break in the ROI
+thres_min_division=0.7 #0.7 
 
-final_thresh=0.8
-
-thres_min_division=0.75 #threshold to consider that there is a division and not just a break in the ROI
-
-lin_mat_name='non_trig_Link_matrix.npy'
-
-Bool_mat_name="Bool_matrix.npy"
-
-Link_mat='Link_matrix.npy'
-
-index_list_name='masks_ROI_list.npz'
-
-min_len_ROI=3 #minimum number of element in an ROI
-
-data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]
-
-data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+#minimum number of frames in an ROI
+min_len_ROI=3 
 
 
-colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
-
-ROI_name='ROI_dict.npz' 
+''' Output'''
 
 #Dictionnary of the ROIs with the ROI name as entry and as argument : Parent ROI (string, if not ''), Child1 ROI (string, if not ''), Child2 ROI (string, if not ''), list of masks (int), ROI index, Roi color_index
 
 
-#Update the main_dic with the ROI of each mask
 
-
-
-
-
-
-
-
-
+''' Functions'''
 
 def filter_good_ROI_dic(ROI_dic,min_number):
     newdic={}
@@ -429,7 +409,27 @@ def manually_regluing(direc,ROIdict,indexlistname,parent,child,division=True):
     
     
     
-def run_whole_lineage_tree(direc,dicname,listname,ROIdict,indexlistname,maskcol,linmatname,boolmatname,linkmatname,thres,min_number,thresmin):
+def run_whole_lineage_tree(direc,thres=final_thresh,min_number=min_len_ROI,thresmin=thres_min_division):
+    
+    
+    dicname='Main_dictionnary.npz'
+
+    listname='masks_list.npz'
+
+    ROIdict='ROI_dict.npz'
+
+    linmatname='non_trig_Link_matrix.npy'
+
+    boolmatname="Bool_matrix.npy"
+
+    linkmatname='Link_matrix.npy'
+
+    indexlistname='masks_ROI_list.npz'
+    
+    
+    colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
+
+
     
     masks_list=np.load(direc+listname, allow_pickle=True)['arr_0']
     main_dict=np.load(direc+dicname, allow_pickle=True)['arr_0'].item()
@@ -446,33 +446,32 @@ def run_whole_lineage_tree(direc,dicname,listname,ROIdict,indexlistname,maskcol,
     
     indexlist=detect_bad_div(newdic,linmatrix,masks_list,thres,thresmin)
 
-    plot_lineage_tree(newdic,masks_list,main_dict,maskcol,direc)
-    plot_image_lineage_tree(newdic,masks_list,main_dict,maskcol,indexlist,direc)
+    plot_lineage_tree(newdic,masks_list,main_dict,colormask,direc)
+    plot_image_lineage_tree(newdic,masks_list,main_dict,colormask,indexlist,direc)
     np.savez_compressed(direc+ROIdict,newdic,allow_pickle=True)
     np.savez_compressed(direc+indexlistname,indexlist,allow_pickle=True)
     
     
-    # os.remove(direc+linmatname)
-    # os.remove(direc+boolmatname)
-    # os.remove(direc+linkmatname)
-    # return newdic,indexlist
+    os.remove(direc+linmatname)
+    os.remove(direc+boolmatname)
+    os.remove(direc+linkmatname)
     
     
 
 if __name__ == "__main__":
     
-    # manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)
-
+    
    
-    run_whole_lineage_tree(Directory,dic_name,list_name,ROI_dictionary,index_list_name,colormask,lin_mat_name,Bool_mat_name,Link_mat,final_thresh,min_len_ROI,thres_min_division)
+    # run_whole_lineage_tree(Directory)
 
 
-    # for direct in data_set2:
-    #     print(direct)
+    for direct in data_set:
+        print(direct)
         
-    #     # run_whole_lineage_tree(direc,dic_name,list_name,ROI_dictionary,index_list_name,colormask,lin_mat_name,Bool_mat_name,Link_mat,final_thresh,min_len_ROI,thres_min_division)
+        run_whole_lineage_tree(direct)
         
-        
+#%%   
+    # manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)
     #     index_list=np.load(direct+index_list_name, allow_pickle=True)['arr_0']
     #     List_of_masks=np.load(direct+list_name, allow_pickle=True)['arr_0']
     #     main_dict=np.load(direct+dic_name, allow_pickle=True)['arr_0'].item()

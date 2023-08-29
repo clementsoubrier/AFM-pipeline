@@ -2,7 +2,6 @@ import math
 from enum import IntEnum, auto
 
 import numpy as np
-from preprocess import preprocess_centerline
 from scipy.ndimage import gaussian_filter1d
 
 
@@ -121,19 +120,14 @@ def filter_areas(ys, areas, min_width, min_depth, classif):
 def find_peaks_troughs(
     xs,
     ys,
-    kernel_len,
-    std_cut,
-    window,
     smooth_std,
     min_width,
     min_depth,
-    smoothing=True,
-    resolution=None,
+    resolution,
 ):
-    if smoothing:
-        xs, ys = preprocess_centerline(xs, ys, kernel_len, std_cut, window, resolution)
+    xs_smooth = gaussian_filter1d(xs, smooth_std, mode="nearest")
     ys_smooth = gaussian_filter1d(ys, smooth_std, mode="nearest")
-    der = ys_smooth[1:] - ys_smooth[:-1]
+    der = (ys_smooth[1:] - ys_smooth[:-1]) / (xs_smooth[1:] - xs_smooth[:-1])
     intern_extrema = find_extrema(der)
     extrema, values, classif = resample_extrema(intern_extrema, ys_smooth, min_width)
     areas = build_areas(ys_smooth, extrema, values)
@@ -141,7 +135,7 @@ def find_peaks_troughs(
     peaks = []
     troughs = []
     for area, feature in zip(areas, classif):
-        area = np.array(area, dtype=np.float64) + xs[0]
+        area = np.array(area, dtype=np.float64) * resolution + xs[0]
         match feature:
             case Feature.PEAK:
                 peaks.append(area)
@@ -152,4 +146,6 @@ def find_peaks_troughs(
                     f"Unknown feature {feature}, feature should "
                     f"be a {Feature.PEAK} or a {Feature.TROUGH}."
                 )
+    peaks = np.array(peaks).reshape((len(peaks), 2))
+    troughs = np.array(troughs).reshape((len(troughs), 2))
     return xs, ys, peaks, troughs

@@ -61,7 +61,7 @@ from  complete_centerlines import  complete_one_centerline
 # =============================================================================
 
 
-Directory= 'WT_INH_700min_2014/'#the directory you chose to work on    
+Directory= "WT_mc2_55/03-09-2014/"#the directory you chose to work on    
 # different type of datassets with their cropping parameter
 
 data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #
@@ -688,8 +688,8 @@ def numba_centroid_area(masks):
 def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'): 
     #Erase the masks that are too small (and the centroids too)
     diclist=list(dic.keys())
-    for i in tqdm.trange(len(diclist)):
-        fichier=diclist[i]
+    for j in tqdm.trange(len(diclist)):
+        fichier=diclist[j]
         masks=dic[fichier]['masks']
         img=np.load(dic[fichier]['adress'])['Height_fwd']
         area=dic[fichier]['area']
@@ -726,10 +726,10 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
                 area2[int(non_defect[i]-1)]=area[i]
                 centroid2[int(non_defect[i]-1),:]=centroid[i,:]
         (m,n)=masks.shape
-        for j in range(m):
+        for i in range(m):
             for k in range(n):
-                if masks[j,k]!=0:
-                    masks[j,k]=non_defect[masks[j,k]-1]
+                if masks[i,k]!=0:
+                    masks[i,k]=non_defect[masks[i,k]-1]
         
         dic[fichier]['area']=area2
         dic[fichier]['centroid']=centroid2
@@ -1392,10 +1392,10 @@ if __name__ == "__main__":
     
     '''Running the different functions'''
     
-    # run_one_dataset_logs_only(Directory)
+    run_one_dataset_logs_only(Directory)
     
 
-    for direc in data_set:
-            run_one_dataset_logs_only(direc)
+    # for direc in data_set:
+    #         run_one_dataset_logs_only(direc)
     
-    
+

@@ -19,6 +19,25 @@ def get_neighbors(coords,coords_lst):
     neighbors = [list(nn) for nn in neighborhood for cc in coords_lst if np.all(nn==cc)] # get a list of all the neighbors 
     return neighbors
 
+def one_D_line(seg) : 
+    if len(seg)<2:
+        return seg
+    else:
+        #selecting the two first element, by construction, the two first elements should always be different
+        newseg=[seg[0],seg[1]]
+        if 2<len(seg):
+            for j in range(2,len(seg)):
+                parent=newseg[-1]
+                grandparent=newseg[-2]
+                child=seg[j]
+                if max(abs(child[0]-parent[0]),abs(child[1]-parent[1]),abs(child[0]-grandparent[0]),abs(child[1]-grandparent[1]))<=1:
+                    del newseg[-1]
+                    newseg.append(child)
+                else :
+                    newseg.append(child)
+        if newseg[-1][0]==newseg[-2][0] and newseg[-1][1]==newseg[-2][1]:
+            del newseg[-1]
+        return newseg
 
 def find_extremal_div_pts(coords_lst):
     ex_pts = []
@@ -236,7 +255,7 @@ def complete_one_centerline(centerline, mask):
             reordered.append(neighbors[0])
             centerline_copy.remove(neighbors[0])
             
-    extended_centerline = np.array(reordered)
+    extended_centerline = np.array(one_D_line(reordered))
     
     return extended_centerline
 

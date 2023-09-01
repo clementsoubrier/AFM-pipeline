@@ -14,7 +14,7 @@ import tqdm
 
 
 
-Directory=  "WT_mc2_55/30-03-2015/"  #the directory you chose to work on
+Directory=  'WT_INH_700min_2014/'  #the directory you chose to work on
 
 
 data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
@@ -30,7 +30,7 @@ depth_search=70
 surface_thresh= 0.34
 
 #fraction of the preserved area to consider child and parent relation for masks (fusioning of 2 masks after division)
-final_thresh= 0.8   #0.6
+final_thresh= 0.75   #0.6
 
 
 

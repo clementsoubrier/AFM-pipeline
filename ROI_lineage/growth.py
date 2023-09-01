@@ -78,14 +78,14 @@ linkmatname='Link_matrix.npy'
 
 index_list_name='masks_ROI_list.npz'
 colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
+for direc in data_set:
+    index_list=np.load(direc+index_list_name, allow_pickle=True)['arr_0']
+    List_of_masks=np.load(direc+list_name, allow_pickle=True)['arr_0']
+    main_dict=np.load(direc+dic_name, allow_pickle=True)['arr_0'].item()
+    newdic=np.load(direc+ROI_dict, allow_pickle=True)['arr_0'].item()
 
-index_list=np.load(Directory+index_list_name, allow_pickle=True)['arr_0']
-List_of_masks=np.load(Directory+list_name, allow_pickle=True)['arr_0']
-main_dict=np.load(Directory+dic_name, allow_pickle=True)['arr_0'].item()
-newdic=np.load(Directory+ROI_dict, allow_pickle=True)['arr_0'].item()
 
-
-plot_growth_superimpose(newdic,main_dict,List_of_masks)
+    plot_growth_superimpose(newdic,main_dict,List_of_masks)
 
 # plot_image_one_ROI('ROI 8',newdic,List_of_masks,main_dict)
 # plot_lineage_tree(newdic,List_of_masks,main_dict,colormask,Directory)

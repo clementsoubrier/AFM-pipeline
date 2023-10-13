@@ -10,7 +10,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from cellpose import plot
-import processing as pr
+from numba import njit
 import extract_individuals as exi
 
 

@@ -3,8 +3,8 @@ import math
 import numpy as np
 from numba import njit
 
-from peaks_troughs.preprocess import evenly_spaced_resample, preprocess_centerline
-from peaks_troughs.scaled_parameters import ALIGNMENT_PENALTY
+from preprocess import evenly_spaced_resample, preprocess_centerline
+from scaled_parameters import ALIGNMENT_PENALTY
 
 
 @njit

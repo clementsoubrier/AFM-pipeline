@@ -8,7 +8,7 @@ Created on Thu Apr 20 12:08:29 2023
 import cv2
 import os
 
-image_folder = 'Video/'
+image_folder = '../../Python_code/img/'
 video_name = 'video.avi'
 
 images = [img for img in os.listdir(image_folder) if img.endswith(".png")]

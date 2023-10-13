@@ -329,14 +329,38 @@ def plot_image_one_ROI(ROI,ROI_dic,masks_list,dic):
             plt.plot(center[:,1],center[:,0], color='k')
         plt.show()
         
-        
+
+
+@njit    
+def renorm_img(img):
+    dim1,dim2=np.shape(img)
+    newimg=np.zeros((dim1,dim2))
+    maxi=np.max(img)
+    mini=np.min(img)
+    if maxi==mini:
+        return newimg
+    else:
+        for i in range(dim1):
+            for j in range(dim2):
+                newimg[i,j]=(img[i,j]-mini)/(maxi-mini)
+        return newimg
+
+
+@njit
+def update_masks(mask,new_values):
+    (l,L)=np.shape(mask)
+    for j in range(l):
+        for k in range(L):
+            if mask[j,k]!=0:
+                mask[j,k]=new_values[mask[j,k]-1]
+    return mask
 
 
 def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist,directory):
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         # plot image with masks overlaid
-        img = np.load(dic[fichier]['adress'])['Height_fwd']
+        img = np.load('../data/datasets/'+dic[fichier]['adress'])['Height_fwd']
         masks=dic[fichier]['masks']
         masknumber=np.max(masks)
         col_ind_list=np.zeros(masknumber,dtype=np.int32)
@@ -355,10 +379,10 @@ def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist,directory):
                 col_ind_list[i]=0
             else:
                 col_ind_list[i]=col_ind_list[i]%len_col+1
-        masks=pr.update_masks(masks,col_ind_list)
+        masks=update_masks(masks,col_ind_list)
         
         colormask=np.array(maskcol)
-        mask_RGB = plot.mask_overlay(pr.renorm_img(img),masks,colors=colormask)#image with masks
+        mask_RGB = plot.mask_overlay(renorm_img(img),masks,colors=colormask)#image with masks
         plt.figure()
         plt.title(directory+', time : '+str(dic[fichier]['time']))
         plt.imshow(mask_RGB)
@@ -375,13 +399,13 @@ def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist,directory):
         
         main_centroid=dic[fichier]['main_centroid']
         plt.plot(main_centroid[1], main_centroid[0], color='w',marker='o')
-            
+        plt.savefig('../../Python_code/img/'+fichier+'.png', format='png')
         #plot the displacement of the centroid between two images
         plt.show()
         fichier=dic[fichier]['child']
     
     # plot image with masks overlaid
-    img = np.load(dic[fichier]['adress'])['Height_fwd']
+    img = np.load('../data/datasets/'+dic[fichier]['adress'])['Height_fwd']
     masks=dic[fichier]['masks']
     masknumber=np.max(masks)
     col_ind_list=np.zeros(masknumber,dtype=np.int32)
@@ -400,7 +424,7 @@ def plot_image_lineage_tree(ROI_dic,masks_list,dic,maskcol,indexlist,directory):
             col_ind_list[i]=0
         else:
             col_ind_list[i]=col_ind_list[i]%len_col+1
-    masks=pr.update_masks(masks,col_ind_list)
+    masks=update_masks(masks,col_ind_list)
     colormask=np.array(maskcol)
     mask_RGB = plot.mask_overlay(img,masks,colors=colormask)#image with masks
     plt.figure()
@@ -571,14 +595,14 @@ def run_whole_lineage_tree(direc,thres=final_thresh,min_number=min_len_ROI,thres
 
 
     
-    masks_list=np.load(direc+listname, allow_pickle=True)['arr_0']
-    main_dict=np.load(direc+dicname, allow_pickle=True)['arr_0'].item()
-    Bool_matrix=np.load(direc+boolmatname)
+    masks_list=np.load('../data/datasets/'+direc+listname, allow_pickle=True)['arr_0']
+    main_dict=np.load('../data/datasets/'+direc+dicname, allow_pickle=True)['arr_0'].item()
+    Bool_matrix=np.load('../data/datasets/'+direc+boolmatname)
 
     
     ROI_dict=exi.extract_individuals(Bool_matrix, direc)
     
-    linmatrix=np.load(direc+linmatname)
+    linmatrix=np.load('../data/datasets/'+direc+linmatname)
     
     newdic=filter_good_ROI_dic(ROI_dict,min_number)
     
@@ -589,10 +613,10 @@ def run_whole_lineage_tree(direc,thres=final_thresh,min_number=min_len_ROI,thres
     
     indexlist=detect_bad_div(newdic,linmatrix,masks_list,thres,thresmin)
 
-    plot_lineage_tree(newdic,masks_list,main_dict,colormask,direc)
-    # plot_image_lineage_tree(newdic,masks_list,main_dict,colormask,indexlist,direc)
-    np.savez_compressed(direc+ROIdict,newdic,allow_pickle=True)
-    np.savez_compressed(direc+indexlistname,indexlist,allow_pickle=True)
+    #plot_lineage_tree(newdic,masks_list,main_dict,colormask,direc)
+    plot_image_lineage_tree(newdic,masks_list,main_dict,colormask,indexlist,direc)
+    np.savez_compressed('../data/datasets/'+direc+ROIdict,newdic,allow_pickle=True)
+    np.savez_compressed('../data/datasets/'+direc+indexlistname,indexlist,allow_pickle=True)
     
     
     # os.remove(direc+linmatname)

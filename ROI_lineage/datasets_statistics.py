@@ -8,7 +8,7 @@ Created on Tue May 23 11:33:10 2023
 
 import numpy as np
 import matplotlib.pyplot as plt
-import centerline_analysis_v2 as ca
+from numba import njit
 import tqdm
 
 
@@ -24,6 +24,21 @@ dic_name='Main_dictionnary.npz'
 
 list_name='masks_list.npz'
 
+
+@njit 
+def dist_centerline(center1,im1):
+    n1=len(center1)
+    dist1=np.zeros(n1)
+    height1=np.zeros(n1)
+    error=False
+    for i in range(n1):
+        height1[i]=im1[center1[i,0],center1[i,1]]
+        if i>0:
+            comp_norm=norm(center1[i]-center1[i-1])
+            dist1[i]=dist1[i-1]+comp_norm
+            if comp_norm==0:
+                error=True
+    return(height1,dist1,error)
 
 def classifying_ROI(direct_list,ROIdicname): #with parent and daughter cells
     print('classifying_ROI')

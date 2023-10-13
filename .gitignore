@@ -1,7 +1,8 @@
 __pycache__
 .env
 .idea
-
+*.avi
+*.xlsx
 data/*/*
 
 !/**/.gitkeep

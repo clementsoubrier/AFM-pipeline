@@ -21,16 +21,16 @@ data_set=["WT_mc2_55/30-03-2015/",'delta_LTD6_04-06-2017/']#"WT_mc2_55/30-03-201
 # 'delta_LTD6_04-06-2017/','delta_lamA_03-08-2018/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/",
 title='WT30-03-2015 vs delta_LTD6' #"WT_mc2_55/30-03-2015/"#'WT_INH_700min_2014/'
 file="WT_mc2_55/30-03-2015/"
-A=np.load('centerline_analysis_result/'+file+'centerline_list.npy')
-B=np.load('centerline_analysis_result/'+file+'distance_matrix.npy')
-C=np.load('centerline_analysis_result/'+file+'inversion_matrix.npy')
-D=np.load('centerline_analysis_result/'+file+'delta_matrix.npy')
+# A=np.load('../../centerline_analysis_result/'+file+'centerline_list.npy')
+# B=np.load('../../centerline_analysis_result/'+file+'distance_matrix.npy')
+# C=np.load('../../centerline_analysis_result/'+file+'inversion_matrix.npy')
+# D=np.load('../../centerline_analysis_result/'+file+'delta_matrix.npy')
 
 
-# A=np.load('centerline_analysis_result/centerline_list_all.npy')
-# B=np.load('centerline_analysis_result/distance_matrix_all.npy')
-# C=np.load('centerline_analysis_result/inversion_matrix_all.npy')
-# D=np.load('centerline_analysis_result/delta_matrix_all.npy')
+A=np.load('../../centerline_analysis_result/centerline_list_all.npy')
+B=np.load('../../centerline_analysis_result/distance_matrix_all.npy')
+C=np.load('../../centerline_analysis_result/inversion_matrix_all.npy')
+D=np.load('../../centerline_analysis_result/delta_matrix_all.npy')
 
 
 
@@ -51,12 +51,12 @@ def plot_centerline_align(center_list, invers_mat,delta_mat,distmat,list0,list1,
             data0=center_list[elem0][1]
             data1=center_list[elem1][1]
             if data0!=initdata0:
-                dic0=np.load(data0+dicname, allow_pickle=True)['arr_0'].item()
-                mask_list0=np.load(data0+diclistname, allow_pickle=True)['arr_0']
+                dic0=np.load('../data/datasets/'+data0+dicname, allow_pickle=True)['arr_0'].item()
+                mask_list0=np.load('../data/datasets/'+data0+diclistname, allow_pickle=True)['arr_0']
                 initdata0=data0
             if data1!=initdata1:
-                dic1=np.load(data1+dicname, allow_pickle=True)['arr_0'].item()
-                mask_list1=np.load(data1+diclistname, allow_pickle=True)['arr_0']
+                dic1=np.load('../data/datasets/'+data1+dicname, allow_pickle=True)['arr_0'].item()
+                mask_list1=np.load('../data/datasets/'+data1+diclistname, allow_pickle=True)['arr_0']
                 initdata1=data1
             plot_2_center(data0,dic0,mask_list0,elem0,data1,dic1,mask_list1,elem1,center_list,invers_mat,delta_mat,distmat,epsilon)
         
@@ -67,14 +67,14 @@ def plot_2_center(data0,dic0,mask_list0,num0,data1,dic1,mask_list1,num1,center_l
     fichier0,maskind0=mask_list0[int(center_list[num0][2])][2:]
     centerline0=dic0[fichier0]['centerlines'][maskind0-1]
     size0=dic0[fichier0]['resolution']
-    img0=np.load(dic0[fichier0]['adress'])['Height_fwd']
+    img0=np.load('../data/datasets/'+dic0[fichier0]['adress'])['Height_fwd']
     line_data0=dist_centerline(centerline0,img0)
     
     
     fichier1,maskind1=mask_list1[int(center_list[num1][2])][2:]
     centerline1=dic1[fichier1]['centerlines'][maskind1-1]
     size1=dic1[fichier1]['resolution']
-    img1=np.load(dic1[fichier1]['adress'])['Height_fwd']
+    img1=np.load('../data/datasets/'+dic1[fichier1]['adress'])['Height_fwd']
     line_data1=dist_centerline(centerline1,img1)
     
    
@@ -95,15 +95,21 @@ def plot_2_center(data0,dic0,mask_list0,num0,data1,dic1,mask_list1,num1,center_l
         if pix_len0>pix_len1:
             print('good')
             plt.figure()
+            avg0=np.average(phy_height0[len(phy_height0)//7:6*len(phy_height0)//7])
             plt.plot(np.linspace(0,(pix_len0-1)*size,pix_len0),phy_height0,color='r')
             print(L2_score(pix_len0,phy_height0,pix_len1,phy_height1,delta_mat[num0,num1],epsilon),distmat[num0,num1])
-            plt.plot(np.linspace((delta_mat[num0,num1]-pix_len1//10)*size,(delta_mat[num0,num1]-pix_len1//10+pix_len1-1)*size,pix_len1),phy_height1,color='k')
+            avg1=np.average(phy_height1[len(phy_height1)//7:6*len(phy_height1)//7])
+            plt.plot(np.linspace((delta_mat[num0,num1]-pix_len1//10)*size,(delta_mat[num0,num1]-pix_len1//10+pix_len1-1)*size,pix_len1),phy_height1+np.ones(len(phy_height1))*(avg0-avg1),color='k')
             plt.show()
         else:
             plt.figure()
+            avg0=np.average(phy_height0[len(phy_height0)//7:6*len(phy_height0)//7])
+            avg1=np.average(phy_height1[len(phy_height1)//7:6*len(phy_height1)//7])
             plt.plot(np.linspace(-pix_len0//10*size,(pix_len0-1-pix_len0//10)*size,pix_len0),phy_height0,color='r')
             print(L2_score(pix_len1,phy_height1,pix_len0,phy_height0,delta_mat[num0,num1],epsilon),distmat[num0,num1])
-            plt.plot(np.linspace((delta_mat[num0,num1])*size,(delta_mat[num0,num1]+pix_len1-1)*size,pix_len1),phy_height1,color='k')
+            plt.plot(np.linspace((delta_mat[num0,num1])*size,(delta_mat[num0,num1]+pix_len1-1)*size,pix_len1),phy_height1+np.ones(len(phy_height1))*(avg0-avg1),color='k')
+            plt.xlabel(r'length $(\mu m)$')
+            plt.ylabel(r'height $(nm)$')
             plt.show()
 
 
@@ -150,10 +156,10 @@ def run_mds_plot(center_list,dist_mat, mask=None, ROI_list=None):
         if i==0 or oldname!=infos[1]:
             change_data=True
             oldname=infos[1]
-            dic=np.load(infos[1]+dic_name, allow_pickle=True)['arr_0'].item()
-            # ROI_dict=np.load(infos[1]+ROI_name, allow_pickle=True)['arr_0'].item()
-            mask_list=np.load(infos[1]+'masks_list.npz', allow_pickle=True)['arr_0']
-            ROI_mask_list=np.load(infos[1]+indexlistname, allow_pickle=True)['arr_0']
+            dic=np.load('../data/datasets/'+infos[1]+dic_name, allow_pickle=True)['arr_0'].item()
+            # ROI_dict=np.load('../data/datasets/'+infos[1]+ROI_name, allow_pickle=True)['arr_0'].item()
+            mask_list=np.load('../data/datasets/'+infos[1]+'masks_list.npz', allow_pickle=True)['arr_0']
+            ROI_mask_list=np.load('../data/datasets/'+infos[1]+indexlistname, allow_pickle=True)['arr_0']
             
         # col=int(ROI_mask_list[int(infos[2])][0])
         # c=np.array(colormask[col%len(colormask)])/255
@@ -241,9 +247,9 @@ def run_mds_plot_2_data_time(center_list,dist_mat,base_data,evoldata):
     pos_mu=pos[np.logical_not(list_WT)]
     new_center_list=center_list_prime[np.logical_not(list_WT)]
     timing=np.zeros(len(new_center_list))
-    dic=np.load(evoldata+dic_name, allow_pickle=True)['arr_0'].item()
+    dic=np.load('../data/datasets/'+evoldata+dic_name, allow_pickle=True)['arr_0'].item()
     # ROI_dict=np.load(infos[1]+ROI_name, allow_pickle=True)['arr_0'].item()
-    mask_list=np.load(evoldata+'masks_list.npz', allow_pickle=True)['arr_0']
+    mask_list=np.load('../data/datasets/'+evoldata+'masks_list.npz', allow_pickle=True)['arr_0']
     
     for i in trange(len(new_center_list)):
         frame=mask_list[int(new_center_list[i,2])][2]
@@ -251,7 +257,11 @@ def run_mds_plot_2_data_time(center_list,dist_mat,base_data,evoldata):
     
     p=ax.scatter(pos_mu[:, 0],pos_mu[:, 1],pos_mu[:, 2],c=timing,s=2,cmap='plasma')
     cbar=plt.colorbar(p)
-    cbar.set_label('time (mn), '+evoldata)
+    cbar.set_label('time (mn), '+evoldata[:6])
+    
+    ax.w_xaxis.set_ticklabels([''])
+    ax.w_yaxis.set_ticklabels([''])
+    ax.w_zaxis.set_ticklabels([''])
     plt.legend()
     plt.show()
     
@@ -348,9 +358,9 @@ def run_mds_plot_2_data_cluster(center_list,dist_mat,base_data,evoldata):
     
 def run_mds_plot_INH_time(center_list,dist_mat):
     
-    dic=np.load('WT_INH_700min_2014/'+dic_name, allow_pickle=True)['arr_0'].item()
+    dic=np.load('../data/datasets/'+'WT_INH_700min_2014/'+dic_name, allow_pickle=True)['arr_0'].item()
     # ROI_dict=np.load(infos[1]+ROI_name, allow_pickle=True)['arr_0'].item()
-    mask_list=np.load('WT_INH_700min_2014/'+'masks_list.npz', allow_pickle=True)['arr_0']
+    mask_list=np.load('../data/datasets/'+'WT_INH_700min_2014/'+'masks_list.npz', allow_pickle=True)['arr_0']
     
     
     
@@ -430,22 +440,28 @@ def run_mds_plot_INH_time(center_list,dist_mat):
     cbar=plt.colorbar(p)
     cbar.set_label('time (mn), after INH')
     plt.legend()
+    ax.w_xaxis.set_ticklabels([''])
+    ax.w_yaxis.set_ticklabels([''])
+    ax.w_zaxis.set_ticklabels([''])
     plt.show()
     
     plt.figure()
-    res=dist_WT
+    res=dist_WT/np.sum(dist_WT)
     mean=np.average(res)
     std=np.std(res)
-    plt.hist(dist_WT, 100, alpha=0.5, label='before INH'+"mean "+str(round(mean))+', std '+str(round(std)))
+    plt.hist(res, 100, alpha=0.3, color="blue", label='before INH : '+"mean "+str(round(mean))+', std '+str(round(std)))
     
-    plt.axvline(mean, color="green", label='mean before INH')
+    plt.axvline(mean, color="blue", label='mean before INH')
     
-    res=dist_mu
+    res=dist_mu/np.sum(dist_mu)
     mean=np.average(res)
     std=np.std(res)
-    plt.hist(dist_mu, 100, alpha=0.5, label='after INH'+"mean "+str(round(mean))+', std'+str(round(std)))
-    plt.axvline(mean, color="orange", label='mean after INH')
+    plt.hist(res, 100, alpha=0.3, color="red", label='after INH : '+"mean "+str(round(mean))+', std'+str(round(std)))
+    plt.axvline(mean, color="red", label='mean after INH')
     plt.legend(loc='upper right')
+    plt.xlabel('distance in the mds')
+    plt.ylabel('normalized distribution')
+    plt.title('distance distribution')
     plt.show()
     
     
@@ -457,7 +473,7 @@ def run_mds_plot_INH_time(center_list,dist_mat):
     
     
 if __name__ == "__main__":
-    plot_centerline_align(A,C,D,B,[7],[2],dic_name,mask_list_name,epsilon_penal)
+    # plot_centerline_align(A,C,D,B,[7],[9],dic_name,mask_list_name,epsilon_penal)
 
     # lenlis=len(A)
     # mask=np.zeros(lenlis,dtype=bool)
@@ -465,76 +481,77 @@ if __name__ == "__main__":
     #     olddata=''
     #     if A[i,1] in data_set:
     #         if A[i,1]!=olddata:
-    #             ROI_dic=np.load(A[i,1]+ROI_name, allow_pickle=True)['arr_0'].item()
+    #             ROI_dic=np.load('../data/datasets/'+A[i,1]+ROI_name, allow_pickle=True)['arr_0'].item()
     #         if len(ROI_dic[A[i,3]]['Mask IDs'])>7:
     #             mask[i]=1
     # run_mds_plot(A,B,mask)#,ROI_list=['ROI 2','ROI 4','ROI 5','ROI 12','ROI 6','ROI 9','ROI 45']
     
     
-    # run_mds_plot_2_data_time(A,B,"WT_mc2_55/30-03-2015/","delta_parB/03-02-2015/")
+    # run_mds_plot_2_data_time(A,B,"WT_mc2_55/30-03-2015/",'WT_INH_700min_2014/')
     # run_mds_plot_2_data_cluster(A,B,"WT_mc2_55/30-03-2015/","delta_parB/18-01-2015/")
     
-    # run_mds_plot_INH_time(A,B)
+    run_mds_plot_INH_time(A,B)
     
-    # data='WT_INH_700min_2014/'
-    # dic=np.load(data+dic_name, allow_pickle=True)['arr_0'].item()
-    # mask_list=np.load(data+mask_list_name, allow_pickle=True)['arr_0']
-    # ROI_dic=np.load(data+ROI_name, allow_pickle=True)['arr_0'].item()
+    data='WT_INH_700min_2014/'
+    dic=np.load('../data/datasets/'+data+dic_name, allow_pickle=True)['arr_0'].item()
+    mask_list=np.load('../data/datasets/'+data+mask_list_name, allow_pickle=True)['arr_0']
+    ROI_dic=np.load('../data/datasets/'+data+ROI_name, allow_pickle=True)['arr_0'].item()
     
-    # size=dic[list(dic.keys())[0]]['resolution']
+    size=dic[list(dic.keys())[0]]['resolution']
     
-    # gr_before=[]
-    # gr_indef=[]
-    # gr_after=[]
-    # for ROI in ROI_dic.keys():
-    #     if  len(ROI_dic[ROI]["Mask IDs"])>7:
-    #         first_elem=ROI_dic[ROI]["Mask IDs"][0]
-    #         last_elem=ROI_dic[ROI]["Mask IDs"][-1]
+    gr_before=[]
+    gr_indef=[]
+    gr_after=[]
+    for ROI in ROI_dic.keys():
+        if  len(ROI_dic[ROI]["Mask IDs"])>7:
+            first_elem=ROI_dic[ROI]["Mask IDs"][0]
+            last_elem=ROI_dic[ROI]["Mask IDs"][-1]
             
             
-    #         fichier0,maskind0=mask_list[first_elem][2:]
-    #         time0=dic[fichier0]['time']
-    #         centerline0=dic[fichier0]['centerlines'][maskind0-1]
-    #         img0=np.load(dic[fichier0]['adress'])['Height_fwd']
+            fichier0,maskind0=mask_list[first_elem][2:]
+            time0=dic[fichier0]['time']
+            centerline0=dic[fichier0]['centerlines'][maskind0-1]
+            img0=np.load('../data/datasets/'+dic[fichier0]['adress'])['Height_fwd']
             
-    #         len0=dist_centerline(centerline0,img0)[1][-1]
+            len0=dist_centerline(centerline0,img0)[1][-1]*size
             
-    #         fichier1,maskind1=mask_list[last_elem][2:]
-    #         time1=dic[fichier1]['time']
-    #         centerline1=dic[fichier1]['centerlines'][maskind1-1]
-    #         img1=np.load(dic[fichier1]['adress'])['Height_fwd']
+            fichier1,maskind1=mask_list[last_elem][2:]
+            time1=dic[fichier1]['time']
+            centerline1=dic[fichier1]['centerlines'][maskind1-1]
+            img1=np.load('../data/datasets/'+dic[fichier1]['adress'])['Height_fwd']
             
-    #         len1=dist_centerline(centerline1,img1)[1][-1]
+            len1=dist_centerline(centerline1,img1)[1][-1]*size
             
-    #         if len1-len0>=0:
-    #             if time1<700:
-    #                 gr_before.append((len1-len0)/(time1-time0))
-    #             elif time0>700:
-    #                 gr_after.append((len1-len0)/(time1-time0))
-    #             else:
-    #                 gr_indef.append((len1-len0)/(time1-time0))
+            if len1-len0>=0:
+                if time1<700:
+                    gr_before.append((len1-len0)/(time1-time0)*1000)
+                elif time0>700:
+                    gr_after.append((len1-len0)/(time1-time0)*1000)
+                else:
+                    gr_indef.append((len1-len0)/(time1-time0)*1000)
                 
-    # plt.figure()
-    # plt.title('Growth rate')
+    plt.figure()
+    plt.title('Growth rate')
     
-    # res=np.array(gr_before)
+    res=np.array(gr_before)
+    mean=np.average(res)
+    std=np.std(res)
+    plt.hist(res, 20,color='red', alpha=0.3, label='before INH : '+"mean "+str(round(mean,2))+', std '+str(round(std,2)))
+    plt.axvline(mean, color='red', label='mean before INH')
+    
+    res=np.array(gr_after)
+    mean=np.average(res)
+    std=np.std(res)
+    plt.hist(res, 40,color='blue', alpha=0.3, label='after INH'+"mean "+str(round(mean,2))+', std '+str(round(std,2)))
+    plt.axvline(mean, color='blue', label='mean after INH')
+    res=np.array(gr_indef)
+    
     # mean=np.average(res)
     # std=np.std(res)
-    # plt.hist(res, 20,color='C0', alpha=0.5, label='before INH'+"mean "+str(round(mean,2))+', std '+str(round(std,2)))
-    # plt.axvline(mean, color='C0', label='mean before INH')
-    
-    # res=np.array(gr_after)
-    # mean=np.average(res)
-    # std=np.std(res)
-    # plt.hist(res, 40,color='C1', alpha=0.5, label='after INH'+"mean "+str(round(mean,2))+', std '+str(round(std,2)))
-    # plt.axvline(mean, color='C1', label='mean after INH')
-    # res=np.array(gr_indef)
-    
-    # mean=np.average(res)
-    # std=np.std(res)
-    # plt.hist(res, 30,color='C2', alpha=0.5, label='during INH'+"mean "+str(round(mean,2))+', std '+str(round(std,2)))
+    # plt.hist(res, 30,color='C2', alpha=0.2, label='during INH'+"mean "+str(round(mean,2))+', std '+str(round(std,2)))
     # plt.axvline(mean, color='C2', label='mean during INH')
-    
+    plt.xlabel(r'growth rate ($n m / mn$)')
+    plt.ylabel('number of cells')
     plt.legend()
     plt.show()
 

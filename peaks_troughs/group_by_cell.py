@@ -315,7 +315,12 @@ def save_roi(
     main_dict,
     roi_dirname,
 ):
-    os.makedirs(roi_dirname)
+    
+    if os.path.exists(roi_dirname):
+        for file in os.listdir(roi_dirname):
+            os.remove(os.path.join(roi_dirname, file))
+    else:
+        os.makedirs(roi_dirname)
     masks = roi["Mask IDs"]
     try:
         masks_quality = roi["masks_quality"]

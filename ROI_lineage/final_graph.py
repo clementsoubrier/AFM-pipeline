@@ -6,18 +6,22 @@ Created on Tue May  2 11:43:22 2023
 @author: c.soubrier
 """
 
-import processing as pcs
+#%%  Imports
+
 import numpy as np
 from numba import njit
 from copy import deepcopy
 import tqdm
 
+from scipy.signal import fftconvolve
 
 
-Directory=  'WT_INH_700min_2014/'  #the directory you chose to work on
 
 
-data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+Directory=  "delta_parB/03-02-2015/" #the directory you chose to work on
+
+
+data_set=['WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] # 'delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",
 
 
 
@@ -34,7 +38,7 @@ final_thresh= 0.75   #0.6
 
 
 
-''' Functions'''
+#%% Functions
 
 
 def trans_vector_matrix(dic,max_diff_time):
@@ -48,14 +52,14 @@ def trans_vector_matrix(dic,max_diff_time):
         fichier1=dic_list[number]
         if number<len(dic_list)-1 :
             time1=dic[fichier1]['time']
-            masks1=pcs.main_mask(dic[fichier1]['masks'])
+            masks1=main_mask(dic[fichier1]['masks'])
             angle1=dic[fichier1]['angle']
             main_centr1=dic[fichier1]['main_centroid']
             i=1
             timer=dic[dic_list[number+i]]['time']
             while abs(timer-time1)<=max_diff_time:
                 fichier2=dic_list[number+i]
-                masks2=pcs.main_mask(dic[fichier2]['masks'])
+                masks2=main_mask(dic[fichier2]['masks'])
                 angle2=dic[fichier2]['angle']
                 main_centr2=dic[fichier2]['main_centroid']
                 update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,main_centr1,time1,masks2,angle2,main_centr2,timer,max_diff_time)
@@ -72,19 +76,19 @@ def update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,main_centr1,time1,m
     angle=angle2-angle1
     if angle==0:
         #vecguess=main_centr1-main_centr2
-        res=pcs.opt_trans_vec2(masks1,masks2)#,rad,vecguess
+        res=opt_trans_vec(masks1,masks2)#,rad,vecguess
         mat_vec[time1,timer-time1+max_diff_time]=res
         mat_vec[timer,time1-timer+max_diff_time]=-res
     else:
         dim1,dim2=np.shape(masks1)
         centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
-        #vecguess=(pcs.rotation_vector(angle,main_centr1,centerpoint)-main_centr2).astype(np.int32)
-        masks1=pcs.rotation_img(angle,masks1,centerpoint)
-        res=pcs.opt_trans_vec2(masks1,masks2).astype(np.int32)#,rad,vecguess
+        #vecguess=(rotation_vector(angle,main_centr1,centerpoint)-main_centr2).astype(np.int32)
+        masks1=rotation_img(angle,masks1,centerpoint)
+        res=opt_trans_vec(masks1,masks2).astype(np.int32)#,rad,vecguess
         mat_vec[time1,timer-time1+max_diff_time]=res
         mat_ang[time1,timer-time1+max_diff_time]=angle
         mat_ang[timer,time1-timer+max_diff_time]=-angle
-        mat_vec[timer,time1-timer+max_diff_time]=(pcs.rotation_vector(-angle,-res,np.array([0,0],dtype=np.int32))).astype(np.int32)
+        mat_vec[timer,time1-timer+max_diff_time]=(rotation_vector(-angle,-res,np.array([0,0],dtype=np.int32))).astype(np.int32)
 
 
 
@@ -108,12 +112,12 @@ def lineage_matrix(dic,maskslist,mat_vec,mat_ang,max_diff_time,threshold):
             mask_p=dic[fichier]['masks']
             area_p=dic[fichier]['area']
             
-            mask_c=pcs.mask_transfert(mask_c,transfert)
+            mask_c=mask_transfert(mask_c,transfert)
             
             if angle!=0:            #check on real data
                 dim1,dim2=np.shape(mask_p)
                 centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
-                mask_p=pcs.rotation_img(angle,mask_p,centerpoint)
+                mask_p=rotation_img(angle,mask_p,centerpoint)
             
             links_p,links_c =comparision_mask_score(mask_c,mask_p,area_c,area_p,threshold)
             len_p,len_c=np.shape(links_p)
@@ -155,14 +159,72 @@ def comparision_mask_score(mask_c,mask_p,area_c,area_p,threshold):
                 result_p[i-1,j-1]=area/area_p[i-1]
     return result_p,result_c
 
+
+
+# Effective computation of the translation vector : returns the translation vector that optimizes the score of the intersection of the two main shapes
+
+def opt_trans_vec(img_1, img_2):
+    corr = fftconvolve(img_1, img_2[::-1, ::-1])
+    argmax = np.unravel_index(corr.argmax(), corr.shape)
+    vec = np.array(argmax) - np.array(img_1.shape) + 1
+    return vec
+
+# Translation of the masks by a vector
+@njit 
+def mask_transfert(mask,vector):
+    (l1,l2)=np.shape(mask)
+    new_mask=np.zeros((l1,l2),dtype=np.int32)
+    for i in range(l1):
+        for j in range(l2):
+            if (0<=i+vector[0]<=l1-1) and (0<=j+vector[1]<=l2-1) and mask[i,j]>0:
+                new_mask[int(i+vector[0]),int(j+vector[1])]=mask[i,j]
+    return new_mask
+
+
+#rotation of a vector around a point, the angle is in radian (float as output)
+@njit 
+def rotation_vector(angle,vec,point):
+    mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+    newvec=vec-point
+    var=np.array([mat[0,0]*newvec[0]+mat[0,1]*newvec[1],mat[1,0]*newvec[0]+mat[1,1]*newvec[1]])
+    return point+var
+
+#rotation of an image around a point (int32 as input)
+@njit 
+def rotation_img(angle,img,point):
+    dim1,dim2=np.shape(img)
+    new_img=np.zeros((dim1,dim2),dtype=np.int32)
+    for i in range(dim1):
+        for j in range(dim2):
+            trans_vec=rotation_vector(-angle,np.array([i,j]),point)#sign of the rotation : definition of the angle in the logs
+            i_n,j_n=trans_vec[0],trans_vec[1]
+            i_t=int(i_n)
+            j_t=int(j_n)
+            if 0<=i_t<dim1-1 and 0<=j_t<dim2-1:
+                frac_i=i_n-i_t
+                frac_j=j_n-j_t
+                new_img[i,j]=np.int32(frac_i*frac_j*img[i_t,j_t]+frac_i*(1-frac_j)*img[i_t,j_t+1]+(1-frac_i)*frac_j*img[i_t+1,j_t]+(1-frac_i)*(1-frac_j)*img[i_t+1,j_t+1])
+    return new_img
+
+
+# Tranform all masks into one shape (the main shape)
+@njit
+def main_mask(mask):
+    (l,L)=np.shape(mask)
+    new_mask=np.zeros((l,L))
+    for i in range(l):
+        for j in range(L):
+            if mask[i,j]!=0:
+                new_mask[i,j]=1
+    return new_mask
+
+
 def clean_matrix(lin_mat,dic,maskslist,max_diff_time,thres):
     mat_dim=len(maskslist)
     newmat=np.zeros((mat_dim,mat_dim),dtype=np.int8)
     for i in tqdm.trange(mat_dim):
         base_time=dic[maskslist[i][2]]['time']
-        time_list=[]
-        for k in range(max_diff_time):
-            time_list.append([])
+        time_list=[[] for k in range(max_diff_time)]
         if i<mat_dim:
             for j in range(i+1,mat_dim):
                 if lin_mat[i,j]>thres/4:      #no to put 0, float precision problem can appear
@@ -185,26 +247,25 @@ def clean_matrix(lin_mat,dic,maskslist,max_diff_time,thres):
 
 
 
-'''
-Deriving the boolean matrix from the link matrix. The bollean matrix maximizes the size of trees
 
+#%%Deriving the boolean matrix from the link matrix. The bollean matrix maximizes the size of trees
 
-'''
 
 def Bool_from_linkmatrix(linkmat,max_diff_time):
     dim=len(linkmat)
     newmat=np.zeros((dim,dim),dtype=bool)
     print('Roots and links detection')
-    forwardlinks,backwardlinks,rootslist=detekt_roots(linkmat,dim) #detekts roots and transform the matrix into an adjacence list
+    forwardlinks,backwardlinks,rootslist=detekt_roots(linkmat,dim) 
     print('Leafs detection')
     endpoints=detekt_end_leafs(forwardlinks,backwardlinks,linkmat,dim,max_diff_time)
     print('Computing longest paths')
-    final_links=longuest_path(forwardlinks,backwardlinks,rootslist,dim)
+    final_links=longuest_path(backwardlinks,rootslist,dim)
     for point in endpoints:
         update_bool_mat(final_links[point],newmat)
     return newmat
 
 
+# update the boolean matrix of the lineage tree to add the leaf link_list
 def update_bool_mat(link_list,mat):
     len_lis=len(link_list)
     if len_lis>=2:
@@ -219,7 +280,7 @@ def update_bool_mat(link_list,mat):
                 mat[i,j]=True
         
     
-
+#detekts roots of the tree and transform the matrix into an adjacence list
 def detekt_roots(linkmat,dim):
     
     forwardlinks=[]
@@ -244,6 +305,8 @@ def detekt_roots(linkmat,dim):
             
     return forwardlinks,backwardlinks,rootslist
 
+
+# detect the true leafs of the tree (it comes from a real division and is not the result of bad detection)
 def detekt_end_leafs(forwardlinks,backwardlinks,linkmat,dim,depth):
     res=[]
     for i in tqdm.trange(dim):
@@ -271,6 +334,9 @@ def detekt_end_leafs(forwardlinks,backwardlinks,linkmat,dim,depth):
                 
     return res
 
+
+
+# detection of the leafs of the tree
 def end_leafs(linkmat,dim):
     leafslist=[]
     for i in range(dim):
@@ -278,7 +344,7 @@ def end_leafs(linkmat,dim):
             leafslist.append(i)
     return leafslist
 
-
+# create the list of ancestors of a node in the tree up to a certain time
 def list_ancestors(i,backwardlinks,linkmat,depth):
     res=[i]
     if depth<1:
@@ -290,6 +356,8 @@ def list_ancestors(i,backwardlinks,linkmat,depth):
                 res+=list_ancestors(indiv, backwardlinks,linkmat,depth-subdepth)
         return list(set(res))
 
+
+# create the list of children of a node in the tree up to a certain time
 def list_children(ancestors,forwardlinks,linkmat,depth):
     res=deepcopy(ancestors)
     if depth<1:
@@ -304,11 +372,10 @@ def list_children(ancestors,forwardlinks,linkmat,depth):
         return list(set(res))
             
 
-def longuest_path(forwardlinks,backwardlinks,rootslist,dim):
-    path=[]
+def longuest_path(backwardlinks,rootslist,dim):
+    path=[[] for i in range(dim)]
     value=np.zeros(dim,dtype=np.int32)
-    for i in range(dim):
-        path.append([])
+
     for root in rootslist:
         path[root]=[root]
         value[root]=1
@@ -352,10 +419,12 @@ def Final_lineage_tree(direc,max_diff_time=depth_search,surfthresh=surface_thres
     boolmatname="Bool_matrix.npy"
 
     linkmatname='Link_matrix.npy'
+
+    data_direc='data/datasets/'
     
-    masks_list=np.load(direc+listname, allow_pickle=True)['arr_0']
+    masks_list=np.load(data_direc+direc+listname, allow_pickle=True)['arr_0']
     #print(masks_list)
-    main_dict=np.load(direc+dicname, allow_pickle=True)['arr_0'].item()
+    main_dict=np.load(data_direc+direc+dicname, allow_pickle=True)['arr_0'].item()
     #print(main_dict)
     print('trans_vector_matrix 1')
     vector_matrix, angle_matrix=trans_vector_matrix(main_dict,max_diff_time) #translation vector and rotation angle between the different frames
@@ -366,23 +435,23 @@ def Final_lineage_tree(direc,max_diff_time=depth_search,surfthresh=surface_thres
     print('Bool_matrix  4')
     Bool_mat=Bool_from_linkmatrix(Link_mat,max_diff_time)
     print('saving 5')
-    np.save(direc+boolmatname,Bool_mat)
-    np.save(direc+linkmatname,Link_mat)
-    np.save(direc+linmatname,lin_mat)
+    np.save(data_direc+direc+boolmatname,Bool_mat)
+    np.save(data_direc+direc+linkmatname,Link_mat)
+    np.save(data_direc+direc+linmatname,lin_mat)
     
-    
+#%% running main function   
 
 if __name__ == "__main__":
     
 
     
 
-    # Final_lineage_tree(Directory)
+    Final_lineage_tree(Directory)
     
     
-    for direc in data_set:
-        print(direc)
-        Final_lineage_tree(direc)
+    # for direc in data_set:
+    #     print(direc)
+    #     Final_lineage_tree(direc)
 
 
 

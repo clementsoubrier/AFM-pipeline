@@ -11,34 +11,22 @@ import matplotlib.pyplot as plt
 from numba import njit
 import tqdm
 
+import centerline_analysis_v2 as ca
 
 ROI_name='ROI_dict.npz' 
 
 
 
 # data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]
-# data_set2=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+# data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
-data_set2="WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/"
+data_set="WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/"
 dic_name='Main_dictionnary.npz'
 
 list_name='masks_list.npz'
 
+data_direc='data/datasets/'
 
-@njit 
-def dist_centerline(center1,im1):
-    n1=len(center1)
-    dist1=np.zeros(n1)
-    height1=np.zeros(n1)
-    error=False
-    for i in range(n1):
-        height1[i]=im1[center1[i,0],center1[i,1]]
-        if i>0:
-            comp_norm=norm(center1[i]-center1[i-1])
-            dist1[i]=dist1[i-1]+comp_norm
-            if comp_norm==0:
-                error=True
-    return(height1,dist1,error)
 
 def classifying_ROI(direct_list,ROIdicname): #with parent and daughter cells
     print('classifying_ROI')
@@ -270,5 +258,5 @@ if __name__ == "__main__":
     # whole_ROI,roots_only,leaf_only, non_connected,number_division=classifying_ROI(directory_list,ROI_name)
     # print(len(whole_ROI),len(roots_only),len(leaf_only), len(non_connected))
     # print('number_division',number_division)
-    totale_stats(data_set2,ROI_name,dic_name,list_name)
-    stats_time_evol(data_set2,ROI_name,dic_name,list_name)
+    totale_stats(data_set,ROI_name,dic_name,list_name)
+    stats_time_evol(data_set,ROI_name,dic_name,list_name)

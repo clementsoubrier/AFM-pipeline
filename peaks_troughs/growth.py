@@ -222,7 +222,7 @@ def surf_growth(ROI, ROI_dict, main_dict, masks_list):
 
 
 def get_cells_surface(dataset, skip_bad_roi, bad_rois):
-    path = os.path.join("..", "data", "datasets", dataset)
+    path = os.path.join( "data", "datasets", dataset)
     main_dict_path = os.path.join(path, "Main_dictionnary.npz")
     main_dict = np.load(main_dict_path, allow_pickle=True)["arr_0"].item()
     masks_list_path = os.path.join(path, "masks_list.npz")
@@ -244,7 +244,7 @@ def get_cells_surface(dataset, skip_bad_roi, bad_rois):
 
 
 def get_cells_length(dataset, skip_bad_roi, bad_rois, inh_700=False):
-    path = os.path.join("..", "data", "datasets", dataset)
+    path = os.path.join( "data", "datasets", dataset)
     roi_dict_path = os.path.join(path, "ROI_dict.npz")
     roi_dict = np.load(roi_dict_path, allow_pickle=True)["arr_0"].item()
     full_life_rois = []

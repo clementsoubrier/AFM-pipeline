@@ -7,10 +7,17 @@ from enum import IntEnum
 
 import numpy as np
 import tqdm
-from align import align_with_reference
-from derivative_sign_segmentation import find_peaks_troughs
-from preprocess import keep_centerline
-from scaled_parameters import get_scaled_parameters
+
+try:
+    from align import align_with_reference
+    from derivative_sign_segmentation import find_peaks_troughs
+    from preprocess import keep_centerline
+    from scaled_parameters import get_scaled_parameters
+except:
+    from peaks_troughs.align import align_with_reference
+    from peaks_troughs.derivative_sign_segmentation import find_peaks_troughs
+    from peaks_troughs.preprocess import keep_centerline
+    from peaks_troughs.scaled_parameters import get_scaled_parameters
 
 datasets_missing_masks_quality = []
 
@@ -22,7 +29,7 @@ class Orientation(IntEnum):
 
 
 def find_all_datasets():
-    datasets_dir = os.path.join("..", "data", "datasets")
+    datasets_dir = os.path.join("data", "datasets")
     pattern = os.path.join(datasets_dir, "**", "final_data", "")
     datasets = glob.glob(pattern, recursive=True)
     datasets = [
@@ -32,7 +39,7 @@ def find_all_datasets():
 
 
 def load_data(dataset, log_progress):
-    path = os.path.join("..", "data", "datasets", dataset)
+    path = os.path.join( "data", "datasets", dataset)
     if log_progress:
         print("Loading main dictionary.", end="")
     main_dict_path = os.path.join(path, "Main_dictionnary.npz")
@@ -55,7 +62,7 @@ def load_data(dataset, log_progress):
             frame_dicts, total=len(main_dict), desc="Loading images"
         )
     for img_dict in frame_dicts:
-        img_path = os.path.join("..", "data", "datasets", img_dict["adress"])
+        img_path = os.path.join(img_dict["adress"])
         contents = np.load(img_path)
         fwd_img = contents["Height_fwd"]
         try:
@@ -99,7 +106,7 @@ def get_roi_dir(cell_name, dataset):
             raise ValueError(
                 f"The combination ({cell_name}, {dataset}) does not describe a ROI."
             )
-    roi_dir = os.path.join("..", "data", "cells", dataset, cell_name)
+    roi_dir = os.path.join( "data", "cells", dataset, cell_name)
     return roi_dir
 
 
@@ -156,7 +163,7 @@ def _load_dataset(dataset, progress_bar, return_defects):
     else:
         cut_before_700 = False
         cut_after_700 = False
-    path = os.path.join("..", "data", "cells", dataset)
+    path = os.path.join( "data", "cells", dataset)
     directories = os.listdir(path)
     if progress_bar:
         directories = tqdm.tqdm(directories, desc=dataset)
@@ -359,7 +366,7 @@ def save_dataset(dataset, log_progress):
     references = {}
     for roi_name in roi_names:
         roi = roi_dict[roi_name]
-        roi_dir = os.path.join("..", "data", "cells", dataset, roi_name)
+        roi_dir = os.path.join( "data", "cells", dataset, roi_name)
         reference = references.pop(roi_name, (None, None, None))
         reference, missing_masks_quality = save_roi(
             roi, *reference, masks_list, main_dict, roi_dir
@@ -385,6 +392,7 @@ def main():
             datasets = find_all_datasets()
     else:
         datasets = [dataset]
+
     for dataset in datasets:
         save_dataset(dataset, log_progress)
     global datasets_missing_masks_quality

@@ -6,7 +6,8 @@ Created on Fri Oct 21 11:18:29 2022
 @author: c.soubrier
 """
 
-#First test AFM
+#%%  Imports
+
 
 import os
 import datetime
@@ -21,9 +22,8 @@ import matplotlib.pyplot as plt
 from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
 import scipy
-import pySPM
+from pySPM import Bruker,SPM_image
 from  Centerlines.complete_centerlines import  complete_one_centerline
-
 
 
 
@@ -61,7 +61,7 @@ from  Centerlines.complete_centerlines import  complete_one_centerline
 # =============================================================================
 
 
-Directory= "WT_mc2_55/30-03-2015/" #the directory you chose to work on    
+Directory= "delta_parB/03-02-2015/" #the directory you chose to work on    
 # different type of datassets with their cropping parameter
 
 data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #
@@ -143,7 +143,7 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
         if  files[i][0]!='.':         #avoiding .DS_Store files
             try:                    #SOMETIMES pySPM.Bruker function crashes if the aspect ratios are not integers
                 #loading and saving the data-files and dimension
-                Scan = pySPM.Bruker(log_dir+files[i])
+                Scan = Bruker(log_dir+files[i])
                 channel_list=get_channel_list(Scan)
                 back_for=np.zeros(len(channel_list),dtype=int)
                 for j in range(1,len(channel_list)):
@@ -158,9 +158,9 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                     else:
                         name=channel
                     try:
-                        data_array=Scan.get_channel(channel,lazy=False,backward=(1-backward))
+                        data_array=get_channel(Scan,channel,lazy=False,backward=(1-backward))
                     except:
-                        data_array=Scan.get_channel(channel,lazy=False,backward=backward)
+                        data_array=get_channel(Scan,channel,lazy=False,backward=backward)
                     if name in thres_scars_direc.keys():
                         image=filter_scars_removal(data_array.pixels[::-1,:], thres_scars_direc[name])
                     else:
@@ -202,6 +202,7 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                 np.save(temp_dir_info+filename+'unit',unitdic,allow_pickle=True)
             
             except:
+                print(files[i],'error in log parameters')
                 continue
 
 
@@ -415,7 +416,7 @@ def get_channel(self, channel="Height Sensor", backward=False, corr=None, debug=
                     'x': float(scan_size[0]) / aspect_ratio[1],
                     'y': float(scan_size[1]) / aspect_ratio[0],
                     'unit': scan_size[2].decode(encoding)}
-                image = pySPM.SPM_image(
+                image = SPM_image(
                     channel=[channel, 'Topography'][channel == 'Height Sensor'],
                     BIN=data,
                     real=size,
@@ -429,7 +430,7 @@ def get_channel(self, channel="Height Sensor", backward=False, corr=None, debug=
     raise Exception("Channel {} not found".format(channel))
     
 #%%Preparation of the data so that each image has the same dimension 
-def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the images, dir of the numpy info of logs
+def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata,maxsize): #dir of the images, dir of the numpy info of logs
 
         
     #determining the main dimension and the best vertical/horizontal precision
@@ -445,7 +446,14 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the ima
     dim_height=int(np.max(phys_dim[:,0])/prec)
     dim_len=int(np.max(phys_dim[:,1])/prec)
     print('dimensions :'+str(dim_height)+', '+str(dim_len))
-    np.save(temp_dir_info+dimensiondata,np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
+
+    #avoiding too big pictures with a max size
+    ratio=0
+    if dim_height>=dim_len and dim_height>maxsize:
+        ratio=maxsize/dim_height
+    elif dim_len > dim_height and dim_len>maxsize:
+        ratio=maxsize/dim_len
+    print('ratio', ratio)
     
     # scailing all the images to get same resolution and dimension
     listdir=os.listdir(dir_im)
@@ -464,8 +472,18 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata): #dir of the ima
             else :
                 newimg=datadir[channel]
                 
-            datadir[channel]=bili_scale_image(newimg,log_para[0]/log_para[2],log_para[1]/log_para[3],dim_height,dim_len,prec,prec)
+            newimg=bili_scale_image(newimg,log_para[0]/log_para[2],log_para[1]/log_para[3],dim_height,dim_len,prec,prec)
+            if ratio>0:
+                newimg=cv2.resize(newimg,(int(dim_len*ratio),int(dim_height*ratio)))
+
+            datadir[channel]=newimg
+
         np.savez_compressed(dir_im+filez,datadir)
+    if ratio==0:
+        np.save(temp_dir_info+dimensiondata,np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
+    else :
+        np.save(temp_dir_info+dimensiondata,np.array([int(dim_height*ratio),int(dim_len*ratio),prec/ratio]))
+    
 
 
 
@@ -562,7 +580,7 @@ def falseframe(dim1,dim2,dimi,dimj):
                 img[i,j]=False
     return img
 
-#%%
+#%% Creating the final dictionnary with all the properties of the images
 def download_dict_logs_only(dir_im,temp_dir_info,segmentspath,dimensiondata,year,saving=True,savingpath='dict'):
     
     
@@ -637,36 +655,24 @@ def bili_scale_image(img,preci_h,preci_l,dim_h,dim_l,precf_h,precf_l): #scailing
 
 
 
-#%% Construction the sequence of usable pictures : linking images with previous (parent) and following (child) image
-def main_parenting(dic):
-    parent=''
-    list_key=list(dic.keys())
-    for fichier in list_key:
-            dic[fichier]['parent']=parent
-            parent=fichier
-    child=''
-    key=list(dic.keys())
-    key.reverse()
-    for fichier in key:
-            dic[fichier]['child']=child
-            child=fichier
 
-
-
-#%% Computing the area and the centroid of each mask and saving them in the dictionnary
+#%% Computing the area and the centroid of each mask, saving them in the dictionnary and creating child-parent link
 def centroid_area(dic):
     diclist=list(dic.keys())
     for i in tqdm.trange(len(diclist)):
         fichier=diclist[i]
         masks=dic[fichier]['masks']
-        (centroid,area)=numba_centroid_area(masks)
-        dic[fichier]['centroid']=centroid
-        dic[fichier]['area']=area
+        mask_number=np.max(masks)
+        if mask_number>0:
+            (centroid,area)=numba_centroid_area(masks,mask_number)
+            dic[fichier]['centroid']=centroid
+            dic[fichier]['area']=area
+        else:
+            del dic[fichier]
 
 #to improve computation speed
 @njit
-def numba_centroid_area(masks):
-    mask_number=np.max(masks)
+def numba_centroid_area(masks,mask_number):
     centroid=np.zeros((mask_number,2),dtype=np.int32)
     area=np.zeros(mask_number,dtype=np.int32)
     (l,L)=np.shape(masks)
@@ -683,6 +689,21 @@ def numba_centroid_area(masks):
         area[i]=count
         centroid[i,:]=np.array([vec2//count,vec1//count],dtype=np.int32)
     return(centroid,area)
+
+
+def main_parenting(dic):
+    parent=''
+    list_key=list(dic.keys())
+    for fichier in list_key:
+            dic[fichier]['parent']=parent
+            parent=fichier
+    child=''
+    key=list(dic.keys())
+    key.reverse()
+    for fichier in key:
+            dic[fichier]['child']=child
+            child=fichier
+
 
 #%% Erasing too small masks (less than the fraction frac_mask of the largest mask), and mask with a ratio of saturated area superior to frac_satur . Creating the centroid of the union of acceptable  mask and saving as main_centroid
 def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'): 
@@ -715,26 +736,28 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
                 non_defect_count+=1
                 non_defect[i]=non_defect_count
                 newoutlines.append(outlines[i][:,::-1].astype(np.int32))
-                
-        #update the outlines
-        dic[fichier]['outlines']=newoutlines
-        #new value of the area and the centroid
-        area2=np.zeros(non_defect_count).astype(np.int32)
-        centroid2=np.zeros((non_defect_count,2),dtype=np.int32)
-        for i in range(L):
-            if non_defect[i]!=0:
-                area2[int(non_defect[i]-1)]=area[i]
-                centroid2[int(non_defect[i]-1),:]=centroid[i,:]
-        (m,n)=masks.shape
-        for i in range(m):
-            for k in range(n):
-                if masks[i,k]!=0:
-                    masks[i,k]=non_defect[masks[i,k]-1]
-        
-        dic[fichier]['area']=area2
-        dic[fichier]['centroid']=centroid2
-        #constructing the main centroid
-        if sum(area2)>0:
+
+        if non_defect_count==0:
+            del dic[fichier]
+        else:       
+            #update the outlines
+            dic[fichier]['outlines']=newoutlines
+            #new value of the area and the centroid
+            area2=np.zeros(non_defect_count).astype(np.int32)
+            centroid2=np.zeros((non_defect_count,2),dtype=np.int32)
+            for i in range(L):
+                if non_defect[i]!=0:
+                    area2[int(non_defect[i]-1)]=area[i]
+                    centroid2[int(non_defect[i]-1),:]=centroid[i,:]
+            (m,n)=masks.shape
+            for i in range(m):
+                for k in range(n):
+                    if masks[i,k]!=0:
+                        masks[i,k]=non_defect[masks[i,k]-1]
+            
+            dic[fichier]['area']=area2
+            dic[fichier]['centroid']=centroid2
+            #constructing the main centroid
             main_centroid0=0
             main_centroid1=0
             for i in range (non_defect_count):
@@ -742,8 +765,7 @@ def clean_masks(frac_mask,frac_satur,dic,saving=False,savingpath='dict'):
                 main_centroid1+=area2[i]*centroid2[i,1]
             
             dic[fichier]['main_centroid']=np.array([main_centroid0//sum(area2),main_centroid1//sum(area2)],dtype=np.int32)
-        else :
-            del dic[fichier]
+
     if saving:
         np.savez_compressed(savingpath,dic)
 
@@ -916,7 +938,8 @@ def construc_center(mask,alpha):
         print("Error skel format, len_int="+str(len_int)+"len_extr="+str(len_extr))
         return np.array([[]],dtype=np.int32)
     
-              #construct an integer line between 2 points in 2 D
+
+#construct an integer line between 2 points in 2 D
 def linear_interpolation(point1,point2): 
     len_list= max(np.abs(point1[0]-point2[0]),np.abs(point1[1]-point2[1]))-1
     if len_list<=0:
@@ -948,6 +971,7 @@ def linear_interpolation(point1,point2):
     final[:,1]=val2
     return final
 
+
 def fil_gaps_1D(line):
     if len(line)<2:
         return line
@@ -965,11 +989,7 @@ def fil_gaps_1D(line):
                     newseg.append(newelem)
                     oldelem=newelem
         return newseg
-            
-            
-            
-            
-            
+                     
             
 # skeletonization algorithm
 def padskel(mask):
@@ -1147,7 +1167,8 @@ def one_D_line(seg) :
         if newseg[-1][0]==newseg[-2][0] and newseg[-1][1]==newseg[-2][1]:
             del newseg[-1]
         return newseg
- 
+
+
 # Erasing the shortest branch if it is alpha>1 shorter than the longuest. Else fusioning two external segments linked to the same division point to get just a 1D line, works on simple cases only
 def fusion_erasing(extr_seg,ex,div,alpha):
     if len(extr_seg)==1: #case with just one segment
@@ -1207,82 +1228,16 @@ def fusion_erasing(extr_seg,ex,div,alpha):
 
 
 
-''' Computing the translation vector between an image and its child and saving it under translation_vector'''
 
-# Tranform all masks into one shape (the main shape)
-@njit
-def main_mask(mask):
-    (l,L)=np.shape(mask)
-    new_mask=np.zeros((l,L))
-    for i in range(l):
-        for j in range(L):
-            if mask[i,j]!=0:
-                new_mask[i,j]=1
-    return new_mask
 
-# Define the score of a function (here a sum of white pixels)
-@njit 
-def score_mask(mask1,mask2):
-    (l1,l2)=np.shape(mask1)
-    score=0
-    for i in range(l1):
-        for j in range(l2):
-            if mask1[i,j]==1 and mask2[i,j]==1:
-                score+=1
-    return score
-         
-# Translation of the masks by a vector
-@njit 
-def mask_transfert(mask,vector):
-    (l1,l2)=np.shape(mask)
-    new_mask=np.zeros((l1,l2),dtype=np.int32)
-    for i in range(l1):
-        for j in range(l2):
-            if (0<=i+vector[0]<=l1-1) and (0<=j+vector[1]<=l2-1) and mask[i,j]>0:
-                new_mask[int(i+vector[0]),int(j+vector[1])]=mask[i,j]
-    return new_mask
+
+
       
-# Effective computation of the translation vector : returns the translation vector that optimizes the score of the intersection of the two main shapes
-
-def opt_trans_vec2(img_1, img_2):
-    corr = scipy.signal.fftconvolve(img_1, img_2[::-1, ::-1])
-    argmax = np.unravel_index(corr.argmax(), corr.shape)
-    vec = np.array(argmax) - np.array(img_1.shape) + 1
-    return vec
-
-#rotation of a vector around a point, the angle is in radian (float as output)
-@njit 
-def rotation_vector(angle,vec,point):
-    mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
-    newvec=vec-point
-    var=np.array([mat[0,0]*newvec[0]+mat[0,1]*newvec[1],mat[1,0]*newvec[0]+mat[1,1]*newvec[1]])
-    return point+var
-
-#rotation of an image around a point (int32 as input)
-@njit 
-def rotation_img(angle,img,point):
-    dim1,dim2=np.shape(img)
-    new_img=np.zeros((dim1,dim2),dtype=np.int32)
-    for i in range(dim1):
-        for j in range(dim2):
-            trans_vec=rotation_vector(-angle,np.array([i,j]),point)#sign of the rotation : definition of the angle in the logs
-            i_n,j_n=trans_vec[0],trans_vec[1]
-            i_t=int(i_n)
-            j_t=int(j_n)
-            if 0<=i_t<dim1-1 and 0<=j_t<dim2-1:
-                frac_i=i_n-i_t
-                frac_j=j_n-j_t
-                new_img[i,j]=np.int32(frac_i*frac_j*img[i_t,j_t]+frac_i*(1-frac_j)*img[i_t,j_t+1]+(1-frac_i)*frac_j*img[i_t+1,j_t]+(1-frac_i)*(1-frac_j)*img[i_t+1,j_t+1])
-    return new_img
 
 
 
 
-
-
-
-
-
+#%% main function
 
 def run_one_dataset_logs_only(Main_directory):
     print(Main_directory)
@@ -1293,22 +1248,27 @@ def run_one_dataset_logs_only(Main_directory):
     my_data = "../data2/"+Main_directory       #path of dir
     #directory with the usefull information of the logs, None if there is no.
 
+
+    data_direc='data/datasets/'
+
+
     #Temporary directories
     #directory of cropped data each image of the dataset is cropped to erase the white frame
-    temp_dir_info=Main_directory +"temporary_info/" 
+    temp_dir_info=data_direc+Main_directory +"temporary_info/" 
     #directory for output data from cellpose 
-    segments_path = Main_directory +"cellpose_output/"
-
-
-    #Outputs
-    #directory of the processed images (every image has the same pixel size and same zoom)
-    final_data=Main_directory +"final_data/"  
-    #Saving path for the dictionnary
-    saving_path=Main_directory +'Main_dictionnary'
+    segments_path = data_direc+Main_directory +"cellpose_output/"
     #dimension and scale of all the final data
     dimension_data='Dimension'
+
+    #Outputs
+    
+    #directory of the processed images (every image has the same pixel size and same zoom)
+    final_data=data_direc+Main_directory +"final_data/"  
+    #Saving path for the dictionnary
+    saving_path=data_direc+Main_directory +'Main_dictionnary'
+    
     #dimension and scale of all the final data
-    list_savingpath=Main_directory +'masks_list'
+    list_savingpath=data_direc+Main_directory +'masks_list'
     
 
 
@@ -1331,6 +1291,8 @@ def run_one_dataset_logs_only(Main_directory):
     #erasing masks that have a ratio of saturated surface bigger than :
     ratio_saturation=0.1
     
+    # maximum height or len of a picture
+    max_pixel_im=1024
     
     
     #minimum ratio of two brench length to erase the small branch
@@ -1345,7 +1307,7 @@ def run_one_dataset_logs_only(Main_directory):
     
     print("dimension_def",step)
     step+=1
-    dimension_def_logs_only(final_data,temp_dir_info,dimension_data)
+    dimension_def_logs_only(final_data,temp_dir_info,dimension_data,max_pixel_im)
     
     print("run_cel",step)
     step+=1
@@ -1357,10 +1319,6 @@ def run_one_dataset_logs_only(Main_directory):
     
     # main_dict=np.load(saving_path+'.npz', allow_pickle=True)['arr_0'].item()
     
-    print("main_parenting",step)
-    step+=1
-    main_parenting(main_dict)
-    
     print("centroid_area",step)
     step+=1
     centroid_area(main_dict)
@@ -1371,7 +1329,7 @@ def run_one_dataset_logs_only(Main_directory):
     
     print("main_parenting",step)
     step+=1
-    main_parenting(main_dict) #re-run in case all masks in a frame are erased
+    main_parenting(main_dict) 
 
     print("construction_mask_list",step)
     step+=1
@@ -1386,16 +1344,16 @@ def run_one_dataset_logs_only(Main_directory):
     
     
     
-
+#%% running main function   
 
 if __name__ == "__main__":
     
     '''Running the different functions'''
     
-    run_one_dataset_logs_only(Directory)
+    # run_one_dataset_logs_only(Directory)
     
 
-    # for direc in data_set:
-    #         run_one_dataset_logs_only(direc)
+    for direc in ['WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']: #data_set
+            run_one_dataset_logs_only(direc)
     
 

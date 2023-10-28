@@ -70,6 +70,8 @@ if __name__ == "__main__":
 
     ROI_dict='ROI_dict.npz'
 
+    data_direc='data/datasets/'
+
     linmat_name='non_trig_Link_matrix.npy'
 
     boolmatname="Bool_matrix.npy"
@@ -79,10 +81,10 @@ if __name__ == "__main__":
     index_list_name='masks_ROI_list.npz'
     colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
     for direc in data_set:
-        index_list=np.load(direc+index_list_name, allow_pickle=True)['arr_0']
-        List_of_masks=np.load(direc+list_name, allow_pickle=True)['arr_0']
-        main_dict=np.load(direc+dic_name, allow_pickle=True)['arr_0'].item()
-        newdic=np.load(direc+ROI_dict, allow_pickle=True)['arr_0'].item()
+        index_list=np.load(data_direc+direc+index_list_name, allow_pickle=True)['arr_0']
+        List_of_masks=np.load(data_direc+direc+list_name, allow_pickle=True)['arr_0']
+        main_dict=np.load(data_direc+direc+dic_name, allow_pickle=True)['arr_0'].item()
+        newdic=np.load(data_direc+direc+ROI_dict, allow_pickle=True)['arr_0'].item()
 
 
         plot_growth_superimpose(newdic,main_dict,List_of_masks)

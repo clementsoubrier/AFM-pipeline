@@ -21,7 +21,6 @@ import copy
 import matplotlib.pyplot as plt
 from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
-import scipy
 from pySPM import Bruker,SPM_image
 from  Centerlines.complete_centerlines import  complete_one_centerline
 
@@ -1353,7 +1352,7 @@ if __name__ == "__main__":
     # run_one_dataset_logs_only(Directory)
     
 
-    for direc in ['WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']: #data_set
+    for direc in data_set: 
             run_one_dataset_logs_only(direc)
     
 

@@ -16,38 +16,14 @@ import cv2
 from numba.typed import List
 from tqdm import trange
 
+
 data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
-# data_set=["WT_mc2_55/03-09-2014/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']#
-
-colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
-
-
-
-dic_name='Main_dictionnary.npz'
-
-dim_name='Dimension.npy'
-
-ROI_dic_name='ROI_dict.npz'
-
-mask_list_name='masks_list.npz'
-
-
-epsilon_penal=0.1
-
-cross_ratio=0.1
-
-min_centerline_len=1.5 #micro meters
-
-comparision_window=0.5 #micro meters
-
-#maximal number of iteration
-max_iter_opti=50
 
 
 '''finding the minimal distance between 2 centerline, within a certain window of horizontal variation (in micrometers). size1, size2 physical dimension of a pixel, epsilon,ratio,max_iter are parameters'''
 
-def distancematrix(dataset,dicname,ROIdicname,min_size,window,epsilon,ratio,max_iter=None):
-    center_list,height_list,dist_list,size_list=count_and_order_centerline(dataset,dicname,ROIdicname,min_size)
+def distancematrix(dataset,datadirec,dicname,ROIdicname,masklistname,min_size,window,epsilon,ratio,max_iter=None):
+    center_list,height_list,dist_list,size_list=count_and_order_centerline(dataset,datadirec,dicname,ROIdicname,masklistname,min_size)
     dist_matrix,inversion_matrix,delta_matrix=Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,max_iter)
             
     return center_list,dist_matrix,inversion_matrix,delta_matrix
@@ -74,7 +50,7 @@ def Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,max
             delta_matrix[j,i]=delta
     return dist_matrix,inversion_matrix,delta_matrix
 
-def count_and_order_centerline(dataset,dicname,ROIdicname,min_size):
+def count_and_order_centerline(dataset,datadirec,dicname,ROIdicname,masklistname,min_size):
     center_list=[]
     height_list=List()
     dist_list=List()
@@ -83,9 +59,9 @@ def count_and_order_centerline(dataset,dicname,ROIdicname,min_size):
     for i in range(len(dataset)):
         data=dataset[i]
         print(data)
-        dic=np.load(data+dicname, allow_pickle=True)['arr_0'].item()
-        ROI_dic=np.load(data+ROIdicname, allow_pickle=True)['arr_0'].item()
-        mask_list=np.load(data+mask_list_name, allow_pickle=True)['arr_0']
+        dic=np.load(datadirec+data+dicname, allow_pickle=True)['arr_0'].item()
+        ROI_dic=np.load(datadirec+data+ROIdicname, allow_pickle=True)['arr_0'].item()
+        mask_list=np.load(datadirec+data+masklistname, allow_pickle=True)['arr_0']
         #taking the list of masks for a better tracking, may insert other type of conditionnal event on the masks
         ROI_list=list(ROI_dic.keys())
         for j in trange(len(ROI_list)):
@@ -257,36 +233,51 @@ def L2_score(n1,fun1,n2,fun2,delta,epsilon):
             av=np.average(func)*np.ones(domain)
             return norm(func-av)**2/domain
 
-''''''
+
+def run_centerline_analysis(dataset):
+
+    dic_name='Main_dictionnary.npz'
+
+    ROI_dic_name='ROI_dict.npz'
+
+    mask_list_name='masks_list.npz'
+
+    data_direc='data/datasets/'
+
+    epsilon_penal=0.1
+
+    cross_ratio=0.1
+
+    min_centerline_len=1.5 #micro meters
+
+    comparision_window=0.5 #micro meters
+
+    #maximal number of iteration
+    max_iter_opti=50
+    
+    dir_cent='data/results/centerline_analysis_result/'
+
+    if not os.path.exists(dir_cent):
+        os.makedirs(dir_cent)
+        
+
+    (A,B,C,D)=distancematrix(dataset,data_direc,dic_name,ROI_dic_name,mask_list_name,min_centerline_len,comparision_window,epsilon_penal,cross_ratio,max_iter=None)
+
+    np.save(dir_cent+'centerline_list_all',A)
+    np.save(dir_cent+'distance_matrix_all',B)
+    np.save(dir_cent+'inversion_matrix_all',C)
+    np.save(dir_cent+'delta_matrix_all',D)
+
+
+
+
+
+
 if __name__ == "__main__":
     
+    run_centerline_analysis(data_set)
     
-    
-    # (centerlist,height_list,dist_list,size_list)=count_and_order_centerline(data_set,dic_name,ROI_dic_name,min_centerline_len)
-    # print(len(centerlist))
-    
-    
-    
-    (A,B,C,D)=distancematrix(data_set,dic_name,ROI_dic_name,min_centerline_len,comparision_window,epsilon_penal,cross_ratio,max_iter=None)
-    np.save('centerline_analysis_result/centerline_list_all',A)
-    np.save('centerline_analysis_result/distance_matrix_all',B)
-    np.save('centerline_analysis_result/inversion_matrix_all',C)
-    np.save('centerline_analysis_result/delta_matrix_all',D)
-    
-    
-    # for data in data_set:
-    #     if os.path.exists('centerline_analysis_result/'+data):
-    #         for file in os.listdir('centerline_analysis_result/'+data):
-    #             os.remove(os.path.join('centerline_analysis_result/'+data, file))
-    #     else:
-    #         os.makedirs('centerline_analysis_result/'+data)
-            
-    #     (A,B,C,D)=distancematrix([data],dic_name,ROI_dic_name,min_centerline_len,comparision_window,epsilon_penal,cross_ratio,max_iter=None)
-    #     np.save('centerline_analysis_result/'+data+'centerline_list',A)
-    #     np.save('centerline_analysis_result/'+data+'distance_matrix',B)
-    #     np.save('centerline_analysis_result/'+data+'inversion_matrix',C)
-    #     np.save('centerline_analysis_result/'+data+'delta_matrix',D)
-    
+  
     
     
     

@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import njit
 import tqdm
+import os
 
 import centerline_analysis_v2 as ca
 
@@ -17,18 +18,12 @@ ROI_name='ROI_dict.npz'
 
 
 
-# data_set=[["dataset/",True],["delta_3187/21-02-2019/",True],["delta_3187/19-02-2019/",True],["delta_parB/03-02-2015/",False],["delta_parB/15-11-2014/",False],["delta_parB/18-01-2015/",False],["delta_parB/18-11-2014/",False],["delta_lamA_03-08-2018/1/",True],["delta_lamA_03-08-2018/2/",True],["WT_mc2_55/06-10-2015/",False],["WT_mc2_55/05-10-2015/",False],["WT_mc2_55/30-03-2015/",True],["WT_mc2_55/05-02-2014/",False],["WT_11-02-15/",False,False],["delta_ripA/14-10-2016/",False],["delta_ripA/160330_rip_A_no_inducer/",True],["delta_ripA/160407_ripA_stiffness_septum/",True],["delta_LTD6_04-06-2017/",False]  ]
-# data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
-data_set="WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/"
-dic_name='Main_dictionnary.npz'
-
-list_name='masks_list.npz'
-
-data_direc='data/datasets/'
+data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #
 
 
-def classifying_ROI(direct_list,ROIdicname): #with parent and daughter cells
+
+def classifying_ROI(direct_list,ROIdicname,datadirec): #with parent and daughter cells
     print('classifying_ROI')
     wholeROI=[]
     rootsonly=[]
@@ -37,7 +32,7 @@ def classifying_ROI(direct_list,ROIdicname): #with parent and daughter cells
     numberdivision=0
     for i in tqdm.trange(len(direct_list)):
         direct=direct_list[i]
-        ROIdic=np.load(direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
         for ROI in ROIdic.keys():
             if ROIdic[ROI]['Parent']=='':
                 if ROIdic[ROI]['Children']==[]:
@@ -55,16 +50,16 @@ def classifying_ROI(direct_list,ROIdicname): #with parent and daughter cells
     return wholeROI,rootsonly,leafonly, nonconnected,numberdivision
 
 
-def stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname):
+def stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname,datadirec):
     centerlen=[]
     mask_surf=[]
     print('stat_centerline_surface')
     for i in tqdm.trange(len(wholeROI)):
         elem =wholeROI[i]
         ROI,direct=elem
-        ROIdic=np.load(direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
+        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
         centdist=[]
         subsurf=[]
         for mask in ROIdic[ROI]['Mask IDs']:
@@ -78,7 +73,7 @@ def stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname):
             subsurf.append(area*resolution**2)
             # print(img,centerline)
             if centerline.size  :
-                (height1,dist1)=ca.dist_centerline(centerline,img)
+                dist1=ca.dist_centerline(centerline,img)[1]
                 totdist=dist1[-1]
                 centdist.append(totdist*resolution)
             #voulme=
@@ -86,7 +81,7 @@ def stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname):
         mask_surf.append(subsurf)
     return(centerlen,mask_surf)
 
-def stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname):
+def stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname,datadirec):
     centerlen=[]
     mask_surf=[]
     print('stat_end_ROI')
@@ -94,9 +89,9 @@ def stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname):
         elem =rootsonly[i]
         
         ROI,direct=elem
-        ROIdic=np.load(direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
+        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
         
         mask=ROIdic[ROI]['Mask IDs'][-1]
         file=masklist[mask][2]
@@ -107,7 +102,7 @@ def stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname):
         area=maindict[file]['area'][index-1]
         resolution=maindict[file]['resolution']
         if centerline.size :
-            (height1,dist1)=ca.dist_centerline(centerline,img)
+            dist1=ca.dist_centerline(centerline,img)[1]
             totdist=dist1[-1]
             centerlen.append(totdist*resolution)
         
@@ -115,7 +110,7 @@ def stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname):
     return(centerlen,mask_surf)
 
 
-def stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname):
+def stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname,datadirec):
     centerlen=[]
     mask_surf=[]
     print('stat_begin_ROI')
@@ -123,9 +118,9 @@ def stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname):
         elem =leafonly[i]
         
         ROI,direct=elem
-        ROIdic=np.load(direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
+        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
         
         mask=ROIdic[ROI]['Mask IDs'][0]
         file=masklist[mask][2]
@@ -136,13 +131,14 @@ def stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname):
         area=maindict[file]['area'][index-1]
         resolution=maindict[file]['resolution']
         if centerline.size :
-            (height1,dist1)=ca.dist_centerline(centerline,img)
+            dist1=ca.dist_centerline(centerline,img)[1]
             totdist=dist1[-1]
             centerlen.append(totdist*resolution)
         mask_surf.append(area*resolution**2)
     return(centerlen,mask_surf)
 
-def plotstat(data,title,bar_num=40):
+def plotstat(data,title,save_dir,bar_num=40):
+    plt.figure()
     res=np.array(data)
     mean=np.average(res)
     med=np.median(res)
@@ -155,18 +151,18 @@ def plotstat(data,title,bar_num=40):
     plt.axvline(q3, color="green")
     plt.legend()
     plt.title(title)
-    plt.savefig('stats_'+title, format='jpg')
-    plt.show()
+    plt.savefig(save_dir+title, format='jpg')
+    
 
-def totale_stats(direct_list,ROIdicname,dicname,masklistname):
+def totale_stats(direct_list,ROIdicname,dicname,masklistname,datadirec,dirim):
     
     
-    wholeROI,rootsonly,leafonly, nonconnected,numberdivision=classifying_ROI(direct_list,ROIdicname)
+    wholeROI,rootsonly,leafonly, nonconnected,numberdivision=classifying_ROI(direct_list,ROIdicname,datadirec)
     
     
-    centerlen,mask_surf=stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname)
-    endcenterlen,endmask_surf=stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname)
-    begincenterlen,beginmask_surf=stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname)
+    centerlen,mask_surf=stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname,datadirec)
+    endcenterlen,endmask_surf=stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname,datadirec)
+    begincenterlen,beginmask_surf=stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname,datadirec)
     
     
     print('complete ROI : ',len(wholeROI),' roots only : ', len(rootsonly),' leaf only : ',len(leafonly),' non connected : ', len(nonconnected))
@@ -174,7 +170,7 @@ def totale_stats(direct_list,ROIdicname,dicname,masklistname):
     stat_list=[[[i for elem in centerlen for i in elem],'Centerlines'],[[i for elem in mask_surf for i in elem],'Surfaces'],[[elem[0] for elem in centerlen]+[elem for elem in begincenterlen],'Centerlines after div'],[[elem[0] for elem in mask_surf]+[elem for elem in beginmask_surf],'Surfaces after div'],[[elem[-1] for elem in centerlen]+[elem for elem in endcenterlen],'Centerlines before div'],[[elem[-1] for elem in mask_surf]+[elem for elem in endmask_surf],'Surfaces before div'],[[elem[-1]/elem[0] for elem in centerlen ],'Centerlines len ratio between 2 div'],[[elem[-1]/elem[0] for elem in  mask_surf],'Surface len ratio between 2 div'],[[np.average(np.array(elem)) for elem in centerlen],'ROI AVG Centerlines'],[[np.average(np.array(elem)) for elem in mask_surf],'ROI AVG Surface']]
     
     for elem in stat_list:
-        plotstat(elem[0],elem[1])
+        plotstat(elem[0],elem[1],dirim)
     
   
 
@@ -185,15 +181,15 @@ def totale_stats(direct_list,ROIdicname,dicname,masklistname):
             
             
         
-def stats_time_evol(direct_list,ROIdicname,dicname,masklistname):
+def stats_time_evol(direct_list,ROIdicname,dicname,masklistname,datadirec,dirim):
     centerratio=[]
     surfratio=[]
     print('stats_time_evol')
     
     for direct in direct_list:
-        ROIdic=np.load(direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
+        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
         for ROI in ROIdic.keys():
             if len(ROIdic[ROI]['Mask IDs'])>5:
                 oldfile=masklist[ROIdic[ROI]['Mask IDs'][0]][2]
@@ -211,18 +207,18 @@ def stats_time_evol(direct_list,ROIdicname,dicname,masklistname):
                 newcenterline=maindict[newfile]['centerlines'][newindex-1]
                 
                 if newcenterline.size and oldcenterline.size:
-                    (height1,dist1)=ca.dist_centerline(oldcenterline,oldimg)
+                    dist1=ca.dist_centerline(oldcenterline,oldimg)[1]
                     oldcent=dist1[-1]
-                    (height1,dist1)=ca.dist_centerline(newcenterline,newimg)
+                    dist1=ca.dist_centerline(newcenterline,newimg)[1]
                     newcent=dist1[-1]
                 if newtime-oldtime!=0:
                     centerratio.append((newcent/oldcent)/(newtime-oldtime))
                     
                 
     for direct in direct_list:
-        ROIdic=np.load(direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
+        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
         for ROI in ROIdic.keys():
             if len(ROIdic[ROI]['Mask IDs'])>5:
                 oldfile=masklist[ROIdic[ROI]['Mask IDs'][0]][2]
@@ -244,19 +240,30 @@ def stats_time_evol(direct_list,ROIdicname,dicname,masklistname):
                     print(direct)
                     
                     
-    plotstat(centerratio ,'centerline growth rate')
-    plotstat(surfratio ,'surface growth rate')
+    plotstat(centerratio ,'centerline growth rate',dirim)
+    plotstat(surfratio ,'surface growth rate',dirim)
     
 
         
+def plot_all_stats(dataset):
+    dic_name='Main_dictionnary.npz'
 
+    list_name='masks_list.npz'
+
+    data_direc='data/datasets/'
+
+    dir_im='data/results/plot_stat/'
+
+    if not os.path.exists(dir_im):
+        os.makedirs(dir_im)
+
+    totale_stats(dataset,ROI_name,dic_name,list_name,data_direc,dir_im)
+    stats_time_evol(dataset,ROI_name,dic_name,list_name,data_direc,dir_im)
+    plt.show()
     
         
 
 if __name__ == "__main__":
     
-    # whole_ROI,roots_only,leaf_only, non_connected,number_division=classifying_ROI(directory_list,ROI_name)
-    # print(len(whole_ROI),len(roots_only),len(leaf_only), len(non_connected))
-    # print('number_division',number_division)
-    totale_stats(data_set,ROI_name,dic_name,list_name)
-    stats_time_evol(data_set,ROI_name,dic_name,list_name)
+    
+    plot_all_stats(data_set)

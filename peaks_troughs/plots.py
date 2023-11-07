@@ -7,11 +7,12 @@ import matplotlib.colors as mplc
 import matplotlib.pyplot as plt
 import numpy as np
 
-from align import align_centerlines
+# from align import align_centerlines
 from derivative_sign_segmentation import find_peaks_troughs, Feature
-from group_by_cell import get_centerlines_by_cell
-from preprocess import get_scaled_parameters, preprocess_centerline, \
+from group_by_cell import load_dataset
+from scaled_parameters import get_scaled_parameters, \
     REF_PIXEL_SIZE, REF_VERTI_SCALE
+from preprocess import preprocess_centerline
 
 
 class PlotMode(IntEnum):
@@ -124,7 +125,7 @@ def plot_3d_centerlines(cell_centerlines, cell_peaks=None, cell_troughs=None,
     plt.show()
 
 
-def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE),
+def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE), #1 et 1 ou echelle physique
                    peaks_and_troughs=True, title=None, smooth=False):
     if isinstance(scale, numbers.Real):
         scales = itertools.repeat((scale, REF_VERTI_SCALE))
@@ -176,77 +177,77 @@ def plot_kymograph(*cells, scale=(REF_PIXEL_SIZE, REF_VERTI_SCALE),
                           10, None)
     # plot_3d_centerlines(all_centerlines, all_peaks, all_troughs, title)
 
+#change main
+# def main():
+#     dataset = os.path.join("WT_mc2_55", "30-03-2015")
+#     plot_mode = PlotMode.CENTERLINE
 
-def main():
-    dataset = os.path.join("WT_mc2_55", "30-03-2015")
-    plot_mode = PlotMode.CENTERLINE
+#     if plot_mode is PlotMode.TEST_MULTI_KYMOGRAPH:
+#         cells = []
+#         for _, cell in load_dataset(dataset, False): 
+#             if len(cells) == 3:
+#                 break
+#             cell_centerlines = []
+#             for frame_data in cell:
+#                 xs = frame_data["xs"]
+#                 ys = frame_data["ys"]
+#                 pixel_size = frame_data["pixel_size"]
+#                 params = get_scaled_parameters(pixel_size, misc=True)
+#                 max_translation = params.pop("max_translation")
+#                 del params["v_offset"]
+#                 centerline = preprocess_centerline(xs, ys, **params)
+#                 cell_centerlines.append(centerline)
+#             cell = align_centerlines(*cell_centerlines,
+#                                      max_translation=max_translation)
+#             cell = [(line[:, 0], line[:, 1]) for line in cell]
+#             cells.append(cell)
+#         plot_kymograph(*cells)
+#         plot_kymograph(*cells, peaks_and_troughs=False)
+#         plot_kymograph(*cells, title="smoothing", smooth=True)
+#         return
 
-    if plot_mode is PlotMode.TEST_MULTI_KYMOGRAPH:
-        cells = []
-        for _, cell in get_centerlines_by_cell(dataset, False):
-            if len(cells) == 3:
-                break
-            cell_centerlines = []
-            for frame_data in cell:
-                xs = frame_data["xs"]
-                ys = frame_data["ys"]
-                pixel_size = frame_data["pixel_size"]
-                params = get_scaled_parameters(pixel_size, misc=True)
-                max_translation = params.pop("max_translation")
-                del params["v_offset"]
-                centerline = preprocess_centerline(xs, ys, **params)
-                cell_centerlines.append(centerline)
-            cell = align_centerlines(*cell_centerlines,
-                                     max_translation=max_translation)
-            cell = [(line[:, 0], line[:, 1]) for line in cell]
-            cells.append(cell)
-        plot_kymograph(*cells)
-        plot_kymograph(*cells, peaks_and_troughs=False)
-        plot_kymograph(*cells, title="smoothing", smooth=True)
-        return
+#     for cell_id, cell in load_dataset(dataset):
+#         cell_centerlines = []
+#         pixel_sizes = []
+#         for frame_data in cell:
+#             xs = frame_data["xs"]
+#             ys = frame_data["ys"]
+#             pixel_size = frame_data["pixel_size"]
+#             params = get_scaled_parameters(pixel_size, misc=True)
+#             max_translation = params.pop("max_translation")
+#             v_offset = params.pop("v_offset")
+#             centerline = preprocess_centerline(xs, ys, **params)
+#             cell_centerlines.append(centerline)
+#             pixel_sizes.append(pixel_size)
+#         cell_centerlines = align_centerlines(*cell_centerlines,
+#                                              max_translation=max_translation)
+#         cell_peaks = []
+#         cell_troughs = []
+#         for centerline, pixel_size in zip(cell_centerlines, pixel_sizes):
+#             xs = centerline[:, 0]
+#             ys = centerline[:, 1]
+#             params = get_scaled_parameters(pixel_size, peaks_troughs=True)
+#             xs, ys, peaks, troughs = find_peaks_troughs(xs, ys, **params,
+#                                                         smoothing=False)
+#             xs *= pixel_size
+#             peaks = [(l * pixel_size, r * pixel_size) for l, r in peaks]
+#             troughs = [(l * pixel_size, r * pixel_size) for l, r in troughs]
+#             if plot_mode is PlotMode.CENTERLINE:
+#                 plot_single_centerline(xs, ys, peaks, troughs)
+#             cell_peaks.append(peaks)
+#             cell_troughs.append(troughs)
 
-    for cell_id, cell in get_centerlines_by_cell(dataset):
-        cell_centerlines = []
-        pixel_sizes = []
-        for frame_data in cell:
-            xs = frame_data["xs"]
-            ys = frame_data["ys"]
-            pixel_size = frame_data["pixel_size"]
-            params = get_scaled_parameters(pixel_size, misc=True)
-            max_translation = params.pop("max_translation")
-            v_offset = params.pop("v_offset")
-            centerline = preprocess_centerline(xs, ys, **params)
-            cell_centerlines.append(centerline)
-            pixel_sizes.append(pixel_size)
-        cell_centerlines = align_centerlines(*cell_centerlines,
-                                             max_translation=max_translation)
-        cell_peaks = []
-        cell_troughs = []
-        for centerline, pixel_size in zip(cell_centerlines, pixel_sizes):
-            xs = centerline[:, 0]
-            ys = centerline[:, 1]
-            params = get_scaled_parameters(pixel_size, peaks_troughs=True)
-            xs, ys, peaks, troughs = find_peaks_troughs(xs, ys, **params,
-                                                        smoothing=False)
-            xs *= pixel_size
-            peaks = [(l * pixel_size, r * pixel_size) for l, r in peaks]
-            troughs = [(l * pixel_size, r * pixel_size) for l, r in troughs]
-            if plot_mode is PlotMode.CENTERLINE:
-                plot_single_centerline(xs, ys, peaks, troughs)
-            cell_peaks.append(peaks)
-            cell_troughs.append(troughs)
-
-        cell_peaks = areas_to_points(cell_peaks, cell_centerlines,
-                                     Feature.PEAK)
-        cell_troughs = areas_to_points(cell_troughs, cell_centerlines,
-                                       Feature.TROUGH)
-        if plot_mode is PlotMode.CELL:
-            plot_cell_centerlines(cell_centerlines, cell_peaks, cell_troughs,
-                                  v_offset, cell_id)
-        if plot_mode is PlotMode.KYMOGRAPH and len(cell_centerlines) > 1:
-            plot_3d_centerlines(cell_centerlines, cell_peaks, cell_troughs,
-                                cell_id)
+#         cell_peaks = areas_to_points(cell_peaks, cell_centerlines,
+#                                      Feature.PEAK)
+#         cell_troughs = areas_to_points(cell_troughs, cell_centerlines,
+#                                        Feature.TROUGH)
+#         if plot_mode is PlotMode.CELL:
+#             plot_cell_centerlines(cell_centerlines, cell_peaks, cell_troughs,
+#                                   v_offset, cell_id)
+#         if plot_mode is PlotMode.KYMOGRAPH and len(cell_centerlines) > 1:
+#             plot_3d_centerlines(cell_centerlines, cell_peaks, cell_troughs,
+#                                 cell_id)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

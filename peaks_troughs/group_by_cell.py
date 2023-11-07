@@ -4,6 +4,7 @@ import operator
 import os
 import statistics
 from enum import IntEnum
+from shutil import rmtree
 
 import numpy as np
 import tqdm
@@ -356,6 +357,8 @@ def save_roi(
 
 
 def save_dataset(dataset, log_progress):
+    if os.path.exists(os.path.join( "data", "cells", dataset,'')):
+        rmtree(os.path.join( "data", "cells", dataset,''))
     dataset_missing_masks_quality = False
     if log_progress:
         print("Processing dataset", dataset)
@@ -386,7 +389,7 @@ def save_dataset(dataset, log_progress):
 def main():
     log_progress = True
     datasets = None
-    dataset = None
+    dataset =  None   # os.path.join("WT_mc2_55", "30-03-2015")
     if dataset is None:
         if datasets is None:
             datasets = find_all_datasets()

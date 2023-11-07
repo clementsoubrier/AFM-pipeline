@@ -91,25 +91,30 @@ def keep_centerline(
     min_prep_len,
     max_der_std,
     max_der,
+    max_var_der,
 ):
     if xs[-1] - xs[0] < min_len:
         return np.bool_(False)
-    # n_corrupted = np.count_nonzero(np.logical_or(ys == ys.min(), ys == ys.max())) - 2
-    # if 10 * n_corrupted > len(ys):
-    #     return np.bool_(False)
     if np.ptp(ys) <= 1.0e-8:
         return np.bool_(False)
-    # xs_p, _ = preprocess_centerline(xs, ys, kernel_len, std_cut, window, pixel_size)
-    # if xs_p[-1] - xs_p[0] < min_prep_len:
-    #     return np.bool_(False)
-    # start = np.searchsorted(xs, xs_p[0], "right") - 1
-    # end = np.searchsorted(xs, xs_p[-1], "left") + 1
-    # dx = xs[start + 1 : end] - xs[start : end - 1]
-    # dy = ys[start + 1 : end] - ys[start : end - 1]
-    # der = dy / dx
-    # mean = np.mean(der)
-    # std = np.std(der)
-    # abnormal_variation = abs(der - mean) >= min(max_der_std * std, max_der)
-    # if 10 * np.count_nonzero(abnormal_variation) > len(ys):
-    #     return np.bool_(False)
+    
+    n_corrupted = np.count_nonzero(np.logical_or(ys == ys.min(), ys == ys.max())) - 2
+    if 10 * n_corrupted > len(ys):
+        return np.bool_(False)
+    
+    xs_p, _ = preprocess_centerline(xs, ys, kernel_len, std_cut, window, pixel_size)
+    if xs_p[-1] - xs_p[0] < min_prep_len:
+        return np.bool_(False)
+    start = np.searchsorted(xs, xs_p[0], "right") - 1
+    end = np.searchsorted(xs, xs_p[-1], "left") + 1
+    dx = xs[start + 1 : end] - xs[start : end - 1]
+    dy = ys[start + 1 : end] - ys[start : end - 1]
+    der = dy / dx
+    mean = np.mean(der)
+    std = np.std(der)
+    abnormal_variation = abs(der - mean) >= min(max_der_std * std, max_der)
+    if 10 * np.count_nonzero(abnormal_variation) > len(ys):
+        return np.bool_(False)
+    if np.max(np.abs(der[1:]-der[:-1]))>max_var_der:
+        return np.bool_(False)
     return np.bool_(True)

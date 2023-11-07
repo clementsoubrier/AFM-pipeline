@@ -2,10 +2,10 @@ import os
 
 import numpy as np
 
-from align import align_centerlines
+# from align import align_centerlines
 from group_by_cell import load_cell
-from plots import plot_kymograph
-from preprocess import get_scaled_parameters, preprocess_centerline
+# from plots import plot_kymograph
+# from preprocess import get_scaled_parameters, preprocess_centerline
 
 
 """
@@ -69,15 +69,26 @@ def main():
     #     centerlines = [(centerline[:, 0], centerline[:, 1])
     #                 for centerline in centerlines]
     #     plot_kymograph(centerlines, scale=pixel_size)
-
-    cell = load_cell(5, dataset, True)
-    offset = 0
-    for frame_data in cell:
-        xs = frame_data["xs"]
-        ys = frame_data["ys"]
-        ys += offset - np.median(ys)
-        plt.plot(xs, ys)
-        offset += 30
+    j=0
+    for i in range(62):
+        
+        try:
+            cell = load_cell(i, dataset, True)
+            plt.figure()
+            plt.title(f'ROI {i}')
+            offset = 0
+            for frame_data in cell:
+                xs = frame_data["xs"]
+                ys = frame_data["ys"]
+                ys += offset - np.median(ys)
+                if frame_data["no_defect"]:
+                    plt.plot(xs, ys)
+                else:
+                    
+                    j+=1
+                offset += 30
+        except:
+            continue
     plt.show()
     
 

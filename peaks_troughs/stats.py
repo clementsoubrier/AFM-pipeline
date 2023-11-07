@@ -5,8 +5,8 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import numpy as np
 from derivative_sign_segmentation import find_peaks_troughs
-from group_by_cell import get_centerlines_by_cell
-from preprocess import get_scaled_parameters
+from group_by_cell import load_dataset
+from scaled_parameters import get_scaled_parameters
 
 
 def compute_stats(dataset):
@@ -14,13 +14,15 @@ def compute_stats(dataset):
     trough_counter = Counter()
     peak_lengths = []
     trough_lengths = []
-    for _, cell in get_centerlines_by_cell(dataset):
+    maindict=np.load('data/datasets/'+dataset+'/Main_dictionnary.npz', allow_pickle=True)['arr_0'].item()
+    pixel_size = maindict[list(maindict.keys())[0]]['resolution']
+    for _, cell in load_dataset(dataset):
         for frame_data in cell:
             xs = frame_data["xs"]
             ys = frame_data["ys"]
-            pixel_size = frame_data["pixel_size"]
-            params = get_scaled_parameters(pixel_size, peaks_troughs=True)
-            _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
+            
+            peaks= frame_data['peaks']
+            troughs =frame_data['troughs']
             peak_counter[len(peaks)] += 1
             trough_counter[len(troughs)] += 1
             peak_lengths.extend((r - l) * pixel_size for l, r in peaks)

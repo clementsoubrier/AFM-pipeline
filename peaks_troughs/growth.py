@@ -533,7 +533,7 @@ def main():
     neto_mean = round(np.mean(t_plt))
     neto_std = round(np.std(t_plt))
 
-    print(len(a_1_plt))
+
     _, ax = plt.subplots()
     ax.boxplot(a_plt, vert=False, showfliers=False)
     ax.set_xlabel("Cell elongation speed (nm / minute)")

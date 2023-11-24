@@ -1,8 +1,9 @@
-import math
+
 from enum import IntEnum, auto
 
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
+from numba import njit
 
 
 class Feature(IntEnum):
@@ -17,104 +18,92 @@ def find_extrema(der):
     return intern_extrema
 
 
-def sort_and_add_edges(ys, extrema, values, classif, min_width):
-    argsort = sorted(range(len(extrema)), key=extrema.__getitem__)
-    extrema = [extrema[i] for i in argsort]
-    values = [values[i] for i in argsort]
-    classif = [classif[i] for i in argsort]
-    if extrema and extrema[0] >= min_width / 2:
-        extrema.insert(0, 0)
-        values.insert(0, ys[0])
-    elif extrema:
-        classif.pop(0)
-    if extrema and len(ys) - 1 - extrema[-1] >= min_width / 2:
-        extrema.append(len(ys) - 1)
-        values.append(ys[-1])
-    elif extrema:
-        classif.pop()
-    return extrema, values, classif
+
+@njit
+def first_filter_extrema(xs,extrema, values, classif, min_width):
+    extr_len=len(extrema)
+
+    bool_arr=np.zeros(extr_len,dtype=np.bool_)
+        
+    bool_arr[0],bool_arr[-1]=True,True
+    for i in range(1,extr_len-1):
+        bool_arr[i]= (np.abs(xs[extrema[i-1]]-xs[extrema[i]]>min_width) or np.abs(xs[extrema[i+1]]-xs[extrema[i]])>min_width)
+        
+                    
+    return extrema[bool_arr],values[bool_arr], classif[bool_arr]
+
+@njit
+def second_filter_extrema(xs,ys,extrema, values, classif, min_depth):           #excluding flat extrema
+    extr_len=len(extrema)
+    bool_arr=np.zeros(extr_len,dtype=np.bool_)
+    if extr_len<=2:
+        return extrema, values, classif
+    bool_arr[0],bool_arr[-1]=True,True
+    for i in range(1,extr_len-1):               
+        a_orth=np.array([[values[i-1]-values[i+1],1000*xs[extrema[i+1]]-1000*xs[extrema[i-1]]]])  #vector joining two minima or two maxima
+        len_pts=extrema[i+1]-extrema[i-1]
+        vect_list=np.ones((2,len_pts))*np.array([[1000*xs[extrema[i-1]]],[values[i-1]]])
+        vect_list[0,:]-=xs[extrema[i-1]:extrema[i+1]]
+        vect_list[1,:]-=ys[extrema[i-1]:extrema[i+1]]
+        proj=np.abs(a_orth@vect_list)           
+        bool_arr[i]=np.max(proj)/np.linalg.norm(a_orth)>min_depth   # distance to the line between the optima
+    return extrema[bool_arr], values[bool_arr], classif[bool_arr]
 
 
-def resample_extrema(intern_extrema, ys, min_width):
+@njit
+def alternating_feature(extrema, values, classif):
+    extr_len=len(extrema)
+    bool_arr=np.ones(extr_len,dtype=np.bool_)
+    if extr_len<=1:
+        return extrema, values, classif
+    for i in range(extr_len-1):               #excluding twice the same feature
+        if classif[i]==classif[i+1]:
+            bool_arr[i]=False
+            match classif[i]:
+                case Feature.PEAK:
+                    j=i+(values[i+1]>values[i])
+                    classif[i+1]=classif[j]
+                    values[i+1]=values[j]
+                    extrema[i+1]=extrema[j]
+                case Feature.TROUGH:
+                    j=i+(values[i+1]<values[i])
+                    classif[i+1]=classif[j]
+                    values[i+1]=values[j]
+                    extrema[i+1]=extrema[j]
+    return extrema[bool_arr], values[bool_arr], classif[bool_arr]
+            
+    
+    
+    
+
+
+def resample_extrema(intern_extrema, xs, ys, min_width,min_depth):
     extrema = []
     values = []
     classif = []
     for i in intern_extrema:
-        a = (ys[i + 1] - 2 * ys[i] + ys[i - 1]) / 2
-        b = (ys[i + 1] - ys[i - 1]) / 2
-        c = ys[i]
-        x = i - b / (2 * a)
-        y = c - b**2 / (4 * a)
-        extrema.append(x)
+        a = (ys[i + 1] - 2 * ys[i] + ys[i - 1]) / 2     #second derivative
+        y = ys[i]
+        extrema.append(i)
         values.append(y)
         if a < 0:
             classif.append(Feature.PEAK)
         else:
             classif.append(Feature.TROUGH)
-    return sort_and_add_edges(ys, extrema, values, classif, min_width)
+    
+    if len(extrema)<=2:
+        return extrema, values, classif
+    argsort = sorted(range(len(extrema)), key=extrema.__getitem__)
+    extrema = np.array([extrema[i] for i in argsort])
+    values = np.array([values[i] for i in argsort])
+    classif = np.array([classif[i] for i in argsort])
 
+    extrema, values, classif = first_filter_extrema(xs,extrema, values, classif,min_width)
+    extrema, values, classif = alternating_feature(extrema, values, classif)
+    extrema, values, classif = second_filter_extrema(xs,ys,extrema, values, classif, min_depth)
 
-def build_areas(ys, extrema, values):
-    limits = []
-    for x_1, y_1, x_2, y_2 in zip(extrema, values, extrema[1:], values[1:]):
-        if x_2 - x_1 <= 1.5:
-            x = (x_1 + x_2) / 2
-        else:
-            mid = (y_1 + y_2) / 2
-            i = math.ceil(x_1)
-            try:
-                while (ys[i + 1] - mid) * (y_1 - y_2) > 0:
-                    i += 1
-                x = i + (ys[i] - mid) / (y_1 - y_2)
-            except IndexError:
-                x = (x_1 + x_2) / 2
-        limits.append(x)
-    areas = list(zip(limits, limits[1:]))
-    return areas
+    return alternating_feature(extrema, values, classif)        
 
-
-def max_depth(ys, x_l, x_r):
-    i_l = math.floor(x_l)
-    a_l = x_l - i_l
-    y_l = a_l * ys[i_l + 1] + (1 - a_l) * ys[i_l]
-    i_r = math.ceil(x_r)
-    a_r = i_r - x_r
-    y_r = a_r * ys[i_r - 1] + (1 - a_r) * ys[i_r]
-    dx = x_r - x_l
-    dy = y_r - y_l
-    norm = math.hypot(dx, dy)
-    dx /= norm
-    dy /= norm
-    max_dist = 0
-    for i in range(i_l + 1, i_r):
-        dist = abs(dx * (y_l - ys[i]) - dy * (x_l - i))
-        max_dist = max(max_dist, dist)
-    return max_dist
-
-
-def remove_area(areas, classif, i):
-    if i == 0:
-        return areas[1:], classif[1:]
-    if i == len(areas) - 1:
-        return areas[:-1], classif[:-1]
-    area = (areas[i - 1][0], areas[i + 1][1])
-    areas = areas[: i - 1] + [area] + areas[i + 2 :]
-    classif = classif[: i - 1] + classif[i + 1 :]
-    return areas, classif
-
-
-def filter_areas(ys, areas, min_width, min_depth, classif):
-    while areas:
-        widths = [r - l for l, r in areas]
-        i_min = min(range(len(widths)), key=widths.__getitem__)
-        width = widths[i_min]
-        if width <= min_width or (
-            width <= 3 * min_width and max_depth(ys, *areas[i_min]) < min_depth
-        ):
-            areas, classif = remove_area(areas, classif, i_min)
-        else:
-            break
-    return areas, classif
 
 
 def find_peaks_troughs(
@@ -123,29 +112,37 @@ def find_peaks_troughs(
     smooth_std,
     min_width,
     min_depth,
-    resolution,
 ):
+
+
+
     xs_smooth = gaussian_filter1d(xs, smooth_std, mode="nearest")
     ys_smooth = gaussian_filter1d(ys, smooth_std, mode="nearest")
     der = (ys_smooth[1:] - ys_smooth[:-1]) / (xs_smooth[1:] - xs_smooth[:-1])
+
+   
+
     intern_extrema = find_extrema(der)
-    extrema, values, classif = resample_extrema(intern_extrema, ys_smooth, min_width)
-    areas = build_areas(ys_smooth, extrema, values)
-    areas, classif = filter_areas(ys_smooth, areas, min_width, min_depth, classif)
+    extrema, _, classif = resample_extrema(intern_extrema,xs_smooth, ys_smooth, min_width,min_depth)
+
+
     peaks = []
     troughs = []
-    for area, feature in zip(areas, classif):
-        area = np.array(area, dtype=np.float64) * resolution + xs[0]
-        match feature:
+
+
+    for i in range(len(extrema)):
+        match classif[i]:
             case Feature.PEAK:
-                peaks.append(area)
+                peaks.append(extrema[i])
             case Feature.TROUGH:
-                troughs.append(area)
+                troughs.append(extrema[i])
             case _:
                 raise ValueError(
-                    f"Unknown feature {feature}, feature should "
+                    f"Unknown feature {classif[i]}, feature should "
                     f"be a {Feature.PEAK} or a {Feature.TROUGH}."
                 )
-    peaks = np.array(peaks).reshape((len(peaks), 2))
-    troughs = np.array(troughs).reshape((len(troughs), 2))
+    peaks = np.array(peaks)
+    troughs = np.array(troughs)
+    
+    
     return xs, ys, peaks, troughs

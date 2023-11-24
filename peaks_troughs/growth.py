@@ -5,7 +5,10 @@ import statistics
 import matplotlib.pyplot as plt
 import numpy as np
 import tqdm
-from group_by_cell import Orientation, load_cell
+try:
+    from group_by_cell import Orientation, load_cell
+except:
+    from peaks_troughs.group_by_cell import Orientation, load_cell
 
 
 def extract_growth(roi):

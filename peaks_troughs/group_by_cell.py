@@ -286,7 +286,7 @@ def save_mask(
         xs, ys, reference_xs, reference_ys, params, pixel_size
     )
     params = get_scaled_parameters(pixel_size, preprocessing=False, peaks_troughs=True)
-    _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params, resolution=pixel_size)
+    _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
     mask_num = len(os.listdir(roi_dirname))
     filename = f"{mask_num:03d}.npz"
     path = os.path.join(roi_dirname, filename)
@@ -389,7 +389,7 @@ def save_dataset(dataset, log_progress):
 def main():
     log_progress = True
     datasets = None
-    dataset =  None   # os.path.join("WT_mc2_55", "30-03-2015")
+    dataset =  os.path.join("WT_mc2_55", "30-03-2015")   # None  
     if dataset is None:
         if datasets is None:
             datasets = find_all_datasets()

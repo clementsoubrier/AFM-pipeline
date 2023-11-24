@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 from numba import njit
+from scipy.ndimage import gaussian_filter1d
 
 try:
     from preprocess import evenly_spaced_resample, preprocess_centerline
@@ -64,6 +65,16 @@ def min_error(y_1, y_2, h_offset, window_len):
     return final_error
 
 
+@njit
+def quantile_error_no_window(y_1, y_2, h_offset, quantile):
+    start_1 = max(0, h_offset)
+    start_2 = max(0, -h_offset)
+    window_len=np.min(np.array([len(y_2)+h_offset,len(y_2),len(y_1)-h_offset]))
+    windows_1=y_1[start_1:start_1+window_len]
+    windows_2=y_2[start_2:start_2+window_len]
+    diff = windows_1 - windows_2
+    final_error = np.quantile(diff**2, quantile)
+    return final_error
 
 
 @njit
@@ -76,15 +87,19 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
     y_1 = y_1.astype(np.float32)
     y_2 = y_2.astype(np.float32)
     window_len = round(window * (len(y_2) - 1)) + 1
-    physical_length = pixel_size * (window_len - 1)
+    physical_length = pixel_size * window_len #np.min(np.array([len(y_2)+h_offset,len(y_2),len(y_1)-h_offset]))
+    v_offset_window_len = window_len*(window_len >1 )+ (round(0.2 * (len(y_2) - 1)) + 1)*(window_len == 1)
     min_h_offset = -round(max_translation * (len(y_2) - 1))
     max_h_offset = len(y_1) - len(y_2) + round(max_translation * (len(y_2) - 1))
     best_error = np.inf
     best_h_offset = 0
     best_v_offset = 0
+
     for h_offset in range(min_h_offset, max_h_offset + 1):
+         #physical superimposition zone
+        
         min_v_offset, max_v_offset = compute_v_offset_range(
-            y_1, y_2, h_offset, window_len
+            y_1, y_2, h_offset,v_offset_window_len
         )
         v_offset_sampling = math.ceil(max_v_offset - min_v_offset) + 1
         v_offsets = np.linspace(min_v_offset, max_v_offset, v_offset_sampling)
@@ -93,7 +108,9 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
         stick_out_error = penalty * physical_stick_out
 
         for v_offset in v_offsets:
-            if use_quantile : 
+            if window_len==1:
+                error=quantile_error_no_window(y_1, y_2, h_offset, quantile)
+            elif use_quantile : 
                 error = quantile_error(y_1, y_2 + v_offset, h_offset, window_len, quantile)
             else :
                 error = min_error(y_1, y_2 + v_offset, h_offset, window_len)
@@ -106,13 +123,14 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
     return best_h_offset, best_v_offset
 
 
-def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True):
+def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True,smoothed=False):
     params = params.copy()
     max_translation = params.pop("max_translation")
     penalty = params.pop("penalty")
     max_relative_translation=params.pop("max_relative_translation")
     window_relative_size=params.pop("window_relative_size")
     quantile_size=params.pop("quantile_size")
+    smooth_std=params.pop("smooth_std")
 
     physical_max_translation = max_translation * pixel_size
     if reference_xs is None or reference_ys is None:
@@ -127,6 +145,10 @@ def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,
         ref_xs_p, ref_ys_p = evenly_spaced_resample(
             reference_xs, reference_ys, pixel_size
         )
+    if smoothed:
+        ys_p = gaussian_filter1d(ys_p, smooth_std, mode="nearest")
+        ref_ys_p = gaussian_filter1d(ref_ys_p, smooth_std, mode="nearest")
+
     relative_translation=min(max_relative_translation,physical_max_translation/min(abs(xs_p[-1] - xs_p[0]),abs(ref_xs_p[-1] - ref_xs_p[0])))
 
     if len(ref_ys_p) < 5 or len(ys_p) < 5:
@@ -135,4 +157,5 @@ def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,
     # add max translation
     delta, v_delta = align_quantile(ref_ys_p, ys_p, relative_translation, penalty, window_relative_size, quantile_size, pixel_size,use_quantile_instead_of_min)
     h_translation = ref_xs_p[0] - xs_p[0] + delta * pixel_size
+
     return xs+ h_translation, ys+ v_delta    

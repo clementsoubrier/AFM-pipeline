@@ -7,18 +7,6 @@ Created on Thu May 11 13:07:51 2023
 
 import numpy as np
 
-#%% Load data for testing
-
-# # Directory paths
-# dictionary_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/Dic_dir/"
-# img_dir = "C:/Users/shawn/OneDrive/Desktop/temp_scripts/Processed_data/dataset/Height/final_data"
-
-# # Load image dictionary, list of all masks, and adjacency matrix for binary trees
-# main_dict = np.load(dictionary_dir + "Main_dictionnary.npy",allow_pickle=True).item()
-# masks_list = np.load(dictionary_dir + "masks_list.npy",allow_pickle=True)
-# link_mat = np.load(dictionary_dir + "Link_matrix.npy")
-# adj_mat = np.load(dictionary_dir + "Bool_matrix.npy") #asymmetric adjacency matrix to represent binary tree
-
 #%% Adjacency matrix to dictionary functions
 
 def extract_individuals(adj_mat,save_dir,filename='ROI_dict'):
@@ -37,8 +25,7 @@ def extract_individuals(adj_mat,save_dir,filename='ROI_dict'):
         starting_num = int(list(ROI_dict.keys())[-1].split()[-1])+1 # make sure next tree's first ROI is latest ROI ID# + 1
     
     create_children(ROI_dict) # add Children key to each dictionary item
-    #np.savez_compressed(save_dir+filename,ROI_dict)
-    # print(ROI_dict)
+
     return ROI_dict
     
 
@@ -126,11 +113,3 @@ def create_children(ROI_dic):
         if ROI_dic[ROI]['Parent']!='':
           ROI_dic[ROI_dic[ROI]['Parent']]['Children'].append(ROI)
 
-#%% Obtain full ROI dictionary from the adjacency matrix and save to specified directory
-
-# extract_individuals(adj_mat,dictionary_dir,filename='ROI_dict')
-
-
-#%% Load and check ROI dictionary
-# ROI_dict = np.load(dictionary_dir + "ROI_dict.npy",allow_pickle=True).item()
-# print(ROI_dict)

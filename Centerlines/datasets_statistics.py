@@ -5,14 +5,18 @@ Created on Tue May 23 11:33:10 2023
 
 @author: c.soubrier
 """
-
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import njit
 import tqdm
 import os
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
 
-import centerline_analysis_v2 as ca
+from scaled_parameters import get_scaled_parameters
+import Centerlines.centerline_analysis_v2 as ca
 
 ROI_name='ROI_dict.npz' 
 
@@ -32,7 +36,7 @@ def classifying_ROI(direct_list,ROIdicname,datadirec): #with parent and daughter
     numberdivision=0
     for i in tqdm.trange(len(direct_list)):
         direct=direct_list[i]
-        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
+        ROIdic=np.load(os.path.join(datadirec, direct, ROIdicname), allow_pickle=True)['arr_0'].item()
         for ROI in ROIdic.keys():
             if ROIdic[ROI]['Parent']=='':
                 if ROIdic[ROI]['Children']==[]:
@@ -54,12 +58,14 @@ def stat_centerline_surface(wholeROI,ROIdicname,dicname,masklistname,datadirec):
     centerlen=[]
     mask_surf=[]
     print('stat_centerline_surface')
+    old_direc=''
     for i in tqdm.trange(len(wholeROI)):
         elem =wholeROI[i]
         ROI,direct=elem
-        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
+        if not direct == old_direc:
+            ROIdic=np.load(os.path.join(datadirec, direct, ROIdicname), allow_pickle=True)['arr_0'].item()
+            maindict=np.load(os.path.join(datadirec, direct, dicname), allow_pickle=True)['arr_0'].item()
+            masklist=np.load(os.path.join(datadirec ,direct ,masklistname), allow_pickle=True)['arr_0']
         centdist=[]
         subsurf=[]
         for mask in ROIdic[ROI]['Mask IDs']:
@@ -89,9 +95,9 @@ def stat_end_ROI(rootsonly,ROIdicname,dicname,masklistname,datadirec):
         elem =rootsonly[i]
         
         ROI,direct=elem
-        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(os.path.join(datadirec, direct, ROIdicname), allow_pickle=True)['arr_0'].item()
+        maindict=np.load(os.path.join(datadirec, direct, dicname), allow_pickle=True)['arr_0'].item()
+        masklist=np.load(os.path.join(datadirec, direct, masklistname), allow_pickle=True)['arr_0']
         
         mask=ROIdic[ROI]['Mask IDs'][-1]
         file=masklist[mask][2]
@@ -118,9 +124,9 @@ def stat_begin_ROI(leafonly,ROIdicname,dicname,masklistname,datadirec):
         elem =leafonly[i]
         
         ROI,direct=elem
-        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(os.path.join(datadirec, direct, ROIdicname), allow_pickle=True)['arr_0'].item()
+        maindict=np.load(os.path.join(datadirec, direct, dicname), allow_pickle=True)['arr_0'].item()
+        masklist=np.load(os.path.join(datadirec, direct, masklistname), allow_pickle=True)['arr_0']
         
         mask=ROIdic[ROI]['Mask IDs'][0]
         file=masklist[mask][2]
@@ -151,7 +157,7 @@ def plotstat(data,title,save_dir,bar_num=40):
     plt.axvline(q3, color="green")
     plt.legend()
     plt.title(title)
-    plt.savefig(save_dir+title, format='jpg')
+    plt.savefig(os.path.join(save_dir, title+'.jpg'), format='jpg')
     
 
 def totale_stats(direct_list,ROIdicname,dicname,masklistname,datadirec,dirim):
@@ -187,9 +193,9 @@ def stats_time_evol(direct_list,ROIdicname,dicname,masklistname,datadirec,dirim)
     print('stats_time_evol')
     
     for direct in direct_list:
-        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(os.path.join(datadirec, direct, ROIdicname), allow_pickle=True)['arr_0'].item()
+        maindict=np.load(os.path.join(datadirec, direct, dicname), allow_pickle=True)['arr_0'].item()
+        masklist=np.load(os.path.join(datadirec, direct, masklistname), allow_pickle=True)['arr_0']
         for ROI in ROIdic.keys():
             if len(ROIdic[ROI]['Mask IDs'])>5:
                 oldfile=masklist[ROIdic[ROI]['Mask IDs'][0]][2]
@@ -216,9 +222,9 @@ def stats_time_evol(direct_list,ROIdicname,dicname,masklistname,datadirec,dirim)
                     
                 
     for direct in direct_list:
-        ROIdic=np.load(datadirec+direct+ROIdicname, allow_pickle=True)['arr_0'].item()
-        maindict=np.load(datadirec+direct+dicname, allow_pickle=True)['arr_0'].item()
-        masklist=np.load(datadirec+direct+masklistname, allow_pickle=True)['arr_0']
+        ROIdic=np.load(os.path.join(datadirec, direct, ROIdicname), allow_pickle=True)['arr_0'].item()
+        maindict=np.load(os.path.join(datadirec, direct, dicname), allow_pickle=True)['arr_0'].item()
+        masklist=np.load(os.path.join(datadirec, direct, masklistname), allow_pickle=True)['arr_0']
         for ROI in ROIdic.keys():
             if len(ROIdic[ROI]['Mask IDs'])>5:
                 oldfile=masklist[ROIdic[ROI]['Mask IDs'][0]][2]
@@ -246,13 +252,11 @@ def stats_time_evol(direct_list,ROIdicname,dicname,masklistname,datadirec,dirim)
 
         
 def plot_all_stats(dataset):
-    dic_name='Main_dictionnary.npz'
-
-    list_name='masks_list.npz'
-
-    data_direc='data/datasets/'
-
-    dir_im='data/results/plot_stat/'
+    params = get_scaled_parameters(paths_and_names=True,mds=True)
+    dic_name = params["main_dict_name"]
+    data_direc = params["main_data_direc"]
+    list_name = params["masks_list_name"]
+    dir_im=params["dir_plot_stat"]
 
     if not os.path.exists(dir_im):
         os.makedirs(dir_im)

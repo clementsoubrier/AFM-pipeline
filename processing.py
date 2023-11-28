@@ -18,11 +18,14 @@ import tqdm
 from cellpose import utils, io, models
 import re
 import copy
+from multiprocessing import Pool
+
 import matplotlib.pyplot as plt
 from shutil import rmtree #erasing a whole directory
 from skimage.morphology import skeletonize #,medial_axis
 from pySPM import Bruker,SPM_image
 from  Centerlines.complete_centerlines import  complete_one_centerline
+from scaled_parameters import get_scaled_parameters
 
 
 
@@ -60,12 +63,6 @@ from  Centerlines.complete_centerlines import  complete_one_centerline
 # =============================================================================
 
 
-Directory= "delta_parB/03-02-2015/" #the directory you chose to work on    
-# different type of datassets with their cropping parameter
-
-data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] #
-
-problem=['WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
 
 
 
@@ -142,7 +139,7 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
         if  files[i][0]!='.':         #avoiding .DS_Store files
             try:                    #SOMETIMES pySPM.Bruker function crashes if the aspect ratios are not integers
                 #loading and saving the data-files and dimension
-                Scan = Bruker(log_dir+files[i])
+                Scan = Bruker(os.path.join(log_dir, files[i]))
                 channel_list=get_channel_list(Scan)
                 back_for=np.zeros(len(channel_list),dtype=int)
                 for j in range(1,len(channel_list)):
@@ -175,11 +172,11 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                 filename=re.split(r'\W+',files[i])[0]# taking care of extensions in the filename
                 
                 newsubdic=realign_bwd_fwd_images(subdic)  #aligning backward and forward pictures
-                np.savez_compressed(dir_im+filename,newsubdic)
+                np.savez_compressed(os.path.join(dir_im,filename),newsubdic)
                 
                 
                 #extracting the angle
-                text_file = open(log_dir+files[i], "r", errors='ignore' )
+                text_file = open(os.path.join(log_dir, files[i]), "r", errors='ignore' )
                 #read whole file to a string
                 text = text_file.read()
                 
@@ -193,12 +190,12 @@ def data_prep_logs_only(log_dir,dir_im,temp_dir_info, thres_scars_direc):
                 match1=re.findall(r'\d+\.\d+|\d+',match1)
                 
                 if data_array.size['real']['unit']=='um':
-                    np.save(temp_dir_info+filename+'dimp',np.array([data_array.size['real']['y'],data_array.size['real']['x'],np.shape(data_array.pixels)[0],np.shape(data_array.pixels)[1],float(match1[0])])) #format : physical y len, physical x len, pixel number y, pixel number x, rotation angle
+                    np.save(os.path.join(temp_dir_info, filename + 'dimp.npy'),np.array([data_array.size['real']['y'],data_array.size['real']['x'],np.shape(data_array.pixels)[0],np.shape(data_array.pixels)[1],float(match1[0])])) #format : physical y len, physical x len, pixel number y, pixel number x, rotation angle
                 elif data_array.size['real']['unit']=='nm':
-                    np.save(temp_dir_info+filename+'dimp',np.array([data_array.size['real']['y']/1000,data_array.size['real']['x']/1000,np.shape(data_array.pixels)[0],np.shape(data_array.pixels)[1],float(match1[0])]))
+                    np.save(os.path.join(temp_dir_info, filename + 'dimp.npy'),np.array([data_array.size['real']['y']/1000,data_array.size['real']['x']/1000,np.shape(data_array.pixels)[0],np.shape(data_array.pixels)[1],float(match1[0])]))
                 else: 
                     print('error unit format', data_array.size['real']['unit'])
-                np.save(temp_dir_info+filename+'unit',unitdic,allow_pickle=True)
+                np.save(os.path.join(temp_dir_info, filename + 'unit.npy'),unitdic,allow_pickle=True)
             
             except:
                 print(files[i],'error in log parameters')
@@ -429,14 +426,14 @@ def get_channel(self, channel="Height Sensor", backward=False, corr=None, debug=
     raise Exception("Channel {} not found".format(channel))
     
 #%%Preparation of the data so that each image has the same dimension 
-def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata,maxsize): #dir of the images, dir of the numpy info of logs
+def dimension_def_logs_only(dir_im, temp_dir_info, dimensiondata, maxsize): #dir of the images, dir of the numpy info of logs
 
         
     #determining the main dimension and the best vertical/horizontal precision
     phys_dim=[]
     for file in os.listdir(temp_dir_info):
         if file[-8:]=='dimp.npy':
-            log_para=np.load(temp_dir_info+file)
+            log_para=np.load(os.path.join(temp_dir_info, file))
             if log_para[0]==0 or log_para[1]==0:
                 raise TypeError('Error in file '+file+', please exculde of dataset')
             phys_dim.append([log_para[0],log_para[1],log_para[0]/log_para[2],log_para[1]/log_para[3]])#format : physical y len, physical x len, resolution y, resolution x
@@ -444,7 +441,6 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata,maxsize): #dir of
     prec=np.min(phys_dim[:,2:4][phys_dim[:,2:4]>0])
     dim_height=int(np.max(phys_dim[:,0])/prec)
     dim_len=int(np.max(phys_dim[:,1])/prec)
-    print('dimensions :'+str(dim_height)+', '+str(dim_len))
 
     #avoiding too big pictures with a max size
     ratio=0
@@ -452,16 +448,15 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata,maxsize): #dir of
         ratio=maxsize/dim_height
     elif dim_len > dim_height and dim_len>maxsize:
         ratio=maxsize/dim_len
-    print('ratio', ratio)
     
     # scailing all the images to get same resolution and dimension
     listdir=os.listdir(dir_im)
     for i in tqdm.trange(len(listdir)):
         filez=listdir[i]
-        datadir=np.load(dir_im+filez,allow_pickle=True)['arr_0'].item()
+        datadir=np.load(os.path.join(dir_im, filez),allow_pickle=True)['arr_0'].item()
         
         for channel in datadir.keys():
-            log_para=np.load(temp_dir_info+filez[:-4]+'dimp.npy')
+            log_para=np.load(os.path.join(temp_dir_info, filez[:-4] + 'dimp.npy'))
             if not 'Error' in channel:
                 
                 newimg=datadir[channel]
@@ -477,11 +472,11 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata,maxsize): #dir of
 
             datadir[channel]=newimg
 
-        np.savez_compressed(dir_im+filez,datadir)
+        np.savez_compressed(os.path.join(dir_im, filez), datadir)
     if ratio==0:
-        np.save(temp_dir_info+dimensiondata,np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
+        np.save(os.path.join(temp_dir_info, dimensiondata),np.array([dim_height,dim_len,prec]))#saving dimensions of the images and physical dimension of a pixel for future plots
     else :
-        np.save(temp_dir_info+dimensiondata,np.array([int(dim_height*ratio),int(dim_len*ratio),prec/ratio]))
+        np.save(os.path.join(temp_dir_info, dimensiondata),np.array([int(dim_height*ratio),int(dim_len*ratio),prec/ratio]))
     
 
 
@@ -489,7 +484,16 @@ def dimension_def_logs_only(dir_im,temp_dir_info,dimensiondata,maxsize): #dir of
     
 
 #%% Running cellpose and saving the results
-def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dimensiondata,gpuval=False):
+def run_cel_logs_only(dir_im,seg,temp_dir_info,dimensiondata):
+    params=get_scaled_parameters(cellpose=True)
+
+    mod = params['cel_model_type']
+    chan = params['cel_channels']
+    param_dia = params['cel_diameter_param']
+    thres = params['cel_flow_threshold']
+    celp = params['cel_prob_threshold']
+    gpuval = params['cel_gpu']
+
     #clean or create the output directory
     if os.path.exists(seg):
         for file in os.listdir(seg):
@@ -498,17 +502,17 @@ def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dim
         os.makedirs(seg)
         
     # computation of the expected cell diameter in pixels
-    scale=np.load(temp_dir_info+dimensiondata+'.npy')[2]
+    scale=np.load(os.path.join(temp_dir_info, dimensiondata))[2]
     dia=2/scale*param_dia
     
     # Loop over all of our image files and run Cellpose on each of them. 
     listdir=os.listdir(dir_im)
     for i in tqdm.trange(len(listdir)):
         filez=listdir[i]
-        log_para=np.load(temp_dir_info+filez[:-4]+'dimp.npy')
+        log_para=np.load(os.path.join(temp_dir_info, filez[:-4] + 'dimp.npy'))
         dimi=int(log_para[0])/scale
         dimj=int(log_para[1])/scale
-        datadir=np.load(dir_im+filez,allow_pickle=True)['arr_0'].item()
+        datadir=np.load(os.path.join(dir_im, filez),allow_pickle=True)['arr_0'].item()
         
         keys=datadir.keys()
         if "Height_fwd" in keys and "Peak Force Error_fwd" in keys and "Peak Force Error_bwd" in keys:
@@ -534,7 +538,7 @@ def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dim
             masks, flows, st, diams = model.eval(img, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
 
         # save results
-        io.masks_flows_to_seg(img, masks, flows, diams, seg+filez[:-4], chan)
+        io.masks_flows_to_seg(img, masks, flows, diams, os.path.join(seg, filez[:-4]), chan)
         
         
         
@@ -554,7 +558,7 @@ def run_cel_logs_only(dir_im,mod,chan,param_dia,thres,celp,seg,temp_dir_info,dim
                 goodimg[np.logical_not(falseframe(dim1,dim2,dimi,dimj))]=cst_val*np.ones((dim1,dim2))[np.logical_not(falseframe(dim1,dim2,dimi,dimj))]
                 datadir[channel]=goodimg
 
-        np.savez_compressed(dir_im+filez,**datadir)
+        np.savez_compressed(os.path.join(dir_im, filez),**datadir)
 
 @njit    
 def renorm_img(img):
@@ -580,12 +584,12 @@ def falseframe(dim1,dim2,dimi,dimj):
     return img
 
 #%% Creating the final dictionnary with all the properties of the images
-def download_dict_logs_only(dir_im,temp_dir_info,segmentspath,dimensiondata,year,saving=True,savingpath='dict'):
+def download_dict_logs_only(dir_im,temp_dir_info,segmentspath,dimensiondata,year,saving=False ,savingpath='dict'):
     
     
     files = os.listdir(dir_im)
     dic={}
-    dimen=np.load(temp_dir_info+dimensiondata+'.npy')
+    dimen=np.load(os.path.join(temp_dir_info, dimensiondata))
     
     
     # Sort files by timepoint.
@@ -593,7 +597,7 @@ def download_dict_logs_only(dir_im,temp_dir_info,segmentspath,dimensiondata,year
     init_time=datetime.datetime(int(year), int(files[0][:2]), int(files[0][2:4]), int(files[0][4:6]), int(files[0][6:8]), 0, 0)
     for fichier in files:
         fichier=fichier[:-4]
-        dat = np.load(segmentspath+fichier+'_seg.npy', allow_pickle=True).item()
+        dat = np.load(os.path.join(segmentspath, fichier+'_seg.npy'), allow_pickle=True).item()
         if np.max(dat['masks'])!=0:
 
             dic[fichier]={}
@@ -602,12 +606,12 @@ def download_dict_logs_only(dir_im,temp_dir_info,segmentspath,dimensiondata,year
             t=(time-init_time).total_seconds()
             
             dic[fichier]['time']=int(t/60)      #time in minutes after the beginning of the experiment
-            dic[fichier]['adress']=dir_im+fichier+'.npz'
+            dic[fichier]['adress']=os.path.join(dir_im,fichier+'.npz')
             dic[fichier]['masks']=dat['masks']
-            dic[fichier]['outlines']=utils.outlines_list(dat['masks'])
-            dic[fichier]['angle']=np.load(temp_dir_info+fichier+'dimp.npy')[-1]
+            dic[fichier]['outlines']=utils.outlines_list(dat['masks'],multiprocessing=False)
+            dic[fichier]['angle']=np.load(os.path.join(temp_dir_info, fichier + 'dimp.npy'))[-1]
             dic[fichier]['resolution']=dimen[2]
-            dic[fichier]['units']=np.load(temp_dir_info+fichier+'unit.npy', allow_pickle=True).item()
+            dic[fichier]['units']=np.load(os.path.join(temp_dir_info, fichier + 'unit.npy'), allow_pickle=True).item()
             
     #deleting temporary dir
     rmtree(segmentspath)
@@ -859,9 +863,9 @@ def transfo_bin(mask,num):
 #Constructing the centerline given a unique mask
 def construc_center(mask,alpha):
     skel=padskel(mask)              #runing the skeleton algorithm and obtaining a boolean picture
-    ex,div=find_extremal_division_point(skel)               #extracting the extremal and division points of the skel
+    _,div=find_extremal_division_point(skel)               #extracting the extremal and division points of the skel
     extr_seg,int_seg=division_path_detek(skel)          #EXTRACTING THE DIFFERENT SEGMENTS
-    extr_seg=fusion_erasing(extr_seg,ex,div,alpha)          #fusioning/erasing the external segments if needed
+    extr_seg=fusion_erasing(extr_seg,div,alpha)          #fusioning/erasing the external segments if needed
     len_int=len(int_seg)
     len_extr=len(extr_seg)
     
@@ -1169,7 +1173,7 @@ def one_D_line(seg) :
 
 
 # Erasing the shortest branch if it is alpha>1 shorter than the longuest. Else fusioning two external segments linked to the same division point to get just a 1D line, works on simple cases only
-def fusion_erasing(extr_seg,ex,div,alpha):
+def fusion_erasing(extr_seg,div,alpha):
     if len(extr_seg)==1: #case with just one segment
         return extr_seg
     else: #each external segment has a connection to a division point
@@ -1241,118 +1245,119 @@ def fusion_erasing(extr_seg,ex,div,alpha):
 def run_one_dataset_logs_only(Main_directory):
     print(Main_directory)
     
-    year=Main_directory[-5:-1]
+    year=Main_directory[-4:]
     
     print(year)
-    my_data = "../data2/"+Main_directory       #path of dir
+    today = datetime.date.today()
+
+    if not 1950 <int(year)<=today.year:
+        raise NameError('The name of your directory should end with the year of the experiment')
+    
+    params=get_scaled_parameters(paths_and_names=True)
+    initial_data = params["initial_data_direc"]
+    data_direc = params["main_data_direc"]
+    final_data_direc = params["final_data_direc"]
+    main_dict_name = params["main_dict_name"]
+    masks_list_name = params["masks_list_name"]
+
+    my_data = os.path.join(initial_data,Main_directory)     #path of dir
     #directory with the usefull information of the logs, None if there is no.
 
 
     data_direc='data/datasets/'
 
 
-    #Temporary directories
-    #directory of cropped data each image of the dataset is cropped to erase the white frame
-    temp_dir_info=data_direc+Main_directory +"temporary_info/" 
-    #directory for output data from cellpose 
-    segments_path = data_direc+Main_directory +"cellpose_output/"
-    #dimension and scale of all the final data
-    dimension_data='Dimension'
+    #Temporary directories and files
+    temp_dir_info=os.path.join(data_direc, Main_directory, "temporary_info")
+    segments_path = os.path.join(data_direc, Main_directory, "cellpose_output")
+    dimension_data = 'Dimension.npy'
 
     #Outputs
     
     #directory of the processed images (every image has the same pixel size and same zoom)
-    final_data=data_direc+Main_directory +"final_data/"  
+    final_data=os.path.join(data_direc, Main_directory, final_data_direc)
     #Saving path for the dictionnary
-    saving_path=data_direc+Main_directory +'Main_dictionnary'
-    
+    saving_path=os.path.join(data_direc, Main_directory, main_dict_name)
     #dimension and scale of all the final data
-    list_savingpath=data_direc+Main_directory +'masks_list'
+    list_savingpath=os.path.join(data_direc, Main_directory, masks_list_name)
     
 
 
     
     ''' Parameters'''
 
-    threshold_scars_directory={'Height':0.9,"Peak Force Error": 0.1,"other":0.5}
+    param_img = get_scaled_parameters(img_treatment=True)
+
+    ratio_erasing_masks = param_img['ratio_erasing_masks']
+    ratio_saturation = param_img['ratio_saturation']
+    max_pixel_im = param_img['max_pixel_im']
+    centerline_crop_param = param_img['centerline_crop_param']
+    threshold_scars_directory = param_img['threshold_scars_directory']
     
-    #cellpose parameters
-    
-    cel_model_type='cyto'
-    cel_channels=[0,0]  # define CHANNELS to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
-    cel_diameter_param = 1 # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
-    cel_flow_threshold = 0.8 #oldparam : 0.9
-    cel_cellprob_threshold=0.4 #oldparam : 0.0
-    cell_gpu=True
-    
-    #erasing small masks that have a smaller relative size :
-    ratio_erasing_masks=0.2
-    #erasing masks that have a ratio of saturated surface bigger than :
-    ratio_saturation=0.1
-    
-    # maximum height or len of a picture
-    max_pixel_im=1024
-    
-    
-    #minimum ratio of two brench length to erase the small branch
-    centerline_crop_param=2
-    
+
     step=0
     ''''''
     
-    print("data_prep",step)
+    print(Main_directory,"data_prep",step)
     step+=1
     data_prep_logs_only(my_data,final_data,temp_dir_info,threshold_scars_directory)
     
-    print("dimension_def",step)
+    print(Main_directory,"dimension_def",step)
     step+=1
     dimension_def_logs_only(final_data,temp_dir_info,dimension_data,max_pixel_im)
     
-    print("run_cel",step)
+    print(Main_directory,"run_cel",step)
     step+=1
-    run_cel_logs_only(final_data,cel_model_type,cel_channels,cel_diameter_param,cel_flow_threshold,cel_cellprob_threshold,segments_path,temp_dir_info,dimension_data,gpuval=cell_gpu)
+    run_cel_logs_only(final_data,segments_path,temp_dir_info,dimension_data)
     
-    print("download_dict",step)
+    print(Main_directory,"download_dict",step)
     step+=1
-    main_dict=download_dict_logs_only(final_data,temp_dir_info,segments_path,dimension_data,year,saving=True,savingpath=saving_path)
+    main_dict=download_dict_logs_only(final_data,temp_dir_info,segments_path,dimension_data,year)
     
-    # main_dict=np.load(saving_path+'.npz', allow_pickle=True)['arr_0'].item()
-    
-    print("centroid_area",step)
+    print(Main_directory,"centroid_area",step)
     step+=1
     centroid_area(main_dict)
 
-    print("clean_masks",step)
+    print(Main_directory,"clean_masks",step)
     step+=1
     clean_masks(ratio_erasing_masks,ratio_saturation, main_dict)
     
-    print("main_parenting",step)
+    print(Main_directory,"main_parenting",step)
     step+=1
     main_parenting(main_dict) 
 
-    print("construction_mask_list",step)
+    print(Main_directory,"construction_mask_list",step)
     step+=1
     construction_mask_list(main_dict,Main_directory,list_savingpath)
     
-    print("centerline_mask",step)
+    print(Main_directory,"centerline_mask",step)
     step+=1
     centerline_mask(main_dict,centerline_crop_param,saving=True,savingpath=saving_path)
     
     
     
+def main(Directory= "all"):
+    params = get_scaled_parameters(data_set=True)
+    if Directory in params.keys():
+        with Pool(processes=8) as pool:
+            for direc in pool.imap_unordered(run_one_dataset_logs_only, params[Directory]):
+                pass
+    elif isinstance(Directory, list)  : 
+        with Pool(processes=8) as pool:
+            for direc in pool.imap_unordered(run_one_dataset_logs_only, Directory):
+                pass
+    elif isinstance(Directory, str)  : 
+        raise NameError('This directory does not exist')
     
+    
+
     
     
 #%% running main function   
 
 if __name__ == "__main__":
-    
-    '''Running the different functions'''
-    
-    # run_one_dataset_logs_only(Directory)
-    
-
-    for direc in data_set: 
-            run_one_dataset_logs_only(direc)
+    # Directory= "delta_parB/03-02-2015" 
+    # main(Directory = Directory )
+    main()
     
 

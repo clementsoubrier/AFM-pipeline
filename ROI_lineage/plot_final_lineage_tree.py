@@ -9,35 +9,23 @@ Created on Wed May 10 14:34:34 2023
 #%%  Imports
 
 import re
+import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from cellpose import plot
 from numba import njit
-try :
-    import extract_individuals as exi
-except:
-    import ROI_lineage.extract_individuals as exi
+from multiprocessing import Pool
+from functools import partial
 
 
-Directory="delta_parB/03-02-2015/"#"dataset/"# 'delta_lamA_03-08-2018/2/'
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
 
-data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']#
+from scaled_parameters import get_scaled_parameters
+import ROI_lineage.extract_individuals as exi
 
-
-
-''' Parameters '''
-
-#minimal threshold to consider a daughter-mother relation
-final_thresh=0.75 #0.8
-
-#threshold to consider that there is a division and not just a break in the ROI
-thres_min_division=0.7 #0.7 
-
-#threshold to consider that two children are actually linked
-comparison_thres=0.7
-#minimum number of frames in an ROI
-min_len_ROI=3 
 
 
 ''' Output'''
@@ -316,13 +304,13 @@ def extract_roi_list_from_dic(ROI_dic,masks_list):
 
 
 
-def plot_image_one_ROI(ROI,ROI_dic,masks_list,dic,datadirec):
+def plot_image_one_ROI(ROI,ROI_dic,masks_list,dic):
     plotlist=ROI_dic[ROI]['Mask IDs']
     Roi_index=ROI_dic[ROI]['index']
     for maskindex in plotlist:
         file=masks_list[maskindex][2]
         index=masks_list[maskindex][3]
-        img = np.load(datadirec+dic[file]['adress'])['Height_fwd']
+        img = np.load(dic[file]['adress'])['Height_fwd']
         mask=(dic[file]['masks']==index).astype(int)
         mask_RGB =plot.mask_overlay(img,mask)
         plt.figure()
@@ -362,7 +350,7 @@ def update_masks(mask,new_values):
     return mask
 
 
-def plot_image_lineage_tree(dic,maskcol,indexlist,directory,datadirec,saving=False,img_dir=''):
+def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir=''):
     if saving:
         if os.path.exists(img_dir):
             for file in os.listdir(img_dir):
@@ -414,7 +402,7 @@ def plot_image_lineage_tree(dic,maskcol,indexlist,directory,datadirec,saving=Fal
         main_centroid=dic[fichier]['main_centroid']
         plt.plot(main_centroid[1], main_centroid[0], color='w',marker='o')
         if saving:
-            plt.savefig(img_dir+fichier+'.png', format='png')
+            plt.savefig(os.path.join(img_dir, fichier+'.png'), format='png')
             plt.close()
         #plot the displacement of the centroid between two images
         fichier=dic[fichier]['child']
@@ -461,7 +449,7 @@ def plot_image_lineage_tree(dic,maskcol,indexlist,directory,datadirec,saving=Fal
     plt.plot(main_centroid[1], main_centroid[0], color='w',marker='o')
 
     if saving:
-        plt.savefig(img_dir+fichier+'.png', format='png')
+        plt.savefig(os.path.join(img_dir, fichier+'.png'), format='png')
         plt.close()
     else:
         plt.show()
@@ -583,8 +571,8 @@ def manually_regluing(direc,ROIdict,indexlistname,parent,child,datadirec,divisio
                     indexlist[mask,2]=parentROI
     else:
         raise NameError('No ROI with following index :'+(parentROI=='')*parent+' '+(childROI=='')*child)
-    np.savez_compressed(datadirec+direc+ROIdict,ROI_dict,allow_pickle=True)
-    np.savez_compressed(datadirec+direc+indexlistname,indexlist,allow_pickle=True)
+    np.savez_compressed(os.path.join(datadirec, direc, ROIdict), ROI_dict, allow_pickle=True)
+    np.savez_compressed(os.path.join(datadirec, direc, indexlistname), indexlist, allow_pickle=True)
             
                 
     
@@ -592,38 +580,34 @@ def manually_regluing(direc,ROIdict,indexlistname,parent,child,datadirec,divisio
     
     
  #%% main function      
-def run_whole_lineage_tree(direc,thres=final_thresh,min_number=min_len_ROI,thresmin=thres_min_division,comp_threshold=comparison_thres,plot=True):
+def run_whole_lineage_tree(direc, plot):
+    
+    params=get_scaled_parameters(paths_and_names=True,plot=True,lineage_tree=True)
+    
+    dicname = params["main_dict_name"]
+    listname = params["masks_list_name"]
+    ROIdict = params["roi_dict_name"]
+    linmatname = params['lineage_matrix_name']
+    boolmatname = params['bool_matrix_name']
+    data_direc = params["main_data_direc"]
+    indexlistname = params['roi_masks_list_name']
     
     
-    dicname='Main_dictionnary.npz'
+    colormask = params["masks_colors"]
 
-    listname='masks_list.npz'
-
-    ROIdict='ROI_dict.npz'
-
-    linmatname='non_trig_Link_matrix.npy'
-
-    boolmatname="Bool_matrix.npy"
-
-    # linkmatname='Link_matrix.npy'
-
-    data_direc='data/datasets/'
-
-    indexlistname='masks_ROI_list.npz'
+    thres = params["final_thresh"]
+    thresmin = params["thres_min_division"]
+    comp_threshold = params["comparison_thres"]
+    min_number = params["min_len_ROI"]
     
-    
-    colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
-
-
-    
-    masks_list=np.load(data_direc+direc+listname, allow_pickle=True)['arr_0']
-    main_dict=np.load(data_direc+direc+dicname, allow_pickle=True)['arr_0'].item()
-    Bool_matrix=np.load(data_direc+direc+boolmatname)
+    masks_list=np.load(os.path.join(data_direc, direc, listname), allow_pickle=True)['arr_0']
+    main_dict=np.load(os.path.join(data_direc, direc, dicname), allow_pickle=True)['arr_0'].item()
+    Bool_matrix=np.load(os.path.join(data_direc, direc, boolmatname))
 
     
     ROI_dict=exi.extract_individuals(Bool_matrix, direc)
     
-    linmatrix=np.load(data_direc+direc+linmatname)
+    linmatrix=np.load(os.path.join(data_direc, direc, linmatname))
     
     newdic=filter_good_ROI_dic(ROI_dict,min_number)
     
@@ -635,30 +619,40 @@ def run_whole_lineage_tree(direc,thres=final_thresh,min_number=min_len_ROI,thres
     indexlist=detect_bad_div(newdic,linmatrix,masks_list,thres,thresmin)
     if plot :
         plot_lineage_tree(newdic,masks_list,main_dict,colormask,direc)
-        plot_image_lineage_tree(main_dict,colormask,indexlist,direc,data_direc)
-    np.savez_compressed(data_direc+direc+ROIdict,newdic,allow_pickle=True)
-    np.savez_compressed(data_direc+direc+indexlistname,indexlist,allow_pickle=True)
+        plot_image_lineage_tree(main_dict,colormask,indexlist,direc)
+
+    np.savez_compressed(os.path.join(data_direc, direc ,ROIdict), newdic, allow_pickle=True)
+    np.savez_compressed(os.path.join(data_direc, direc, indexlistname), indexlist, allow_pickle=True)
     
     
     # os.remove(direc+linmatname)
     # os.remove(direc+boolmatname)
     # os.remove(direc+linkmatname)
     
+
     
+def main(Directory= "all", plot=True):
+    params = get_scaled_parameters(data_set=True)
+    if Directory in params.keys():
+        func=partial(run_whole_lineage_tree, plot=plot)
+        with Pool(processes=8) as pool:
+            for direc in pool.imap_unordered(func,params[Directory]):
+                pass
+    elif isinstance(Directory, list)  : 
+        func=partial(run_whole_lineage_tree, plot=plot)
+        with Pool(processes=8) as pool:
+            for direc in pool.imap_unordered(func, Directory):
+                pass
+    elif isinstance(Directory, str)  : 
+        raise NameError('This directory does not exist')
+    
+
+
 #%% running main function   
 if __name__ == "__main__":
-    
-    
-   
-    run_whole_lineage_tree(Directory,plot=False)
-
-
-    # for direct in data_set:
-    #     print(direct)
-        
-    #     run_whole_lineage_tree(direct,plot=True)
-        
-
+    # Directory= "delta_parB/03-02-2015" 
+    # main(Directory = Directory )
+    main(plot=False)
 
     '''
     manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)

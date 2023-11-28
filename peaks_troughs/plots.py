@@ -1,22 +1,16 @@
-from enum import IntEnum, auto
-import itertools
-import numbers
 import os
+import sys
 
 import matplotlib.colors as mplc
 import matplotlib.pyplot as plt
 import numpy as np
 
-# from align import align_centerlines
-from derivative_sign_segmentation import find_peaks_troughs, Feature
-from group_by_cell import load_dataset
-from scaled_parameters import get_scaled_parameters, \
-    REF_PIXEL_SIZE, REF_VERTI_SCALE
-from preprocess import evenly_spaced_resample, preprocess_centerline
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
 
-
-
-
+from peaks_troughs.group_by_cell import load_dataset
+from peaks_troughs.preprocess import evenly_spaced_resample
 
 
 def plot_single_centerline(xs, ys, peaks, troughs):
@@ -83,6 +77,7 @@ def kymograph(*cells, title=None):   #first cell is the mother, if several cells
     for cell in cells:
         for frame_data in cell:
             xs,ys=frame_data["xs"],frame_data["ys"]
+            print(frame_data["line"],'.....')
             cell_centerlines.append(np.vstack((xs,ys)))
             xs,ys=evenly_spaced_resample(xs,ys,step)
             cell_centerlines_renorm.append(np.vstack((xs,ys)))
@@ -109,7 +104,6 @@ def kymograph(*cells, title=None):   #first cell is the mother, if several cells
         zs_3d = np.zeros(shape, dtype=np.float64)
 
 
-        ax = plt.axes(projection='3d')
         for i, centerline in enumerate(cell_centerlines_renorm):
             xs = centerline[0,:]
             ys = centerline[1,:]

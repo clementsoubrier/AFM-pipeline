@@ -7,34 +7,26 @@ Created on Tue May  2 11:43:22 2023
 """
 
 #%%  Imports
-
+import os
+import sys
 import numpy as np
 from numba import njit
 from copy import deepcopy
 import tqdm
+from multiprocessing import Pool
 
 from scipy.signal import fftconvolve
 
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
+
+from scaled_parameters import get_scaled_parameters
 
 
 
-Directory=  "delta_parB/03-02-2015/" #the directory you chose to work on
 
 
-data_set=['WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/'] # 'delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",
-
-
-
-
-''' Parameters '''
-# max time (minutes) between two comparable frames
-depth_search=70 
-
-#fraction of the preserved area to consider child and parent relation for masks (should be less than 0.5 to take into account the division)
-surface_thresh= 0.34
-
-#fraction of the preserved area to consider child and parent relation for masks (fusioning of 2 masks after division)
-final_thresh= 0.75   #0.6
 
 
 
@@ -408,50 +400,78 @@ def update_longest_path(iteration,backwardlinks,value,path):
 #%% running the whole lineage tree algorithm    
 
 
-def Final_lineage_tree(direc,max_diff_time=depth_search,surfthresh=surface_thresh,finthres=final_thresh):
+def Final_lineage_tree(direc):
+
+    params=get_scaled_parameters(lineage_tree=True)
+    # max time (minutes) between two comparable frames
+    max_diff_time = params["max_diff_time"]
+
+   
+    surfthresh = params["child_div_thres"]
+
+    #fraction of the preserved area to consider child and parent relation for masks (fusioning of 2 masks after division)
+    finthres = params["final_thresh"] 
+
+
+    params = get_scaled_parameters(paths_and_names=True)
+
+    dicname = params["main_dict_name"]
+    listname = params["masks_list_name"]
+    linmatname = params['lineage_matrix_name']
+    boolmatname = params['bool_matrix_name']
+    data_direc = params["main_data_direc"]
+    linkmatname = params['link_matrix_name']
+
+
+    trans_vect_name = 'Trans_vect_mat.npy'
+
+    angle_mat_name = 'Angle_mat.npy'
     
-    dicname='Main_dictionnary.npz'
-
-    listname='masks_list.npz'
-    
-    linmatname='non_trig_Link_matrix.npy'
-
-    boolmatname="Bool_matrix.npy"
-
-    linkmatname='Link_matrix.npy'
-
-    data_direc='data/datasets/'
-    
-    masks_list=np.load(data_direc+direc+listname, allow_pickle=True)['arr_0']
+    masks_list = np.load(os.path.join(data_direc, direc, listname), allow_pickle=True)['arr_0']
     #print(masks_list)
-    main_dict=np.load(data_direc+direc+dicname, allow_pickle=True)['arr_0'].item()
+    main_dict=np.load(os.path.join(data_direc, direc, dicname), allow_pickle=True)['arr_0'].item()
     #print(main_dict)
-    print('trans_vector_matrix 1')
+    print(direc,'trans_vector_matrix 1')
     vector_matrix, angle_matrix=trans_vector_matrix(main_dict,max_diff_time) #translation vector and rotation angle between the different frames
-    print('lineage_matrix 2')
+    print(direc,'lineage_matrix 2')
     lin_mat=lineage_matrix(main_dict,masks_list,vector_matrix, angle_matrix,max_diff_time,surfthresh)
-    print('Link_matrix 3')
+    print(direc,'Link_matrix 3')
     Link_mat=clean_matrix(lin_mat,main_dict,masks_list,max_diff_time,finthres)
-    print('Bool_matrix  4')
+    print(direc,'Bool_matrix  4')
     Bool_mat=Bool_from_linkmatrix(Link_mat,max_diff_time)
-    print('saving 5')
-    np.save(data_direc+direc+boolmatname,Bool_mat)
-    np.save(data_direc+direc+linkmatname,Link_mat)
-    np.save(data_direc+direc+linmatname,lin_mat)
+    print(direc,'saving 5')
+    np.save(os.path.join(data_direc, direc, boolmatname), Bool_mat)
+    np.save(os.path.join(data_direc, direc, linkmatname), Link_mat)
+    np.save(os.path.join(data_direc, direc, linmatname), lin_mat)
+    np.save(os.path.join(data_direc, direc, trans_vect_name), vector_matrix)
+    np.save(os.path.join(data_direc, direc, angle_mat_name), angle_matrix)
+    
+
+
+    
+def main(Directory= "all"):
+    params = get_scaled_parameters(data_set=True)
+    if Directory in params.keys():
+        with Pool(processes=8) as pool:
+            for direc in pool.imap_unordered(Final_lineage_tree, params[Directory]):
+                pass
+    elif isinstance(Directory, list)  : 
+        with Pool(processes=8) as pool:
+            for direc in pool.imap_unordered(Final_lineage_tree, Directory):
+                pass
+    elif isinstance(Directory, str)  : 
+        raise NameError('This directory does not exist')
     
 #%% running main function   
 
 if __name__ == "__main__":
-    
 
-    
+    # Directory=  "delta_parB/03-02-2015"
+    # main(Directory)
 
-    Final_lineage_tree(Directory)
+    main()
     
     
-    # for direc in data_set:
-    #     print(direc)
-    #     Final_lineage_tree(direc)
 
 
 

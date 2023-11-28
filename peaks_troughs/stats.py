@@ -1,11 +1,17 @@
 import glob
 import os
+import sys
 from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
-from derivative_sign_segmentation import find_peaks_troughs
-from group_by_cell import load_dataset
+
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
+
+from peaks_troughs.derivative_sign_segmentation import find_peaks_troughs
+from peaks_troughs.group_by_cell import load_dataset
 from scaled_parameters import get_scaled_parameters
 
 

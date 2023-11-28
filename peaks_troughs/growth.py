@@ -1,14 +1,17 @@
 import itertools
 import os
+import sys
 import statistics
 
 import matplotlib.pyplot as plt
 import numpy as np
 import tqdm
-try:
-    from group_by_cell import Orientation, load_cell
-except:
-    from peaks_troughs.group_by_cell import Orientation, load_cell
+
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
+
+from peaks_troughs.group_by_cell import Orientation, load_cell
 
 
 def extract_growth(roi):

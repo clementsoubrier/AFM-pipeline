@@ -2,6 +2,7 @@ import glob
 import math
 import operator
 import os
+import sys
 import statistics
 from enum import IntEnum
 from shutil import rmtree
@@ -9,16 +10,16 @@ from shutil import rmtree
 import numpy as np
 import tqdm
 
-try:
-    from align import align_with_reference
-    from derivative_sign_segmentation import find_peaks_troughs
-    from preprocess import keep_centerline
-    from scaled_parameters import get_scaled_parameters
-except:
-    from peaks_troughs.align import align_with_reference
-    from peaks_troughs.derivative_sign_segmentation import find_peaks_troughs
-    from peaks_troughs.preprocess import keep_centerline
-    from peaks_troughs.scaled_parameters import get_scaled_parameters
+
+
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
+
+from peaks_troughs.align import align_with_reference
+from peaks_troughs.derivative_sign_segmentation import find_peaks_troughs
+from peaks_troughs.preprocess import keep_centerline
+from scaled_parameters import get_scaled_parameters
 
 datasets_missing_masks_quality = []
 
@@ -209,7 +210,7 @@ def topological_sort(roi_dict):
     return order
 
 
-def use_same_direction(reference, line, xs, ys, xs_bwd, ys_bwd):
+def use_same_direction(reference, line, xs, ys, xs_bwd, ys_bwd): #add angle
     diffs = reference[:, np.newaxis] - line[np.newaxis]
     dists_sq = np.sum(diffs**2, axis=-1)
     if len(line) <= len(reference):
@@ -226,7 +227,7 @@ def use_same_direction(reference, line, xs, ys, xs_bwd, ys_bwd):
     return line, xs, ys, xs_bwd, ys_bwd
 
 
-def determine_orientation(reference, line):
+def determine_orientation(reference, line):  
     if reference is None:
         return Orientation.UNKNOWN
     dist_start_start = math.dist(reference[0], line[0])
@@ -249,7 +250,7 @@ def extract_height_profile(centerline, img, pixel_size):
     return xs, ys
 
 
-def save_mask(
+def save_mask(          #add centerline dir
     img_dict,
     mask_id,
     reference_line,
@@ -272,7 +273,7 @@ def save_mask(
         orientation = determine_orientation(reference_line, line)
     timestamp = img_dict["time"]
     pixel_size = img_dict["resolution"]
-    params = get_scaled_parameters(pixel_size, filtering=True)
+    params = get_scaled_parameters(pixel_size=pixel_size, pnt_preprocessing=True, pnt_filtering=True)
     no_defect = keep_centerline(xs, ys, pixel_size, **params)
     if not no_defect and xs_bwd is not None:
         no_defect_bwd = keep_centerline(xs_bwd, ys_bwd, pixel_size, **params)
@@ -281,11 +282,11 @@ def save_mask(
             ys = ys_bwd
             no_defect = no_defect_bwd
     no_defect = no_defect and quality
-    params = get_scaled_parameters(pixel_size, aligning=True)
+    params = get_scaled_parameters(pixel_size=pixel_size, pnt_preprocessing=True, pnt_aligning=True)
     xs, ys = align_with_reference(
         xs, ys, reference_xs, reference_ys, params, pixel_size
     )
-    params = get_scaled_parameters(pixel_size, preprocessing=False, peaks_troughs=True)
+    params = get_scaled_parameters(pixel_size=pixel_size, pnt_peaks_troughs=True)
     _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
     mask_num = len(os.listdir(roi_dirname))
     filename = f"{mask_num:03d}.npz"
@@ -386,9 +387,9 @@ def save_dataset(dataset, log_progress):
         print("\n\n")
 
 
-def main():
+def main(datasets=None):
     log_progress = True
-    datasets = None
+    
     dataset =  os.path.join("WT_mc2_55", "30-03-2015")   # None  
     if dataset is None:
         if datasets is None:

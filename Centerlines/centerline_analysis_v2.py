@@ -10,83 +10,109 @@ Created on Tue Apr  4 09:22:13 2023
 
 #import matplotlib.pyplot as plt
 import os
+import sys
 import numpy as np
-from numba import njit
-import cv2
+from numba import njit, prange
 from numba.typed import List
 from tqdm import trange
+from multiprocessing import Pool
+from functools import partial
 
 
-data_set=['delta_lamA_03-08-2018/','delta_LTD6_04-06-2017/',"delta_parB/03-02-2015/","delta_parB/15-11-2014/","delta_parB/18-01-2015/","delta_parB/18-11-2014/","delta_ripA/14-10-2016/","WT_mc2_55/06-10-2015/","WT_mc2_55/30-03-2015/","WT_mc2_55/03-09-2014/",'WT_INH_700min_2014/','WT_CCCP_irrigation_2016/','WT_filamentation_cipro_2015/']
+package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
+if not package_path in sys.path:
+    sys.path.append(package_path)
+
+from scaled_parameters import get_scaled_parameters
+
+
 
 
 '''finding the minimal distance between 2 centerline, within a certain window of horizontal variation (in micrometers). size1, size2 physical dimension of a pixel, epsilon,ratio,max_iter are parameters'''
 
-def distancematrix(dataset,datadirec,dicname,ROIdicname,masklistname,min_size,window,epsilon,ratio,max_iter=None):
+def distancematrix(dataset,datadirec,dicname,ROIdicname,masklistname,min_size,window,epsilon,ratio,comp_ratio,max_iter):
     center_list,height_list,dist_list,size_list=count_and_order_centerline(dataset,datadirec,dicname,ROIdicname,masklistname,min_size)
-    dist_matrix,inversion_matrix,delta_matrix=Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,max_iter)
+    print (type(size_list),type(dist_list),type(height_list))
+    dist_matrix,inversion_matrix,delta_matrix=Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,comp_ratio,max_iter)
             
     return center_list,dist_matrix,inversion_matrix,delta_matrix
 
 
 
-@njit
-def Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,max_iter):
+@njit(parallel=True)
+def Matrix_construction(height_list,dist_list,size_list,window,epsilon,ratio,comp_ratio,max_iter):
     dim_matrix=len(size_list)
     dist_matrix=np.zeros((dim_matrix,dim_matrix))
     inversion_matrix=np.zeros((dim_matrix,dim_matrix),dtype=np.bool_)
     delta_matrix=np.zeros((dim_matrix,dim_matrix),dtype=np.int32)
-    for i in range(dim_matrix):
+    for i in prange(dim_matrix):
         heighti,disti,sizei=height_list[i],dist_list[i],size_list[i]
-        for j in range(i+1,dim_matrix):
+        for j in prange(i+1,dim_matrix):
             heightj,distj,sizej=height_list[j],dist_list[j],size_list[j]
-            (delta,res,inverted)=comparison_centerline(heighti,heightj,disti,distj,sizei,sizej,window,epsilon,ratio,max_iter=max_iter)
+            (delta,res,inverted)=comparison_centerline(heighti,heightj,disti,distj,sizei,sizej,window,epsilon,ratio,comp_ratio,max_iter)
             dist_matrix[i,j]=res
             dist_matrix[j,i]=res
             inversion_matrix[i,j]=inverted
             inversion_matrix[j,i]=inverted
             delta_matrix[i,j]=delta
-            (delta,res,inverted)=comparison_centerline(heightj,heighti,distj,disti,sizej,sizei,window,epsilon,ratio,max_iter=max_iter)
+            (delta,res,inverted)=comparison_centerline(heightj,heighti,distj,disti,sizej,sizei,window,epsilon,ratio,comp_ratio,max_iter)
             delta_matrix[j,i]=delta
     return dist_matrix,inversion_matrix,delta_matrix
 
 def count_and_order_centerline(dataset,datadirec,dicname,ROIdicname,masklistname,min_size):
     center_list=[]
-    height_list=List()
-    dist_list=List()
-    size_list=List()
-    count=0
-    for i in range(len(dataset)):
-        data=dataset[i]
-        print(data)
-        dic=np.load(datadirec+data+dicname, allow_pickle=True)['arr_0'].item()
-        ROI_dic=np.load(datadirec+data+ROIdicname, allow_pickle=True)['arr_0'].item()
-        mask_list=np.load(datadirec+data+masklistname, allow_pickle=True)['arr_0']
-        #taking the list of masks for a better tracking, may insert other type of conditionnal event on the masks
-        ROI_list=list(ROI_dic.keys())
-        for j in trange(len(ROI_list)):
-            ROI=ROI_list[j]
-            if len(ROI_dic[ROI]['Mask IDs'])>=5:
-                for elem in range(len(ROI_dic[ROI]['masks_quality'])):
-                    if ROI_dic[ROI]['masks_quality'][elem]:
-                        maskid=ROI_dic[ROI]['Mask IDs'][elem]
-                        fichier,masknumber=mask_list[maskid][2:]
-                        size=dic[fichier]['resolution']
-                        line=dic[fichier]['centerlines'][masknumber-1]
-                        if len(line)*size>min_size:
-                            
-                            img=np.load(dic[fichier]['adress'])['Height_fwd']
-                            line_data=dist_centerline(line,img)
-                            
-                            if not line_data[2]:
-                                center_list.append([count,data,maskid,ROI])
-                                height_list.append(line_data[0])
-                                dist_list.append(line_data[1])
-                                size_list.append(size)
-                                count+=1
+    height_list=[]
+    dist_list=[]
+    size_list=[]
+
+    func=partial(count_and_order_centerline_one_data,datadirec=datadirec,dicname=dicname,ROIdicname=ROIdicname,masklistname=masklistname,min_size=min_size)
+    with Pool(processes=8) as pool:
+        for res in pool.imap_unordered(func,dataset):
+            center_list.extend(res[0])
+            height_list.extend(res[1])
+            dist_list.extend(res[2])
+            size_list.extend(res[3])
+ 
+    new_height_list=List()
+    new_dist_list=List()
+    new_size_list=List()
+    [new_height_list.append(x) for x in height_list]
+    [new_dist_list.append(x) for x in dist_list]
+    [new_size_list.append(x) for x in size_list]
+
+    return center_list, new_height_list, new_dist_list, new_size_list
+
+def count_and_order_centerline_one_data(data,datadirec,dicname,ROIdicname,masklistname,min_size):
+    center_list=[]
+    height_list=[]
+    dist_list=[]
+    size_list=[]
+    dic=np.load(os.path.join(datadirec, data, dicname), allow_pickle=True)['arr_0'].item()
+    ROI_dic=np.load(os.path.join(datadirec, data, ROIdicname), allow_pickle=True)['arr_0'].item()
+    mask_list=np.load(os.path.join(datadirec, data, masklistname), allow_pickle=True)['arr_0']
+    #taking the list of masks for a better tracking, may insert other type of conditionnal event on the masks
+    ROI_list=list(ROI_dic.keys())
+    for j in trange(len(ROI_list)):
+        ROI=ROI_list[j]
+        if len(ROI_dic[ROI]['Mask IDs'])>=5:
+            for elem in range(len(ROI_dic[ROI]['masks_quality'])):
+                if ROI_dic[ROI]['masks_quality'][elem]:
+                    maskid=ROI_dic[ROI]['Mask IDs'][elem]
+                    fichier,masknumber=mask_list[maskid][2:]
+                    size=dic[fichier]['resolution']
+                    line=dic[fichier]['centerlines'][masknumber-1]
+                    if len(line)*size>min_size:
+                        
+                        img=np.load(dic[fichier]['adress'])['Height_fwd']
+                        line_data=dist_centerline(line,img)
+                        
+                        if not line_data[2]:
+                            center_list.append([data,maskid,ROI])
+                            height_list.append(line_data[0])
+                            dist_list.append(line_data[1])
+                            size_list.append(size)
     return center_list, height_list, dist_list, size_list
-
-
+    
 @njit 
 def dist_centerline(center1,im1):
     n1=len(center1)
@@ -104,7 +130,7 @@ def dist_centerline(center1,im1):
 
 
 @njit               #The result is given by (delta,res,inverted): res the minimal distance, inverted if the second centerline has to be flipped, delta the translation of the beginning of centerline 2 to do (after inversion)
-def comparison_centerline(height1,height2,dist1,dist2,size1,size2,window,epsilon,ratio,max_iter):
+def comparison_centerline(height1,height2,dist1,dist2,size1,size2,window,epsilon,ratio,comp_ratio,max_iter):
     
     (phy_height1,phy_height2,pix_len1,pix_len2)=scaling_centerlines(height1,height2,dist1,dist2,size1,size2)
     
@@ -114,15 +140,15 @@ def comparison_centerline(height1,height2,dist1,dist2,size1,size2,window,epsilon
         pixel_drift=int(window/size)
         if pixel_drift>pix_len2*ratio:
             pixel_drift=int(pix_len2*ratio)
-        pixel_range=np.array([-pixel_drift,pixel_drift+pix_len1-(pix_len2*8//10+1)])
-        return optimal_trans_center(pix_len1,phy_height1,pix_len2,phy_height2,pixel_range,epsilon,max_iter)
+        pixel_range=np.array([-pixel_drift,pixel_drift+pix_len1-(pix_len2*comp_ratio[0]//comp_ratio[1]+1)])
+        return optimal_trans_center(pix_len1,phy_height1,pix_len2,phy_height2,pixel_range,size*epsilon,comp_ratio,max_iter)
     
     else:
         pixel_drift=int(window/size)
         if pixel_drift>pix_len1*ratio:
             pixel_drift=int(pix_len1*ratio)
-        pixel_range=np.array([-pixel_drift,pixel_drift+pix_len2-(pix_len1*8//10+1)])
-        (delta,res,inverted)=optimal_trans_center(pix_len2,phy_height2,pix_len1,phy_height1,pixel_range,epsilon,max_iter)
+        pixel_range=np.array([-pixel_drift,pixel_drift+pix_len2-(pix_len1*comp_ratio[0]//comp_ratio[1]+1)])
+        (delta,res,inverted)=optimal_trans_center(pix_len2,phy_height2,pix_len1,phy_height1,pixel_range,size*epsilon,comp_ratio,max_iter)
         if not inverted:
             return (-delta,res,inverted)
         else :
@@ -167,10 +193,10 @@ def norm(line):
 
 
 @njit   #first element is the longest return the drift, the result, if the second line has to be inverted
-def optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=False):
+def optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,comp_ratio,max_iter,signed=False):
     if not signed:
-        (delta_plus,res_plus,plus)=optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=True)
-        (delta_minus,res_minus,minus)=optimal_trans_center(n1,fun1,n2,fun2[::-1],pixel_range,epsilon,max_iter,signed=True)
+        (delta_plus,res_plus,_)=optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,comp_ratio,max_iter,signed=True)
+        (delta_minus,res_minus,_)=optimal_trans_center(n1,fun1,n2,fun2[::-1],pixel_range,epsilon,comp_ratio,max_iter,signed=True)
         if res_plus<=res_minus:
             return (delta_plus,res_plus,False)
         else :
@@ -184,10 +210,10 @@ def optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=Fal
             
         
         delta=pixel_range[0]
-        res=L2_score(n1,fun1,n2,fun2,pixel_range[0],epsilon)
+        res=L2_score(n1,fun1,n2,fun2,pixel_range[0],comp_ratio,epsilon)
         
         for i in sub_range:
-            score=L2_score(n1,fun1,n2,fun2,int(i),epsilon)
+            score=L2_score(n1,fun1,n2,fun2,int(i),comp_ratio,epsilon)
             # if i>=0:
             #     score=L2_score(n1,fun1,n2,fun2,int(i),epsilon)
             # else :
@@ -214,8 +240,8 @@ def optimal_trans_center(n1,fun1,n2,fun2,pixel_range,epsilon,max_iter,signed=Fal
 
 @njit   #first element is the longest
 
-def L2_score(n1,fun1,n2,fun2,delta,epsilon):
-        newfun2=fun2[n2//10:9*n2//10]
+def L2_score(n1, fun1, n2, fun2, delta, comp_ratio, epsilon):
+        newfun2=fun2[(comp_ratio[1]-comp_ratio[0])//2*n2//comp_ratio[1]:(comp_ratio[1]+comp_ratio[0])//2*n2//comp_ratio[1]]
         newn2=len(newfun2)
         if delta<0:
             domain=newn2+delta
@@ -235,47 +261,67 @@ def L2_score(n1,fun1,n2,fun2,delta,epsilon):
 
 
 def run_centerline_analysis(dataset):
-
-    dic_name='Main_dictionnary.npz'
-
-    ROI_dic_name='ROI_dict.npz'
-
-    mask_list_name='masks_list.npz'
-
-    data_direc='data/datasets/'
-
-    epsilon_penal=0.1
-
-    cross_ratio=0.1
-
-    min_centerline_len=1.5 #micro meters
-
-    comparision_window=0.5 #micro meters
-
-    #maximal number of iteration
-    max_iter_opti=50
     
-    dir_cent='data/results/centerline_analysis_result/'
+    params = get_scaled_parameters(paths_and_names=True,mds=True)
+    dic_name = params["main_dict_name"]
+    mask_list_name = params["masks_list_name"]
+    ROI_dic_name = params["roi_dict_name"]
+    data_direc = params["main_data_direc"]
+    dir_cent = params["dir_res_centerlines"] 
+
+    epsilon_penal = params['translation_penalty']
+    cross_ratio = params['relative_translation_ratio']
+    comp_ratio = params['comparision_ratio']
+    if comp_ratio[0]>comp_ratio[1]:
+        comp_ratio=comp_ratio[::-1]
+    if comp_ratio[0]%2==1 or comp_ratio[1]%2==1:
+        comp_ratio= 2*comp_ratio
+    min_centerline_len = params['min_centerline_len']
+    comparision_window = params['mds_max_trans']
+    max_iter_opti = params['mds_max_iter']
+    
 
     if not os.path.exists(dir_cent):
         os.makedirs(dir_cent)
         
 
-    (A,B,C,D)=distancematrix(dataset,data_direc,dic_name,ROI_dic_name,mask_list_name,min_centerline_len,comparision_window,epsilon_penal,cross_ratio,max_iter=None)
+    (A,B,C,D)=distancematrix(dataset,
+                             data_direc,
+                             dic_name,
+                             ROI_dic_name,
+                             mask_list_name,
+                             min_centerline_len,
+                             comparision_window,
+                             epsilon_penal,
+                             cross_ratio,
+                             comp_ratio,
+                             max_iter_opti)
 
-    np.save(dir_cent+'centerline_list_all',A)
-    np.save(dir_cent+'distance_matrix_all',B)
-    np.save(dir_cent+'inversion_matrix_all',C)
-    np.save(dir_cent+'delta_matrix_all',D)
+    
+    np.save(os.path.join(dir_cent, params['centerline_list']),A)
+    np.save(os.path.join(dir_cent, params['distance_matrix']),B)
+    np.save(os.path.join(dir_cent, params['inversion_matrix']),C)
+    np.save(os.path.join(dir_cent, params['delta_matrix']),D)
 
 
+def main(Directory= "all"):
+    params = get_scaled_parameters(data_set=True)
+    if Directory in params.keys():
+        run_centerline_analysis(params[Directory])
+    elif isinstance(Directory, list)  : 
+        run_centerline_analysis(Directory)
+    elif isinstance(Directory, str)  : 
+        raise NameError('This directory does not exist')
+    
+    
 
+    
 
 
 
 if __name__ == "__main__":
     
-    run_centerline_analysis(data_set)
+    main()
     
   
     

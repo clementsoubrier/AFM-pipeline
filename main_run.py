@@ -15,12 +15,13 @@ from ROI_lineage import plot_final_lineage_tree
 from ROI_lineage import Images_to_video
 from peaks_troughs import group_by_cell
 
+
 def run_one_direc(direc):
     processing.run_one_dataset_logs_only(direc)
     final_graph.Final_lineage_tree(direc)
     plot_final_lineage_tree.run_whole_lineage_tree(direc,False)
     Images_to_video.create_video(direc)
-    group_by_cell.main(direc)
+    group_by_cell.compute_dataset(direc)
 
 
 

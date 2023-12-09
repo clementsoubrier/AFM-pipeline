@@ -9,7 +9,7 @@ package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/a
 if not package_path in sys.path:
     sys.path.append(package_path)
 
-from peaks_troughs.group_by_cell import load_dataset
+from peaks_troughs.group_by_cell import load_dataset, get_peak_troughs_lineage_lists
 from peaks_troughs.preprocess import evenly_spaced_resample
 
 
@@ -25,14 +25,17 @@ def plot_single_centerline(xs, ys, peaks, troughs):
     plt.show()
 
 
-def plot_cell_centerlines(*cells, title=None):   #first cell is the mother, if several cells, a tuple of the cells
+def plot_cell_centerlines(*cells_and_id, dataset=''):   #first cell is the mother, each argument is a tuple (cell, id)
+    
     plt.figure()
     cell_centerlines=[]
     cell_peaks=[]
     cell_troughs=[]
     cell_timestamps=[]
-    base_time=cells[0][0]["timestamp"]
-    for cell in cells:
+    base_time=cells_and_id[0][0][0]["timestamp"]
+    for cell_id in cells_and_id:
+        cell = cell_id[0]
+        roi_id = cell_id[1]
         for frame_data in cell:
             cell_centerlines.append(np.vstack((frame_data["xs"],frame_data["ys"])))
             cell_peaks.append(frame_data["peaks"])
@@ -53,31 +56,44 @@ def plot_cell_centerlines(*cells, title=None):   #first cell is the mother, if s
             if troughs.size:
                 troughs_x.extend(xs[troughs])
                 troughs_y.extend(ys[troughs])
-            plt.plot(xs, ys)
+            plt.plot(xs, ys, color='k')
         plt.scatter(peaks_x, peaks_y, c="red")
         plt.scatter(troughs_x, troughs_y, c="green")
-    if title is not None:
-        plt.title(str(title))
+        
+        pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
+        for key in pnt_ROI :
+            coord_x = []
+            coord_y = []
+            for elem in pnt_ROI[key]:
+                coord_x.append(pnt_list[elem,3])
+                coord_y.append(pnt_list[elem,4] + 2*(pnt_list[elem,5]-base_time))
+            plt.plot(coord_x, coord_y, color = 'b')
+        
+        
+    
+    plt.title(roi_id)
     plt.show()
 
-def kymograph(*cells, title=None):   #first cell is the mother, if several cells, a tuple of the cells
+def kymograph(*cells_and_id,  dataset=''):   #first cell is the mother, each argument is a tuple (cell, id)
     ax = plt.axes(projection='3d')
     cell_centerlines=[]
     cell_centerlines_renorm=[]
     cell_peaks=[]
     cell_troughs=[]
     cell_timestamps=[]
-    base_time=cells[0][0]["timestamp"]
+    base_time=cells_and_id[0][0][0]["timestamp"]
     pixelsize=[]
-    for cell in cells:
+    for cell_id in cells_and_id:
+        cell = cell_id[0]
         for frame_data in cell:
             pixelsize.append((frame_data["xs"][-1]-frame_data["xs"][0])/(len(frame_data["xs"])-1))
     
     step=min(pixelsize)
-    for cell in cells:
+    for cell_id in cells_and_id:
+        cell = cell_id[0]
+        roi_id = cell_id[1]
         for frame_data in cell:
             xs,ys=frame_data["xs"],frame_data["ys"]
-            print(frame_data["line"],'.....')
             cell_centerlines.append(np.vstack((xs,ys)))
             xs,ys=evenly_spaced_resample(xs,ys,step)
             cell_centerlines_renorm.append(np.vstack((xs,ys)))
@@ -107,10 +123,6 @@ def kymograph(*cells, title=None):   #first cell is the mother, if several cells
         for i, centerline in enumerate(cell_centerlines_renorm):
             xs = centerline[0,:]
             ys = centerline[1,:]
-            if xs[0]>xs[-1:]:
-                print('switch')
-                xs = centerline[0,::-1]
-                ys = centerline[1,::-1]
             preval=round((xs[0]-xs_min)/step)
             postval=preval+len(xs)
             xs_3d[i, :preval] = xs[0]
@@ -141,15 +153,27 @@ def kymograph(*cells, title=None):   #first cell is the mother, if several cells
             ax.plot3D(xs, zs, ys,c="k")
         ax.scatter(peaks_x,  peaks_z, peaks_y,c="red")
         ax.scatter(troughs_x, troughs_z, troughs_y, c="green")
-    if title is not None:
-        plt.title(str(title))
+        
+        
+        pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
+        for key in pnt_ROI :
+            coord_x = []
+            coord_y = []
+            coord_z = []
+            for elem in pnt_ROI[key]:
+                coord_x.append(pnt_list[elem,3])
+                coord_y.append(pnt_list[elem,4] )
+                coord_z.append(pnt_list[elem,5]-base_time)
+            ax.plot(coord_x, coord_z, coord_y, color = 'b')
+    plt.title(roi_id)
     plt.show()
 
 def main():
     dataset = os.path.join("WT_mc2_55", "30-03-2015")
-    for id, cell in load_dataset(dataset, False):
-        kymograph(cell, title=id)
-        # plot_cell_centerlines(cell, title=id)
+    for roi_id, cell in load_dataset(dataset, False):
+        if len(cell)>1:
+            kymograph((cell, roi_id), dataset=dataset)
+        # plot_cell_centerlines((cell, roi_id), dataset=dataset)
     plt.show()
 
 

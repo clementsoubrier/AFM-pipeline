@@ -50,6 +50,9 @@ FINAL_DATA = "final_data"                       # sub directory with the final i
 RESULT_DIR = os.path.join('data', 'results')    # result directory (stats, videos, images)
 DIR_CENT = os.path.join(RESULT_DIR,'centerline_analysis_result') # result directory MDS
 DIR_PLOT_STAT = os.path.join(RESULT_DIR,'plot_stat') # result directory stats
+DATA_CELL = os.path.join('data', 'cells')       # directory of the ROIs
+LINE_DIR = "lines"                              # data of the ROIs (centerlines, peaks and troughs)
+FEATURES_TRACKING = "features_tracking"         # peaks and troughs tracking directory
 
 MAIN_DICTIONNARY_NAME = 'main_dictionnary.npz'
 MASKS_LIST_NAME = 'masks_list.npz'
@@ -65,6 +68,8 @@ DISTANCE_MATRIX_MDS = 'distance_matrix_mds.npy'
 INVERSION_MATRIX_MDS = 'inversion_matrix_mds.npy'
 DELTA_MATRIX_MDS = 'delta_matrix_mds.npy'
 
+PNT_LIST_NAME = 'peaks_troughs_list.npz'
+PNT_ROI_NAME = 'peaks_troughs_ROI_list.npz'
 '''
 Processing 
 '''
@@ -150,6 +155,12 @@ if MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE>1:
     raise ValueError("MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE<=1 is required") 
 QUANTILE_SIZE = 0.3 # or 0.3
 
+# pnt_tracking      # tracking of the suface features (peaks and troughs over generations)
+MAX_TIME = 70       #mn  max time between 2 frames to compare them
+FIRST_MAX_XDRIFT = 0.5      #mu m  max x coordinate difference between 2 frames to compare them
+FINAL_MAX_XDRIFT = 0.8      #mu m  max x coordinate difference between 2 frames to compare them
+MAX_YDRIFT = 500    #NM  max y coordinate difference between 2 frames to compare them
+
 
 
 
@@ -167,6 +178,7 @@ def get_scaled_parameters(
     pnt_peaks_troughs=False,
     pnt_filtering=False,
     pnt_aligning=False,
+    pnt_tracking=False
 ):
     params = {}
 
@@ -177,6 +189,9 @@ def get_scaled_parameters(
         params["results_direc"] = RESULT_DIR
         params["dir_res_centerlines"] = DIR_CENT
         params["dir_plot_stat"] = DIR_PLOT_STAT
+        params["dir_cells"] = DATA_CELL    
+        params["dir_cells_data"] = LINE_DIR 
+        params["dir_cells_list"] = FEATURES_TRACKING 
 
         params["main_dict_name"] = MAIN_DICTIONNARY_NAME
         params["masks_list_name"] = MASKS_LIST_NAME
@@ -191,6 +206,9 @@ def get_scaled_parameters(
         params['distance_matrix'] = DISTANCE_MATRIX_MDS
         params['inversion_matrix'] = INVERSION_MATRIX_MDS
         params['delta_matrix'] = DELTA_MATRIX_MDS
+
+        params['pnt_list_name'] = PNT_LIST_NAME
+        params['pnt_ROI_name'] = PNT_ROI_NAME
 
     if data_set:
         for data in DATA_SET:
@@ -265,6 +283,12 @@ def get_scaled_parameters(
         params["window_relative_size"] = WINDOW_RELATIVE_SIZE
         params["quantile_size"] = QUANTILE_SIZE
         params["smooth_std"] = SMOOTH_KERNEL_STD / pixel_size
+    
+    if pnt_tracking:
+        params["max_time"] = MAX_TIME
+        params["first_max_xdrift"] = FIRST_MAX_XDRIFT 
+        params["final_max_xdrift"] = FINAL_MAX_XDRIFT 
+        params["max_ydrift"] = MAX_YDRIFT
 
 
     return params

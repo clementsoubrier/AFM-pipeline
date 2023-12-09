@@ -6,6 +6,7 @@ import sys
 import statistics
 from enum import IntEnum
 from shutil import rmtree
+from multiprocessing import Pool
 
 import numpy as np
 import tqdm
@@ -20,6 +21,8 @@ from peaks_troughs.align import align_with_reference
 from peaks_troughs.derivative_sign_segmentation import find_peaks_troughs
 from peaks_troughs.preprocess import keep_centerline
 from scaled_parameters import get_scaled_parameters
+from ROI_lineage.final_graph import rotation_line
+from peaks_troughs.suface_feature_tracking import peak_troughs_lineage
 
 datasets_missing_masks_quality = []
 
@@ -44,7 +47,7 @@ def load_data(dataset, log_progress):
     path = os.path.join( "data", "datasets", dataset)
     if log_progress:
         print("Loading main dictionary.", end="")
-    main_dict_path = os.path.join(path, "Main_dictionnary.npz")
+    main_dict_path = os.path.join(path, "main_dictionnary.npz")
     main_dict = np.load(main_dict_path, allow_pickle=True)["arr_0"].item()
     if log_progress:
         print(" Done.")
@@ -119,7 +122,7 @@ def load_cell(
     cut_before_700=False,
     cut_after_700=False,
 ):
-    roi_dir = get_roi_dir(cell_name, dataset)
+    roi_dir = os.path.join(get_roi_dir(cell_name, dataset),"lines")
     centerlines = os.listdir(roi_dir)
     roi = []
     for filename in centerlines:
@@ -133,7 +136,12 @@ def load_cell(
             no_defect = centerline["no_defect"].item()
             peaks = centerline["peaks"]
             troughs = centerline["troughs"]
+            peaks_index = centerline['peaks_index']
+            troughs_index = centerline['troughs_index']
+            peaks_ROI = centerline["peaks_ROI"]
+            troughs_ROI = centerline["troughs_ROI"]
             frame_data = {
+                "filename" : filename,
                 "line": line,
                 "xs": xs,
                 "ys": ys,
@@ -142,6 +150,11 @@ def load_cell(
                 "no_defect": no_defect,
                 "peaks": peaks,
                 "troughs": troughs,
+                "peaks_index": peaks_index,
+                "troughs_index": troughs_index,
+                "peaks_ROI": peaks_ROI,
+                "troughs_ROI": troughs_ROI
+                
             }
         if cut_before_700 and timestamp >= 700:
             continue
@@ -171,7 +184,7 @@ def _load_dataset(dataset, progress_bar, return_defects):
         directories = tqdm.tqdm(directories, desc=dataset)
     for roi_dir in directories:
         roi = load_cell(roi_dir, dataset, return_defects, cut_before_700, cut_after_700)
-        roi_id = int(roi_dir.split("ROI ")[-1])
+        roi_id =  roi_dir #int(roi_dir.split("ROI ")[-1])
         if roi:
             yield roi_id, roi
 
@@ -210,7 +223,15 @@ def topological_sort(roi_dict):
     return order
 
 
-def use_same_direction(reference, line, xs, ys, xs_bwd, ys_bwd): #add angle
+def use_same_direction(reference, line, reference_angle, angle, xs, ys, xs_bwd, ys_bwd): #add angle
+    mean_ref= np.average(reference, axis=0)
+    mean= np.average(line, axis=0)
+    if reference_angle != angle:
+        reference = rotation_line(angle - reference_angle, reference, mean_ref)
+        
+    line = line - mean
+    reference = reference - mean_ref
+    
     diffs = reference[:, np.newaxis] - line[np.newaxis]
     dists_sq = np.sum(diffs**2, axis=-1)
     if len(line) <= len(reference):
@@ -250,24 +271,26 @@ def extract_height_profile(centerline, img, pixel_size):
     return xs, ys
 
 
-def save_mask(          #add centerline dir
+def save_mask(          
     img_dict,
     mask_id,
     reference_line,
     reference_xs,
     reference_ys,
+    reference_angle,
     orientation,
     quality,
     roi_dirname,
 ):
     line = img_dict["centerlines"][mask_id]
+    angle=img_dict['angle']
     xs, ys = img_dict["height_profiles_fwd"][mask_id]
     xs_bwd, ys_bwd = img_dict["height_profiles_bwd"][mask_id]
     if not line.size:
-        return reference_line, reference_xs, reference_ys, orientation
+        return reference_line, reference_xs, reference_ys, reference_angle, orientation
     if reference_line is not None:
         line, xs, ys, xs_bwd, ys_bwd = use_same_direction(
-            reference_line, line, xs, ys, xs_bwd, ys_bwd
+            reference_line, line, reference_angle, angle, xs, ys, xs_bwd, ys_bwd
         )
     if orientation is None:
         orientation = determine_orientation(reference_line, line)
@@ -290,7 +313,7 @@ def save_mask(          #add centerline dir
     _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
     mask_num = len(os.listdir(roi_dirname))
     filename = f"{mask_num:03d}.npz"
-    path = os.path.join(roi_dirname, filename)
+    path = os.path.join(roi_dirname,filename)
     np.savez(
         path,
         line=line,
@@ -301,6 +324,10 @@ def save_mask(          #add centerline dir
         orientation=orientation.value,
         peaks=peaks,
         troughs=troughs,
+        troughs_index=np.array([]),
+        peaks_index=np.array([]),
+        troughs_ROI=np.array([]),
+        peaks_ROI=np.array([])
     )
     length_current = xs[-1] - xs[0]
     if reference_xs is None:
@@ -311,8 +338,8 @@ def save_mask(          #add centerline dir
         len(line) >= 10
         and (reference_line is None or length_current >= length_reference)
     ):
-        return line, xs, ys, orientation
-    return reference_line, reference_xs, reference_ys, orientation
+        return line, xs, ys, angle, orientation
+    return reference_line, reference_xs, reference_ys, reference_angle, orientation
 
 
 def save_roi(
@@ -320,6 +347,7 @@ def save_roi(
     reference_line,
     reference_xs,
     reference_ys,
+    reference_angle,
     masks_list,
     main_dict,
     roi_dirname,
@@ -344,20 +372,21 @@ def save_roi(
     for mask, quality in zip(masks, masks_quality, strict=True):
         _, _, frame, mask_label = masks_list[mask]
         img_dict = main_dict[frame]
-        reference_line, reference_xs, reference_ys, orientation = save_mask(
+        reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
             img_dict,
             mask_label - 1,
             reference_line,
             reference_xs,
             reference_ys,
+            reference_angle,
             orientation,
             quality,
             roi_dirname,
         )
-    return (reference_line, reference_xs, reference_ys), missing_masks_quality
+    return (reference_line, reference_xs, reference_ys, reference_angle), missing_masks_quality
 
 
-def save_dataset(dataset, log_progress):
+def save_dataset(dataset, log_progress=True):
     if os.path.exists(os.path.join( "data", "cells", dataset,'')):
         rmtree(os.path.join( "data", "cells", dataset,''))
     dataset_missing_masks_quality = False
@@ -370,8 +399,8 @@ def save_dataset(dataset, log_progress):
     references = {}
     for roi_name in roi_names:
         roi = roi_dict[roi_name]
-        roi_dir = os.path.join( "data", "cells", dataset, roi_name)
-        reference = references.pop(roi_name, (None, None, None))
+        roi_dir = os.path.join( "data", "cells", dataset, roi_name, "lines")
+        reference = references.pop(roi_name, (None, None, None, None))
         reference, missing_masks_quality = save_roi(
             roi, *reference, masks_list, main_dict, roi_dir
         )
@@ -387,18 +416,41 @@ def save_dataset(dataset, log_progress):
         print("\n\n")
 
 
-def main(datasets=None):
-    log_progress = True
-    
-    dataset =  os.path.join("WT_mc2_55", "30-03-2015")   # None  
-    if dataset is None:
-        if datasets is None:
-            datasets = find_all_datasets()
-    else:
-        datasets = [dataset]
 
-    for dataset in datasets:
-        save_dataset(dataset, log_progress)
+def get_peak_troughs_lineage_lists(dataset, roi_id):
+    
+    params=get_scaled_parameters(paths_and_names=True)
+    direct = os.path.join(params["dir_cells"], dataset, roi_id, params["dir_cells_list"])
+    pnt_list_name = os.path.join(direct, params['pnt_list_name'])
+    pnt_ROI_name = os.path.join(direct, params['pnt_ROI_name'])
+    pnt_list = np.load(pnt_list_name, allow_pickle=True)['arr_0']
+    pnt_ROI = np.load(pnt_ROI_name, allow_pickle=True)['arr_0'].item()
+    
+    return pnt_list, pnt_ROI
+
+def compute_dataset(dataset):
+    save_dataset(dataset)
+        
+    for roi_dir, cell in load_dataset(dataset, False):
+        peak_troughs_lineage(dataset, cell, roi_dir)
+
+
+def main(datasets=None):
+     
+    if datasets is None:
+        datasets = find_all_datasets()
+    else:
+        params = get_scaled_parameters(data_set=True)
+        if datasets in params.keys():
+            datasets = params[datasets]
+        elif isinstance(datasets, str): 
+            raise NameError('This directory does not exist')
+
+
+    with Pool(processes=8) as pool:
+        for _ in pool.imap_unordered(compute_dataset, datasets):
+            pass
+            
     global datasets_missing_masks_quality
     if datasets_missing_masks_quality:
         print(
@@ -408,4 +460,5 @@ def main(datasets=None):
 
 
 if __name__ == "__main__":
+    # main(os.path.join("WT_mc2_55", "30-03-2015"))
     main()

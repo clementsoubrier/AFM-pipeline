@@ -46,15 +46,13 @@ def trans_vector_matrix(dic,max_diff_time):
             time1=dic[fichier1]['time']
             masks1=main_mask(dic[fichier1]['masks'])
             angle1=dic[fichier1]['angle']
-            main_centr1=dic[fichier1]['main_centroid']
             i=1
             timer=dic[dic_list[number+i]]['time']
             while abs(timer-time1)<=max_diff_time:
                 fichier2=dic_list[number+i]
                 masks2=main_mask(dic[fichier2]['masks'])
                 angle2=dic[fichier2]['angle']
-                main_centr2=dic[fichier2]['main_centroid']
-                update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,main_centr1,time1,masks2,angle2,main_centr2,timer,max_diff_time)
+                update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,time1,masks2,angle2,timer,max_diff_time)
                 i+=1
                 if number+i>=len(dic_list):
                     break
@@ -64,19 +62,17 @@ def trans_vector_matrix(dic,max_diff_time):
     return mat_vec, mat_ang
 
 
-def update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,main_centr1,time1,masks2,angle2,main_centr2,timer,max_diff_time):      #enlever le rayon et le vecguess
+def update_trans_vector_matrix(mat_vec,mat_ang,masks1,angle1,time1,masks2,angle2,timer,max_diff_time):      #enlever le rayon et le vecguess
     angle=angle2-angle1
     if angle==0:
-        #vecguess=main_centr1-main_centr2
-        res=opt_trans_vec(masks1,masks2)#,rad,vecguess
+        res=opt_trans_vec(masks1,masks2)
         mat_vec[time1,timer-time1+max_diff_time]=res
         mat_vec[timer,time1-timer+max_diff_time]=-res
     else:
         dim1,dim2=np.shape(masks1)
         centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
-        #vecguess=(rotation_vector(angle,main_centr1,centerpoint)-main_centr2).astype(np.int32)
         masks1=rotation_img(angle,masks1,centerpoint)
-        res=opt_trans_vec(masks1,masks2).astype(np.int32)#,rad,vecguess
+        res=opt_trans_vec(masks1,masks2).astype(np.int32)
         mat_vec[time1,timer-time1+max_diff_time]=res
         mat_ang[time1,timer-time1+max_diff_time]=angle
         mat_ang[timer,time1-timer+max_diff_time]=-angle
@@ -179,6 +175,13 @@ def rotation_vector(angle,vec,point):
     mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
     newvec=vec-point
     var=np.array([mat[0,0]*newvec[0]+mat[0,1]*newvec[1],mat[1,0]*newvec[0]+mat[1,1]*newvec[1]])
+    return point+var
+
+
+def rotation_line(angle,line,point):    #format n by 2, ij representation
+    mat=np.array([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+    newline=line-point
+    var= newline @ np.transpose(mat)  
     return point+var
 
 #rotation of an image around a point (int32 as input)
@@ -422,10 +425,6 @@ def Final_lineage_tree(direc):
     data_direc = params["main_data_direc"]
     linkmatname = params['link_matrix_name']
 
-
-    trans_vect_name = 'Trans_vect_mat.npy'
-
-    angle_mat_name = 'Angle_mat.npy'
     
     masks_list = np.load(os.path.join(data_direc, direc, listname), allow_pickle=True)['arr_0']
     #print(masks_list)
@@ -443,8 +442,6 @@ def Final_lineage_tree(direc):
     np.save(os.path.join(data_direc, direc, boolmatname), Bool_mat)
     np.save(os.path.join(data_direc, direc, linkmatname), Link_mat)
     np.save(os.path.join(data_direc, direc, linmatname), lin_mat)
-    np.save(os.path.join(data_direc, direc, trans_vect_name), vector_matrix)
-    np.save(os.path.join(data_direc, direc, angle_mat_name), angle_matrix)
     
 
 

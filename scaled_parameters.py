@@ -32,6 +32,10 @@ DATA_SET_WT_NO_DRUG = ["WT_mc2_55/06-10-2015",
                        "WT_mc2_55/30-03-2015",
                        "WT_mc2_55/03-09-2014"]
 
+DATA_SET_WT_DRUG = ['WT_INH_700min_2014',
+                    'WT_CCCP_irrigation_2016',
+                    'WT_filamentation_cipro_2015']
+
 DATA_SET_NO_WT = ['delta_lamA_03-08-2018',
                   'delta_LTD6_04-06-2017',
                   "delta_parB/15-11-2014",
@@ -161,6 +165,12 @@ FIRST_MAX_XDRIFT = 0.5      #mu m  max x coordinate difference between 2 frames 
 FINAL_MAX_XDRIFT = 0.8      #mu m  max x coordinate difference between 2 frames to compare them
 MAX_YDRIFT = 500    #NM  max y coordinate difference between 2 frames to compare them
 
+#stats
+BIN_NUMBER_HIST_FEAT_CREA = 20          # number of bins for the histogram for the feature creation plot
+BIN_NUMBER_HIST_COUNT = 40              # number of bins for the histogram for the feature count plot
+SMOOTHING_HIST_FEAT_CREA = 400          # smoothing parameter for the feature creation plot
+SMOOTHING_HIST_COUNT = 3                # smoothing parameter for the feature count plot
+
 
 
 
@@ -178,7 +188,8 @@ def get_scaled_parameters(
     pnt_peaks_troughs=False,
     pnt_filtering=False,
     pnt_aligning=False,
-    pnt_tracking=False
+    pnt_tracking=False,
+    stats=False
 ):
     params = {}
 
@@ -216,6 +227,7 @@ def get_scaled_parameters(
         params['all'] = DATA_SET
         params['WT'] = DATA_SET_WT
         params['WT_no_drug'] = DATA_SET_WT_NO_DRUG
+        params['WT_drug'] = DATA_SET_WT_DRUG
         params['no_WT'] = DATA_SET_NO_WT
         params['good'] = DATA_SET_GOOD_QUAL
 
@@ -289,6 +301,12 @@ def get_scaled_parameters(
         params["first_max_xdrift"] = FIRST_MAX_XDRIFT 
         params["final_max_xdrift"] = FINAL_MAX_XDRIFT 
         params["max_ydrift"] = MAX_YDRIFT
+    
+    if stats:
+         params["bin_number_hist_feat_crea"] = BIN_NUMBER_HIST_FEAT_CREA
+         params["bin_number_hist_count"] = BIN_NUMBER_HIST_COUNT
+         params["smoothing_hist_feat_crea"] = SMOOTHING_HIST_FEAT_CREA
+         params["smoothing_hist_fcount"] = SMOOTHING_HIST_FEAT_CREA
 
 
     return params

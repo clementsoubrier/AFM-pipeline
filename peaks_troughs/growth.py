@@ -11,7 +11,7 @@ package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/a
 if not package_path in sys.path:
     sys.path.append(package_path)
 
-from peaks_troughs.group_by_cell import Orientation, load_cell
+from peaks_troughs.group_by_cell import Orientation, load_cell, load_dataset
 
 
 def extract_growth(roi):
@@ -74,53 +74,16 @@ def plot_single_cell_growth(roi):
         old_pole_speed,
         new_pole_speed,
     ) = extract_growth(roi)
-    # plt.figure()
-    # plt.plot(timestamps, old_pole_growth, label="old pole")
-    # plt.plot(timestamps, new_pole_growth, label="new pole")
-    # plt.legend()
+    plt.figure()
+    plt.plot(timestamps, old_pole_growth, label="old pole")
+    plt.plot(timestamps, new_pole_growth, label="new pole")
     overall = np.array(old_pole_growth) + np.array(new_pole_growth)
-    # plt.figure()
-    # plt.plot(timestamps[1:], old_pole_speed, label="old pole")
-    # plt.plot(timestamps[1:], new_pole_speed, label="new pole")
-    # plt.legend()
-    plt.plot(timestamps, overall)
+    plt.plot(timestamps, overall,label="overall growth")
+    plt.legend()
     plt.show()
 
 
-# def main():
-#     dataset = os.path.join("WT_mc2_55", "30-03-2015")
-#     ages = []
-#     old_pole_growth = []
-#     new_pole_growth = []
-#     old_pole_speed = []
-#     new_pole_speed = []
-#     for roi_name, roi in get_centerlines_by_cell(dataset):
-#         dates, old_growth, new_growth, old_speed, new_speed = extract_growth(roi)
-#         ages.extend(dates[1:])
-#         old_pole_growth.extend(old_growth[1:])
-#         new_pole_growth.extend(new_growth[1:])
-#         old_pole_speed.extend(old_speed)
-#         new_pole_speed.extend(new_speed)
-#         if len(dates) >= 5:
-#             plt.figure()
-#             offset = 0
-#             for frame_data in roi:
-#                 xs = frame_data["xs"]
-#                 ys = frame_data["ys"]
-#                 plt.plot(xs, ys + offset)
-#                 offset += 100
-#             plt.title(roi_name)
-#             plt.figure()
-#             plot_single_cell_growth(roi)
-#     plt.figure()
-#     plt.scatter(ages, old_pole_growth, label="old")
-#     plt.scatter(ages, new_pole_growth, label="new")
-#     plt.legend()
-#     # plt.figure()
-#     # plt.scatter(ages, old_pole_speed, label="old")
-#     # plt.scatter(ages, new_pole_speed, label="new")
-#     # plt.legend()
-#     plt.show()
+
 
 
 def piecewise_pointwise_linear_regression(times, y):
@@ -151,63 +114,9 @@ def piecewise_pointwise_linear_regression(times, y):
                 best_a_2 = a_2
                 best_b = b
                 best_t = t
-    # plt.plot(errs)
-    # plt.show()
     return best_a_1, best_a_2, best_b, best_t
 
 
-# def main():
-#     single_cell = True
-#     plot_centerlines = False
-#     skip_bad_roi = True
-#     bad_rois = {3, 8, 48}
-#     dataset = os.path.join("WT_mc2_55", "30-03-2015")
-#     timestamps = []
-#     growth = []
-#     for roi_name, roi in get_centerlines_by_cell(dataset):
-#         if skip_bad_roi and roi_name in bad_rois:
-#             continue
-#         cell_timestamps = []
-#         cell_growth = []
-#         first_frame = roi[0]
-#         t_0 = first_frame["timestamp"]
-#         l_0 = first_frame["xs"][-1] - first_frame["xs"][0]
-#         for frame_data in roi[1:]:
-#             t = frame_data["timestamp"]
-#             xs = frame_data["xs"]
-#             l = xs[-1] - xs[0]
-#             cell_timestamps.append(t - t_0)
-#             cell_growth.append(l - l_0)
-#         lifespan = cell_timestamps[-1] - cell_timestamps[0]
-#         if lifespan < 60:
-#             continue
-#         times = []
-#         lengths = []
-#         for frame_data in roi:
-#             lengths.append(frame_data["xs"][-1] - frame_data["xs"][0])
-#             times.append(frame_data["timestamp"])
-#         times = np.array(times) - times[0]
-#         lengths = np.array(lengths)
-#         a_1, a_2, b, t = piecewise_linear_regression(times, lengths)
-#         timestamps.extend(cell_timestamps)
-#         growth.extend(cell_growth)
-#         if single_cell:
-#             plt.figure()
-#             # plt.plot(cell_timestamps, cell_growth)
-#             plt.plot(times, lengths)
-#             plt.plot([0, t, times[-1]], [b - a_1 * t, b, b + a_2 * (times[-1] - t)])
-#             plt.title(f"ROI {roi_name} -- ratio {a_2 / a_1:.2f} -- T_0 {t:.2f}")
-#             if plot_centerlines:
-#                 plt.figure()
-#                 offset = 0
-#                 for frame_data in roi:
-#                     xs = frame_data["xs"]
-#                     ys = frame_data["ys"]
-#                     plt.plot(xs, ys + offset)
-#                     offset += 100
-#             plt.show()
-#     plt.scatter(timestamps, growth)
-#     plt.show()
 
 
 def surf_growth(ROI, ROI_dict, main_dict, masks_list):
@@ -291,11 +200,6 @@ def get_cells_length(dataset, skip_bad_roi, bad_rois, inh_700=False):
             plt.plot(timestamps, np.array(pole_1) - pole_1[0], label="old pole")
             plt.plot(timestamps, np.array(pole_2) - pole_2[0], label="new pole")
             plt.legend()
-            # plt.figure()
-            # offset = 0
-            # for frame_data in roi:
-            #     plt.plot(frame_data["xs"], frame_data["ys"] + offset)
-            #     offset += 50
             plt.show()
     return individuals
 
@@ -471,7 +375,7 @@ def measure_growth(individuals, show_single_cell=False, skip_bad_roi=True):
 
 
 def main():
-    show_single_cell = False
+    show_single_cell = True
     skip_bad_roi = True
     bad_rois = {3, 8}
 
@@ -557,6 +461,83 @@ def main():
 
     plt.show()
 
+def old_pole_new_pole_growth(dataset):
+    dataset = os.path.join("WT_mc2_55", "30-03-2015")
+    ages = []
+    old_pole_growth = []
+    new_pole_growth = []
+    old_pole_speed = []
+    new_pole_speed = []
+    for roi_name, roi in load_dataset(dataset, False):
+        dates, old_growth, new_growth, old_speed, new_speed = extract_growth(roi)
+        ages.extend(dates[1:])
+        old_pole_growth.extend(old_growth[1:])
+        new_pole_growth.extend(new_growth[1:])
+        old_pole_speed.extend(old_speed)
+        new_pole_speed.extend(new_speed)
+        if len(dates) >= 5:
+            plot_single_cell_growth(roi)
+    plt.figure()
+    plt.scatter(ages, old_pole_growth, label="old")
+    plt.scatter(ages, new_pole_growth, label="new")
+    plt.legend()
+    plt.show()
+
+
+# def main():
+#     single_cell = True
+#     plot_centerlines = False
+#     skip_bad_roi = True
+#     bad_rois = {3, 8, 48}
+#     dataset = os.path.join("WT_mc2_55", "30-03-2015")
+#     timestamps = []
+#     growth = []
+#     for roi_name, roi in load_cell(dataset):
+#         if skip_bad_roi and roi_name in bad_rois:
+#             continue
+#         cell_timestamps = []
+#         cell_growth = []
+#         first_frame = roi[0]
+#         t_0 = first_frame["timestamp"]
+#         l_0 = first_frame["xs"][-1] - first_frame["xs"][0]
+#         for frame_data in roi[1:]:
+#             t = frame_data["timestamp"]
+#             xs = frame_data["xs"]
+#             l = xs[-1] - xs[0]
+#             cell_timestamps.append(t - t_0)
+#             cell_growth.append(l - l_0)
+#         lifespan = cell_timestamps[-1] - cell_timestamps[0]
+#         if lifespan < 60:
+#             continue
+#         times = []
+#         lengths = []
+#         for frame_data in roi:
+#             lengths.append(frame_data["xs"][-1] - frame_data["xs"][0])
+#             times.append(frame_data["timestamp"])
+#         times = np.array(times) - times[0]
+#         lengths = np.array(lengths)
+#         a_1, a_2, b, t = piecewise_pointwise_linear_regression(times, lengths)
+#         timestamps.extend(cell_timestamps)
+#         growth.extend(cell_growth)
+#         if single_cell:
+#             plt.figure()
+#             # plt.plot(cell_timestamps, cell_growth)
+#             plt.plot(times, lengths)
+#             plt.plot([0, t, times[-1]], [b - a_1 * t, b, b + a_2 * (times[-1] - t)])
+#             plt.title(f"ROI {roi_name} -- ratio {a_2 / a_1:.2f} -- T_0 {t:.2f}")
+#             if plot_centerlines:
+#                 plt.figure()
+#                 offset = 0
+#                 for frame_data in roi:
+#                     xs = frame_data["xs"]
+#                     ys = frame_data["ys"]
+#                     plt.plot(xs, ys + offset)
+#                     offset += 100
+#             plt.show()
+#     plt.scatter(timestamps, growth)
+#     plt.show()
 
 if __name__ == "__main__":
     main()
+    old_pole_new_pole_growth(1)
+    

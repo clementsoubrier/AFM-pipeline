@@ -165,6 +165,10 @@ def kymograph(*cells_and_id,  dataset=''):   #first cell is the mother, each arg
                 coord_y.append(pnt_list[elem,4] )
                 coord_z.append(pnt_list[elem,5]-base_time)
             ax.plot(coord_x, coord_z, coord_y, color = 'b')
+    ax.set_zlabel(r'height ($nm$)')
+    ax.set_ylabel(r'time ($min$)')
+    ax.set_xlabel(r' centerline lenght ($\mu m$)')
+
     plt.title(roi_id)
     plt.show()
 

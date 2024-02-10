@@ -1356,8 +1356,8 @@ def main(Directory= "all"):
 #%% running main function   
 
 if __name__ == "__main__":
-    # Directory= "delta_parB/03-02-2015" 
-    # main(Directory = Directory )
+    Directory= "WT_mc2_55/30-03-2015"
+    main(Directory = Directory )
     main()
     
 

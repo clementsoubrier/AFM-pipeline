@@ -350,7 +350,7 @@ def update_masks(mask,new_values):
     return mask
 
 
-def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir=''):
+def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir='',channel= 'Height_fwd'):
     if saving:
         if os.path.exists(img_dir):
             for file in os.listdir(img_dir):
@@ -362,7 +362,7 @@ def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir
     fichier=list(dic.keys())[0]
     while dic[fichier]['child']!='':
         # plot image with masks overlaid
-        img = np.load(dic[fichier]['adress'])['Height_fwd']
+        img = np.load(dic[fichier]['adress'])[channel]
         masks=dic[fichier]['masks']
         masknumber=np.max(masks)
         col_ind_list=np.zeros(masknumber,dtype=np.int32)
@@ -408,7 +408,7 @@ def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir
         fichier=dic[fichier]['child']
     
     # plot image with masks overlaid
-    img = np.load(dic[fichier]['adress'])['Height_fwd']
+    img = np.load(dic[fichier]['adress'])[channel]
     masks=dic[fichier]['masks']
     masknumber=np.max(masks)
     col_ind_list=np.zeros(masknumber,dtype=np.int32)
@@ -629,7 +629,20 @@ def run_whole_lineage_tree(direc, plot):
     # os.remove(direc+boolmatname)
     # os.remove(direc+linkmatname)
     
-
+def plot_channel(direc, channel):
+    params=get_scaled_parameters(paths_and_names=True,plot=True)
+    
+    data_direc = params["main_data_direc"]
+    colormask = params["masks_colors"]
+    dicname = params["main_dict_name"]
+    indexlistname = params['roi_masks_list_name']
+    
+    main_dict=np.load(os.path.join(data_direc, direc, dicname), allow_pickle=True)['arr_0'].item()
+    indexlist = np.load(os.path.join(data_direc, direc, indexlistname), allow_pickle=True)['arr_0']
+    
+    plot_image_lineage_tree(main_dict,colormask,indexlist,direc,channel=channel)
+    
+    
     
 def main(Directory= "all", plot=True):
     params = get_scaled_parameters(data_set=True)
@@ -650,9 +663,10 @@ def main(Directory= "all", plot=True):
 
 #%% running main function   
 if __name__ == "__main__":
-    # Directory= "delta_parB/03-02-2015" 
+    Directory = os.path.join("WT_mc2_55", "30-03-2015") #"delta_parB/03-02-2015" 
+    plot_channel(Directory, 'DMTModulus_fwd')
     # main(Directory = Directory )
-    main(plot=False)
+    # main(plot=False)
 
     '''
     manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)

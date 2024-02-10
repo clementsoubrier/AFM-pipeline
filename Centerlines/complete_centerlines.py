@@ -156,7 +156,7 @@ def complete_one_centerline(centerline, mask):
             reordered.append(neighbors[0])
             centerline_copy.remove(neighbors[0])
             
-    extended_centerline = np.array(one_D_line(reordered))
+    extended_centerline = np.array(one_D_line(reordered), dtype=np.int64)
     
     return extended_centerline
 

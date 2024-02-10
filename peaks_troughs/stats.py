@@ -2,6 +2,7 @@ import glob
 import os
 import sys
 from collections import Counter
+import statistics
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +14,7 @@ package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/a
 if not package_path in sys.path:
     sys.path.append(package_path)
 
-from peaks_troughs.group_by_cell import load_dataset, get_peak_troughs_lineage_lists
+from peaks_troughs.group_by_cell import Orientation, load_dataset, get_peak_troughs_lineage_lists
 from scaled_parameters import get_scaled_parameters
 
 #%% Statistics on peaks and troughs without lineage
@@ -153,8 +154,14 @@ def feature_creation(dataset_names):
     
     bin_num = params["bin_number_hist_feat_crea"]
     smooth_param = params["smoothing_hist_feat_crea"]
-    plt.figure()
+    
     stat_list = []
+    stat_list_relat = []
+    length_list = []
+    stat_list_np = []
+    stat_list_op = []
+    
+    
     for dataset in datasets:
         for roi_id, cell in load_dataset(dataset, False):
             if len(cell) > 1:
@@ -162,32 +169,192 @@ def feature_creation(dataset_names):
                 for key in pnt_ROI:
                     if len(pnt_ROI[key]) >= 4:
                         root = pnt_ROI[key][0]
+                        frame_data = cell[0] #pnt_ROI[key][1]
+                        orientation = Orientation(frame_data['orientation'])
                         time = pnt_list[root][-2]
                         if time >0 :
                             generation = int(pnt_list[root][1])
-                            total_length =  abs(cell[generation]['xs'][0]-cell[generation]['xs'][-1])
-                            x_coord = abs(pnt_list[root][3]-cell[generation]['xs'][0])/total_length
                             if generation >2 :
-                                if 0 <= x_coord <= 0.5:
-                                    stat_list.append(x_coord)
-                                else :
-                                    stat_list.append(1-x_coord)
+                                total_length =  abs(cell[generation]['xs'][0]-cell[generation]['xs'][-1])
+                                length_list.append(total_length)
+                                x_coord = abs(pnt_list[root][3]-cell[generation]['xs'][0])
+                                match orientation:
+                                    case Orientation.UNKNOWN:
+                                        if x_coord > total_length/2 :
+                                            x_coord = total_length - x_coord
+                                            
+                                    case Orientation.NEW_POLE_OLD_POLE:
+                                        if x_coord > total_length/2 :
+                                            x_coord = total_length - x_coord
+                                            stat_list_op.append(x_coord)
+                                        else:
+                                            stat_list_np.append(x_coord)
+                                            
+                                    case Orientation.OLD_POLE_NEW_POLE:
+                                        if x_coord > total_length/2 :
+                                            x_coord = total_length - x_coord
+                                            stat_list_np.append(x_coord)
+                                        else:
+                                            stat_list_op.append(x_coord)
+                                stat_list.append(x_coord)
+                                stat_list_relat.append(x_coord/total_length)
+                                
+                                
+                                
     
     stat_list = np.array(stat_list)
-    density, bins = np.histogram(stat_list , bin_num)
-    spl = splrep(bins[1:], density, s=smooth_param, per=False)
-    x2 = np.linspace(bins[0], bins[-1], 200)
-    y2 = splev(x2, spl)
+    stat_list_relat = np.array(stat_list_relat)
+    length_list = np.array(length_list)
+    stat_list_op = np.array(stat_list_op)
+    stat_list_np = np.array(stat_list_np)
+    
+    # density, bins = np.histogram(stat_list , bin_num)
+    # spl = splrep(bins[1:], density, s=smooth_param, per=False)
+    # x2 = np.linspace(bins[0], bins[-1], 200)
+    # y2 = splev(x2, spl)
+    
+    plt.figure()
     title = (
-        f"Relative distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list)} features tracked"
+        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list)} features tracked"
     )
-    plt.plot(x2, y2, 'r-', label='smooth approximation')
-    plt.hist(stat_list, bin_num, color="grey")
-    plt.xlabel(r'$\leftarrow$ pole | center $\rightarrow$ ')
+    # plt.plot(x2, y2, 'r-', label='smooth approximation')
+    plt.hist(stat_list, bin_num, color="grey", alpha=0.6, label= 'feature creation')
+    plt.hist(length_list, bin_num, color="r", alpha=0.6, label= 'total length')
+    plt.xlabel(r'Distance to the pole ($\mu m$) ')
+    plt.legend()
+    plt.title(title)
+    plt.show()
+    
+    plt.figure()
+    title = (
+        f"Feature creation with dataset \'{dataset_names}\',\n and {len(stat_list_relat)} features tracked, normalized total lenght"
+    )
+    plt.hist(stat_list_relat, bin_num, color="grey", alpha=0.6, label= 'feature creation')
+    plt.xlabel(r' $\leftarrow \; \text{pole}\;|\; \text{center}\; \rightarrow$ ')
+    plt.legend()
+    plt.title(title)
+    plt.show()
+    
+    
+    plt.figure()
+    title = (
+        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list_op)+len(stat_list_np)} features tracked"
+    )
+    res = stats.kstest(stat_list_op,stat_list_np)
+    print(res.statistic, res.pvalue)
+    plt.hist(stat_list_op, bin_num, color="g", alpha=0.6,  label= 'old pole')
+    plt.hist(stat_list_np, bin_num, color="b", alpha=0.6, label= 'new pole')
+    plt.annotate(f'pvalue = {res.pvalue:.2e}', (3,15))
+    plt.xlabel(r'Distance to the pole ($\mu m$) ')
     plt.legend()
     plt.title(title)
     plt.show()
 
+
+
+def peaks_trough_diff(dataset_names):
+    
+    params = get_scaled_parameters(data_set=True,stats=True)
+    if dataset_names in params.keys():
+        datasets = params[dataset_names]
+    else : 
+        datasets = dataset_names
+    
+    bin_num = params["bin_number_hist_feat_crea"]
+    stat_list = []
+    position_list = []
+    diff_list = []
+    
+    for dataset in datasets:
+        for _, cell in load_dataset(dataset, False):
+            if len(cell) > 1:
+                for frame_data in cell:
+                    ys = frame_data["ys"]
+                    xs = frame_data["xs"]-frame_data["xs"][0]
+                    peaks = frame_data["peaks"]
+                    troughs = frame_data["troughs"]
+                    totlen = len(peaks)+len(troughs)
+                    if totlen>=2:
+                        feature = np.zeros(totlen, dtype=int)
+                        x_coord = np.zeros(totlen)
+                        if peaks[0]<troughs[0]:
+                            feature[::2] = ys[peaks]
+                            feature[1::2] = ys[troughs]
+                            x_coord[::2] = xs[peaks]
+                            x_coord[1::2] = xs[troughs]
+                        else:
+                            feature[1::2] = ys[peaks]
+                            feature[::2] = ys[troughs]
+                            x_coord[1::2] = xs[peaks]
+                            x_coord[::2] = xs[troughs]
+                        stat_list.append(np.absolute(feature[:-1]-feature[1:]))
+                        diff_list.append(x_coord[1:]-x_coord[:-1])
+                        for elem in x_coord[:-1]:
+                            if elem < xs[-1]/2:
+                                position_list.append(elem/xs[-1])
+                            else :
+                                position_list.append((xs[-1]-elem)/xs[-1])
+
+    
+    stat_list = np.concatenate(stat_list)
+    position_list = np.array(position_list)
+    diff_list = np.concatenate(diff_list)
+         
+    good_ind = (stat_list<500) & (diff_list<4) & (position_list<10)
+    stat_list = stat_list[good_ind]
+    position_list = position_list[good_ind]
+    diff_list = diff_list[good_ind]
+    
+    
+    plt.figure()
+    title = (
+        f"Distribution of feature height with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features"
+    )
+    plt.hist(stat_list, bin_num, color="grey")
+    plt.xlabel(r'Height ($n m$) ')
+    plt.vlines(np.average(stat_list),0,8000, label=f'average : {np.average(stat_list):.2e}', color = 'b')
+    plt.vlines(np.median(stat_list),0,8000, label=f'median : {np.median(stat_list):.2e}', color = 'r')
+    plt.legend()
+    plt.title(title)
+    
+    plt.figure()
+    title = (
+        f"Feature height with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features, normalized total lenght"
+    )
+    # plt.scatter(position_list, stat_list, marker='.')
+    bins = 10
+    data_list = []
+    for elem in range(bins):
+        data_list.append([])
+    for i, elem in enumerate(position_list):
+        index = int(elem *2*bins)
+        if index == 10:
+            index = 9
+        data_list[index].append(stat_list[i])
+
+    plt.boxplot(data_list,labels= np.linspace(0.5,5,10)/10, showfliers=False)       #, showmeans=True, meanline=True
+    # slope, intercept = statistics.linear_regression(position_list, stat_list)
+    # min_x= np.min(position_list)
+    # max_x= np.max(position_list)
+    # plt.plot([min_x,max_x], [slope*min_x+intercept, slope*max_x+intercept], color='r', label='linear interpolation')
+    plt.xlabel(r' $\leftarrow \;\text{pole}\;|\;  \text{center} \;\rightarrow$')
+    plt.ylabel(r'Height ($n m$)')
+    # plt.legend()
+    plt.title(title)
+    
+    plt.figure()
+    title = (
+        f"Distribution of feature length with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features"
+    )
+    plt.hist(diff_list, bin_num, color="grey")
+    plt.xlabel(r'Lenght ($\mu m$) ')
+    plt.vlines(np.average(diff_list),0,7000, label=f'average : {np.average(diff_list):.2e}', color = 'b')
+    plt.vlines(np.median(diff_list),0,7000, label=f'median : {np.median(diff_list):.2e}', color = 'r')
+    plt.legend()
+    plt.title(title)
+    plt.show()
+                    
+                    
 
 def feature_creation_comparison(dataset_names1, dataset_names2):
     params = get_scaled_parameters(data_set=True,stats=True)
@@ -361,7 +528,9 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    feature_creation("all")#"WT_mc2_55/30-03-2015", "all""no_WT"
-    feature_creation_comparison("WT_drug",'WT_no_drug')
-    feature_displacement("WT")
-    feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
+    feature_creation('all')     #"WT_mc2_55/30-03-2015", "all""no_WT"
+    # peaks_trough_diff('all')
+    # feature_creation_comparison("WT_drug",'WT_no_drug')
+    # feature_displacement("WT")
+    # feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
+# %%

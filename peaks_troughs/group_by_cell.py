@@ -140,6 +140,9 @@ def load_cell(
             troughs_index = centerline['troughs_index']
             peaks_ROI = centerline["peaks_ROI"]
             troughs_ROI = centerline["troughs_ROI"]
+            mask_index = centerline["mask_index"]
+            dataset_name = centerline["dataset_name"]
+            
             frame_data = {
                 "filename" : filename,
                 "line": line,
@@ -153,8 +156,9 @@ def load_cell(
                 "peaks_index": peaks_index,
                 "troughs_index": troughs_index,
                 "peaks_ROI": peaks_ROI,
-                "troughs_ROI": troughs_ROI
-                
+                "troughs_ROI": troughs_ROI,
+                "mask_index": mask_index,
+                "dataset_name": dataset_name
             }
         if cut_before_700 and timestamp >= 700:
             continue
@@ -223,16 +227,16 @@ def topological_sort(roi_dict):
     return order
 
 
-def use_same_direction(reference, line, reference_angle, angle, xs, ys, xs_bwd, ys_bwd): #add angle
-    mean_ref= np.average(reference, axis=0)
-    mean= np.average(line, axis=0)
+def use_same_direction(reference, line, reference_angle, angle, xs, ys, xs_bwd, ys_bwd): 
+    mean_ref= np.average(reference, axis=0).astype(np.int_)
+    mean= np.average(line, axis=0).astype(np.int_)
     if reference_angle != angle:
         reference = rotation_line(angle - reference_angle, reference, mean_ref)
         
-    line = line - mean
-    reference = reference - mean_ref
+    newline = line - mean
+    newreference = reference - mean_ref
     
-    diffs = reference[:, np.newaxis] - line[np.newaxis]
+    diffs = newreference[:, np.newaxis] - newline[np.newaxis]
     dists_sq = np.sum(diffs**2, axis=-1)
     if len(line) <= len(reference):
         order = dists_sq.argmin(axis=0)
@@ -281,9 +285,11 @@ def save_mask(
     orientation,
     quality,
     roi_dirname,
+    mask_index,
+    dataset_name
 ):
     line = img_dict["centerlines"][mask_id]
-    angle=img_dict['angle']
+    angle = img_dict['angle']
     xs, ys = img_dict["height_profiles_fwd"][mask_id]
     xs_bwd, ys_bwd = img_dict["height_profiles_bwd"][mask_id]
     if not line.size:
@@ -314,6 +320,7 @@ def save_mask(
     mask_num = len(os.listdir(roi_dirname))
     filename = f"{mask_num:03d}.npz"
     path = os.path.join(roi_dirname,filename)
+
     np.savez(
         path,
         line=line,
@@ -327,7 +334,9 @@ def save_mask(
         troughs_index=np.array([]),
         peaks_index=np.array([]),
         troughs_ROI=np.array([]),
-        peaks_ROI=np.array([])
+        peaks_ROI=np.array([]),
+        mask_index=mask_index,
+        dataset_name=dataset_name
     )
     length_current = xs[-1] - xs[0]
     if reference_xs is None:
@@ -351,6 +360,7 @@ def save_roi(
     masks_list,
     main_dict,
     roi_dirname,
+    dataset_name
 ):
     
     if os.path.exists(roi_dirname):
@@ -369,8 +379,8 @@ def save_roi(
         orientation = Orientation.UNKNOWN
     else:
         orientation = None
-    for mask, quality in zip(masks, masks_quality, strict=True):
-        _, _, frame, mask_label = masks_list[mask]
+    for mask_index, quality in zip(masks, masks_quality, strict=True):
+        _, _, frame, mask_label = masks_list[mask_index]
         img_dict = main_dict[frame]
         reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
             img_dict,
@@ -382,6 +392,8 @@ def save_roi(
             orientation,
             quality,
             roi_dirname,
+            mask_index,
+            dataset_name
         )
     return (reference_line, reference_xs, reference_ys, reference_angle), missing_masks_quality
 
@@ -402,7 +414,7 @@ def save_dataset(dataset, log_progress=True):
         roi_dir = os.path.join( "data", "cells", dataset, roi_name, "lines")
         reference = references.pop(roi_name, (None, None, None, None))
         reference, missing_masks_quality = save_roi(
-            roi, *reference, masks_list, main_dict, roi_dir
+            roi, *reference, masks_list, main_dict, roi_dir, dataset
         )
         dataset_missing_masks_quality = (
             dataset_missing_masks_quality or missing_masks_quality

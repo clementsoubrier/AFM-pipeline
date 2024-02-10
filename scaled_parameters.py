@@ -44,8 +44,26 @@ DATA_SET_NO_WT = ['delta_lamA_03-08-2018',
                   "delta_ripA/14-10-2016"]
 
 DATA_SET_GOOD_QUAL = ["WT_mc2_55/30-03-2015",
-                      "WT_mc2_55/03-09-2014",
-                      'WT_INH_700min_2014'] #To precise
+                      "WT_mc2_55/03-09-2014"
+                      ] #To precise
+
+DATA_SET_HEIGHT_ONLY = ['WT_INH_700min_2014']
+                        
+
+DATA_SET_STIFF = ["WT_mc2_55/06-10-2015",
+                  "WT_mc2_55/30-03-2015",
+                  "WT_mc2_55/03-09-2014",
+                  'WT_filamentation_cipro_2015',
+                  'WT_CCCP_irrigation_2016',
+                  "delta_ripA/14-10-2016",
+                  "delta_parB/15-11-2014",
+                  "delta_parB/18-01-2015",
+                  "delta_parB/18-11-2014",
+                  "delta_parB/03-02-2015",
+                  'delta_lamA_03-08-2018',
+                  'delta_LTD6_04-06-2017']
+                
+            
 
 # path_and_names = 
 INITIAL_DATA = os.path.join("..","data2")       # directory with the initial data (logs)
@@ -74,10 +92,11 @@ DELTA_MATRIX_MDS = 'delta_matrix_mds.npy'
 
 PNT_LIST_NAME = 'peaks_troughs_list.npz'
 PNT_ROI_NAME = 'peaks_troughs_ROI_list.npz'
+
+
 '''
 Processing 
 '''
-
 
 
 # cellpose
@@ -128,6 +147,14 @@ COMP_RATIO = np.array([8,10], dtype=np.int16)   # ratio of the centerlines to co
 MIN_CENTERLINE_LEN = 1.5    # mu m  minimal size of the centerlines
 MDS_MAX_TRANS = 0.5    # mu m  maximum translation
 MDS_MAX_ITER = None        # adding a number of iterations for better speed (loss of precision)
+
+#stiffness
+
+STIF_DERIV_PREC = 0.1      #mu m  length of the centerline to compute the vectors tangent to the centerlines
+STIF_NORMAL_PREC =  0.2     #mu m 0.1 length of the averaged portion along the normal to the centerlines
+STIF_TANGENT_PREC = 0.1    #mu m 0.1 length of the averaged portion along the tangent to the centerlines
+
+
 
 '''
 Peaks and troughs parameters (pnt_)
@@ -183,6 +210,7 @@ def get_scaled_parameters(
     video=False,
     lineage_tree=False,
     mds=False,
+    stiffness=False,
     pixel_size=None,
     pnt_preprocessing=False,
     pnt_peaks_troughs=False,
@@ -270,7 +298,11 @@ def get_scaled_parameters(
         params['mds_max_trans'] = MDS_MAX_TRANS
         params['mds_max_iter'] = MDS_MAX_ITER
 
-
+    if stiffness:
+        params["stif_deriv_prec"] = STIF_DERIV_PREC 
+        params["stif_normal_prec"] = STIF_NORMAL_PREC
+        params["stif_tangent_prec"] = STIF_TANGENT_PREC
+        
     if pnt_preprocessing:
         params["kernel_len"] = 1 + round(KERNEL_SIZE / pixel_size)
         params["std_cut"] = SLOPE_STD_CUT

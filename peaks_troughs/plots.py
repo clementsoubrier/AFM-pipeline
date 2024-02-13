@@ -12,7 +12,7 @@ if not package_path in sys.path:
 from scaled_parameters import get_scaled_parameters
 from peaks_troughs.group_by_cell import load_dataset, get_peak_troughs_lineage_lists
 from peaks_troughs.preprocess import evenly_spaced_resample
-from peaks_troughs.stiffness_stats import extract_stiffness
+from peaks_troughs.stiffness_stats import extract_feature
 
 
 def plot_single_centerline(xs, ys, peaks, troughs):
@@ -181,7 +181,7 @@ def kymograph(*cells_and_id,  dataset=''):   #first cell is the mother, each arg
 
 
 
-def kymograph_stifness(*cells_and_id,  dataset=''):   #first cell is the mother, each argument is a tuple (cell, id)
+def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', averaged = True):   #first cell is the mother, each argument is a tuple (cell, id)
 
     params = get_scaled_parameters(paths_and_names=True)
     
@@ -212,7 +212,7 @@ def kymograph_stifness(*cells_and_id,  dataset=''):   #first cell is the mother,
         roi_id = cell_id[1]
         for frame_data in cell:
             xs = frame_data["xs"]
-            ys = extract_stiffness(frame_data, main_dict, masks_list)
+            ys = extract_feature(frame_data, main_dict, masks_list, feature, averaged)
             
             cell_centerlines.append(np.vstack((xs,ys)))
             xs,ys=evenly_spaced_resample(xs,ys,step)
@@ -275,7 +275,7 @@ def kymograph_stifness(*cells_and_id,  dataset=''):   #first cell is the mother,
         ax.scatter(troughs_x, troughs_z, troughs_y, c="green")
         
         
-        pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
+        # pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
         # for key in pnt_ROI :
         #     coord_x = []
         #     coord_y = []
@@ -285,11 +285,14 @@ def kymograph_stifness(*cells_and_id,  dataset=''):   #first cell is the mother,
         #         coord_y.append(pnt_list[elem,4] )
         #         coord_z.append(pnt_list[elem,5]-base_time)
         #     ax.plot(coord_x, coord_z, coord_y, color = 'b')
-    ax.set_zlabel(r'DMT Modulus ($M Pa$)')
+        
+    unit = main_dict[next(iter(main_dict))]['units'][feature]
+    
+    ax.set_zlabel(f'{feature} ({unit})')
     ax.set_ylabel(r'time ($min$)')
     ax.set_xlabel(r' centerline lenght ($\mu m$)')
 
-    plt.title(roi_id + ' Stiffness')
+    plt.title(roi_id + f', {feature}')
 
 
 
@@ -297,11 +300,11 @@ def kymograph_stifness(*cells_and_id,  dataset=''):   #first cell is the mother,
 
 def main():
     dataset = os.path.join("WT_mc2_55", "30-03-2015")
-    dataset = "delta_parB/18-01-2015"
+    # dataset = "delta_parB/18-01-2015"
     for roi_id, cell in load_dataset(dataset, False):
         if len(cell)>1:
             kymograph((cell, roi_id), dataset=dataset)
-            kymograph_stifness((cell, roi_id), dataset=dataset)
+            kymograph_feature((cell, roi_id), dataset=dataset)
         # plot_cell_centerlines((cell, roi_id), dataset=dataset)
             plt.show()
     plt.show()

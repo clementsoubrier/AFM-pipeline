@@ -79,10 +79,10 @@ def quantile_error_no_window(y_1, y_2, h_offset, quantile):
 
 
 @njit
-def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_size,use_quantile):
+def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_size,use_quantile, division, penalty_division):
     if len(y_2) > len(y_1):
         best_h_offset, best_v_offset = align_quantile(
-            y_2, y_1, max_translation, penalty, window, quantile, pixel_size,use_quantile
+            y_2, y_1, max_translation, penalty, window, quantile, pixel_size,use_quantile, division, penalty_division
         )
         return -best_h_offset, -best_v_offset
     y_1 = y_1.astype(np.float32)
@@ -109,13 +109,19 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
         stick_out_error = penalty * physical_stick_out
 
         for v_offset in v_offsets:
-            if window_len==1:
-                error=quantile_error_no_window(y_1, y_2, h_offset, quantile)
-            elif use_quantile : 
+            if division:
                 error = quantile_error(y_1, y_2 + v_offset, h_offset, window_len, quantile)
+                stick_in = min(max(0, h_offset), max(0, len(y_1) - len(y_2) - h_offset))
+                total_error = error / physical_length + stick_out_error + penalty_division * stick_in *pixel_size
             else :
-                error = min_error(y_1, y_2 + v_offset, h_offset, window_len)
-            total_error = error / physical_length + stick_out_error
+                if window_len==1:
+                    error = quantile_error_no_window(y_1, y_2, h_offset, quantile)
+                elif use_quantile : 
+                    error = quantile_error(y_1, y_2 + v_offset, h_offset, window_len, quantile)
+                else :
+                    error = min_error(y_1, y_2 + v_offset, h_offset, window_len)
+                total_error = error / physical_length + stick_out_error
+                
             if total_error < best_error:
                 best_error = total_error
                 best_h_offset = h_offset
@@ -124,21 +130,33 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
     return best_h_offset, best_v_offset
 
 
-def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True,smoothed=False):
-    params = params.copy()
-    max_translation = params.pop("max_translation")
-    penalty = params.pop("penalty")
-    max_relative_translation=params.pop("max_relative_translation")
-    window_relative_size=params.pop("window_relative_size")
-    quantile_size=params.pop("quantile_size")
-    smooth_std=params.pop("smooth_std")
+def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True,smoothed=False, division=False):
+    
 
+    max_translation = params["max_translation"]
+    penalty = params["penalty"]
+    max_relative_translation=params["max_relative_translation"]
+    window_relative_size=params["window_relative_size"]
+    quantile_size=params["quantile_size"]
+    smooth_std=params["smooth_std"]
+    
+    if division:
+        penalty_division = params["penalty_division"]
+        window_relative_size=params["window_relative_size_division"]
+        quantile_size=params["quantile_size_division"]
+    else:
+        penalty_division = 0
+        window_relative_size=params["window_relative_size"]
+        quantile_size=params["quantile_size"]
+    
     physical_max_translation = max_translation * pixel_size
     if reference_xs is None or reference_ys is None:
         return xs, ys
-    xs_p, ys_p = preprocess_centerline(xs, ys, **params, resolution=pixel_size)
+    xs_p, ys_p = preprocess_centerline(
+        xs, ys, params["kernel_len"], params["std_cut"], params["window"], pixel_size
+    )
     ref_xs_p, ref_ys_p = preprocess_centerline(
-        reference_xs, reference_ys, **params, resolution=pixel_size
+        reference_xs, reference_ys, params["kernel_len"], params["std_cut"], params["window"], pixel_size
     )
     if xs_p[-1] - xs_p[0] < physical_max_translation:
         xs_p, ys_p = evenly_spaced_resample(xs, ys, pixel_size)
@@ -156,7 +174,45 @@ def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,
         return xs, ys
 
     # add max translation
-    delta, v_delta = align_quantile(ref_ys_p, ys_p, relative_translation, penalty, window_relative_size, quantile_size, pixel_size,use_quantile_instead_of_min)
+    delta, v_delta = align_quantile(ref_ys_p, ys_p, relative_translation, penalty, window_relative_size, quantile_size, pixel_size, use_quantile_instead_of_min, division, penalty_division)
     h_translation = ref_xs_p[0] - xs_p[0] + delta * pixel_size
 
     return xs+ h_translation, ys+ v_delta    
+
+
+# def align_with_reference_division(xs, ys, xs2, ys2, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True,smoothed=False):
+#     params = params.copy()
+#     max_translation = params["max_translation")
+#     penalty = params["penalty")
+#     max_relative_translation=params["max_relative_translation")
+#     window_relative_size=params["window_relative_size")
+#     quantile_size=params["quantile_size")
+#     smooth_std=params["smooth_std")
+
+#     physical_max_translation = max_translation * pixel_size
+#     if reference_xs is None or reference_ys is None:
+#         return xs, ys
+#     xs_p, ys_p = preprocess_centerline(xs, ys, **params, resolution=pixel_size)
+#     ref_xs_p, ref_ys_p = preprocess_centerline(
+#         reference_xs, reference_ys, **params, resolution=pixel_size
+#     )
+#     if xs_p[-1] - xs_p[0] < physical_max_translation:
+#         xs_p, ys_p = evenly_spaced_resample(xs, ys, pixel_size)
+#     if ref_xs_p[-1] - ref_xs_p[0] < physical_max_translation:
+#         ref_xs_p, ref_ys_p = evenly_spaced_resample(
+#             reference_xs, reference_ys, pixel_size
+#         )
+#     if smoothed:
+#         ys_p = gaussian_filter1d(ys_p, smooth_std, mode="nearest")
+#         ref_ys_p = gaussian_filter1d(ref_ys_p, smooth_std, mode="nearest")
+
+#     relative_translation=min(max_relative_translation,physical_max_translation/min(abs(xs_p[-1] - xs_p[0]),abs(ref_xs_p[-1] - ref_xs_p[0])))
+
+#     if len(ref_ys_p) < 5 or len(ys_p) < 5:
+#         return xs, ys
+
+#     # add max translation
+#     delta, v_delta = align_quantile(ref_ys_p, ys_p, relative_translation, penalty, window_relative_size, quantile_size, pixel_size,use_quantile_instead_of_min)
+#     h_translation = ref_xs_p[0] - xs_p[0] + delta * pixel_size
+
+#     return xs+ h_translation, ys+ v_delta    

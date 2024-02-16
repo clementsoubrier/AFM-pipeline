@@ -179,12 +179,18 @@ MAX_VAR_SLOPE = 4000 # dimensionless (nanometers per micrometers)
 
 # pnt_aligning     # aligning centerlines of a same ROI 
 MAX_TRANSLATION = 1.18  # micrometers
-MAX_RELATIVE_TRANSLATION=0.5
+MAX_RELATIVE_TRANSLATION=0.5 #maximum relative translation for centerlines comparision
 ALIGNMENT_PENALTY = 10000 # dimensionless (nanometers per micrometers) 50 
-WINDOW_RELATIVE_SIZE = 0.1
+WINDOW_RELATIVE_SIZE = 0.1 # size of the window relative to the centerline size
 if MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE>1:
     raise ValueError("MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE<=1 is required") 
-QUANTILE_SIZE = 0.3 # or 0.3
+QUANTILE_SIZE = 0.3 # Quantile value to select alignment
+QUANTILE_SIZE_DIVISION = 0.4
+WINDOW_RELATIVE_SIZE_DIVISION = 0.2
+if MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE_DIVISION>1:
+    raise ValueError("MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE_DIVISION<=1 is required") 
+ALIGNMENT_PENALTY_DIVISION = 20000 # dimensionless (nanometers per micrometers) 
+
 
 # pnt_tracking      # tracking of the suface features (peaks and troughs over generations)
 MAX_TIME = 70       #mn  max time between 2 frames to compare them
@@ -197,8 +203,9 @@ BIN_NUMBER_HIST_FEAT_CREA = 20          # number of bins for the histogram for t
 BIN_NUMBER_HIST_COUNT = 40              # number of bins for the histogram for the feature count plot
 SMOOTHING_HIST_FEAT_CREA = 400          # smoothing parameter for the feature creation plot
 SMOOTHING_HIST_COUNT = 3                # smoothing parameter for the feature count plot
-
-
+POLE_REGION_SIZE = 1.5                  # mu m physical size of the pole region
+DIV_MAX_SUPERPOSITION = 0.5             # mu m maximum superposition of the 2 daughter centerlines admissible
+DIV_MAX_DIST_FROM_MOTH = 1              # mu m maximum distance from mother closest boundary
 
 
 def get_scaled_parameters(
@@ -329,6 +336,9 @@ def get_scaled_parameters(
         params["window_relative_size"] = WINDOW_RELATIVE_SIZE
         params["quantile_size"] = QUANTILE_SIZE
         params["smooth_std"] = SMOOTH_KERNEL_STD / pixel_size
+        params["quantile_size_division"] = QUANTILE_SIZE_DIVISION
+        params["window_relative_size_division"] = WINDOW_RELATIVE_SIZE_DIVISION
+        params["penalty_division"] = ALIGNMENT_PENALTY_DIVISION
     
     if pnt_tracking:
         params["max_time"] = MAX_TIME
@@ -341,6 +351,9 @@ def get_scaled_parameters(
          params["bin_number_hist_count"] = BIN_NUMBER_HIST_COUNT
          params["smoothing_hist_feat_crea"] = SMOOTHING_HIST_FEAT_CREA
          params["smoothing_hist_fcount"] = SMOOTHING_HIST_FEAT_CREA
+         params["pole_region_size"] = POLE_REGION_SIZE
+         params["div_max_superposition"] = DIV_MAX_SUPERPOSITION
+         params["div_max_dist_from_moth"] = DIV_MAX_DIST_FROM_MOTH
 
 
     return params

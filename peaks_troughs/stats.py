@@ -434,6 +434,7 @@ def feature_displacement(dataset_names, plot=True, return_smooth_approx=False):
         datasets = dataset_names
     
     smooth_param = params["smoothing_hist_feat_crea"]
+    pole_size = params["pole_region_size"]
     
     stat_list = []
     for dataset in datasets:
@@ -446,59 +447,184 @@ def feature_displacement(dataset_names, plot=True, return_smooth_approx=False):
                         leaf = pnt_ROI[key][-1]
                         time_diff = pnt_list[leaf][-2] - pnt_list[root][-2]
                         pos_diff = abs(pnt_list[leaf][3]-pnt_list[root][3])
-                        generation = int(pnt_list[leaf][1])
+                        generation = int(pnt_list[root][1]) #leaf
                         total_length =  abs(cell[generation]['xs'][0]-cell[generation]['xs'][-1])
-                        x_coord = abs(pnt_list[leaf][3]-cell[generation]['xs'][0])/total_length
-                        if 0 <= x_coord <= 0.5:
+                        x_coord = abs(pnt_list[root][3]-cell[generation]['xs'][0]) #/total_length #leaf
+                        if x_coord > 0.5 * total_length:
+                            x_coord = total_length - x_coord
+
+                        if time_diff >= 50:
                             stat_list.append([x_coord,pos_diff/time_diff])
-                        else :
-                            stat_list.append([1-x_coord,pos_diff/time_diff])
     
-    stat_list = np.transpose(np.array(stat_list))
-    sort = np.argsort(stat_list[0,:])
-    stat_list = stat_list[:,sort]
+    stat_list = np.array(stat_list)
     
-    spl = splrep(stat_list[0,:], stat_list[1,:], s=smooth_param, per=False)
-    x2 = np.linspace(stat_list[0,0], stat_list[0,-1], 200)
-    y2 = splev(x2, spl)
-    if return_smooth_approx:
-        return x2, y2
+    # stat_list = np.transpose(np.array(stat_list))
+    # sort = np.argsort(stat_list[0,:])
+    # stat_list = stat_list[:,sort]
+    
+    # spl = splrep(stat_list[0,:], stat_list[1,:], s=smooth_param, per=False)
+    # x2 = np.linspace(stat_list[0,0], stat_list[0,-1], 200)
+    # y2 = splev(x2, spl)
+    # if return_smooth_approx:
+    #     return x2, y2
     title = (
-        f"Drift of features with dataset \'{dataset_names}\',\n and {len(stat_list[0,:])} features tracked"
+        f"Variation of feature position with dataset \'{dataset_names}\',\n and {len(stat_list[:,0])} features tracked"
     )
     if plot:
         plt.figure()
-        plt.scatter(stat_list[0,:], stat_list[1,:])
-        plt.plot(x2, y2, 'r-', label='smooth approximation')
-        plt.xlabel(r'$\leftarrow$ pole | center $\rightarrow$ ')
-        plt.ylabel(r'Drift speed $\mu m (min)^{-1}$')
+        # plt.scatter(stat_list[0,:], stat_list[1,:])
+        # plt.plot(x2, y2, 'r-', label='smooth approximation')
+        mask1 = stat_list[:,0] <= pole_size
+        mask2 = stat_list[:,0] > pole_size
+        val1 = stat_list[mask1]
+        val2 = stat_list[mask2]
+        plt.hist(val1[:,1], color='gray', alpha=0.5, label = 'Near pole region', density=True, bins = 30)
+        plt.hist(val2[:,1], color='red', alpha=0.5, label = 'Near center region', density=True)
+        plt.xlabel(r'Variation of feature position $\mu m (min)^{-1}$')
         plt.legend()
         plt.title(title)
         
-        plt.figure()
-        plt.plot(x2, y2, 'r-', label='smooth approximation')
-        plt.xlabel(r'$\leftarrow$ pole | center $\rightarrow$ ')
-        plt.ylabel(r'Drift speed $\mu m (min)^{-1}$')
-        plt.title(title)
-        plt.legend()
         
         plt.show()            
                     
                 
+def feature_len_height_variation(dataset_names):
+    params = get_scaled_parameters(data_set=True,stats=True)
+    if dataset_names in params.keys():
+        datasets = params[dataset_names]
+    else : 
+        datasets = dataset_names
+    
+    pole_size = params["pole_region_size"]
+    stat_list_len = []
+    stat_list_height = []
+    
+    
+    for dataset in datasets:
+        for roi_id, cell in load_dataset(dataset, False):
+            if len(cell) > 1:
+                pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
+                for key in pnt_ROI:
+                    if len(pnt_ROI[key]) >= 6:
+                        root = pnt_ROI[key][0]
+                        leaf = pnt_ROI[key][-1]
+                        feature_type = bool(pnt_list[root][2])
+                        feature = feature_type * 'peaks' + (1-feature_type) * 'troughs'
+                        non_feature = (1-feature_type) * 'peaks' + feature_type * 'troughs'
+                        time_diff = pnt_list[leaf][-2] - pnt_list[root][-2]
+                        if time_diff >= 50:
+                            generation_root = int(pnt_list[root][1]) 
+                            generation_leaf = int(pnt_list[leaf][1]) 
+                            
+                            total_length =  abs(cell[generation_root]['xs'][0]-cell[generation_root]['xs'][-1])
+                            x_coord = abs(pnt_list[root][3]-cell[generation_root]['xs'][0]) 
+                            if x_coord > 0.5 * total_length:
+                                x_coord = total_length - x_coord
+                            
+                            ind_root = np.nonzero(cell[generation_root][feature + '_index'] == root)[0][0]
+                            root_pos = cell[generation_root][feature][ind_root]
+                            
+                            ind_leaf = np.nonzero(cell[generation_leaf][feature + '_index'] == leaf)[0][0]
+                            leaf_pos = cell[generation_leaf][feature][ind_leaf]
+                            
+                            pos_diff_1l = 0
+                            pos_diff_2l = 0
+                            pos_diff_1r = 0
+                            pos_diff_2r = 0
+                            
+                            mask_r = cell[generation_root][non_feature]<root_pos
+                            mask_l = cell[generation_leaf][non_feature]<leaf_pos
+                            
+                            if np.any(mask_r) and np.any(mask_l):
+                                    left_root = cell[generation_root][non_feature][np.nonzero(mask_r)[0][-1]]
+                                    left_leaf = cell[generation_leaf][non_feature][np.nonzero(mask_l)[0][-1]]
+                                    pos_diff_1l = cell[generation_leaf]['xs'][leaf_pos] - cell[generation_leaf]['xs'][left_leaf]\
+                                                    - cell[generation_root]['xs'][root_pos] + cell[generation_root]['xs'][left_root] 
+                                    # stat_list_len.append([x_coord, abs(pos_diff_1l)/time_diff]) 
+                                    
+                                    pos_diff_2l = cell[generation_leaf]['ys'][leaf_pos] - cell[generation_leaf]['ys'][left_leaf]\
+                                                    - cell[generation_root]['ys'][root_pos] + cell[generation_root]['ys'][left_root] 
+                                    # stat_list_height.append([x_coord, abs(pos_diff_2l)/time_diff])
+                                    
+                            mask_r = cell[generation_root][non_feature]>root_pos
+                            mask_l = cell[generation_leaf][non_feature]>leaf_pos
+                            
+                            if np.any(mask_r) and np.any(mask_l):
+                                    right_root = cell[generation_root][non_feature][np.nonzero(mask_r)[0][-1]]
+                                    right_leaf = cell[generation_leaf][non_feature][np.nonzero(mask_l)[0][-1]]
+                                    pos_diff_1r =  cell[generation_leaf]['xs'][leaf_pos] - cell[generation_leaf]['xs'][right_leaf]\
+                                                    - cell[generation_root]['xs'][root_pos] + cell[generation_root]['xs'][right_root] 
+                                    # stat_list_len.append([x_coord, abs(pos_diff_1r)/time_diff])
+                                    
+                                    pos_diff_2r = cell[generation_leaf]['ys'][leaf_pos] - cell[generation_leaf]['ys'][right_leaf]\
+                                                    - cell[generation_root]['ys'][root_pos] + cell[generation_root]['ys'][right_root] 
+                                    # stat_list_height.append([x_coord, abs(pos_diff_2r)/time_diff])
+                                    
+                            if pos_diff_1l>0 + pos_diff_1r>0 == 2:
 
+                                stat_list_len.append([x_coord,abs(pos_diff_1l-pos_diff_1r)/2 /time_diff]) 
+                                stat_list_height.append([x_coord,abs(pos_diff_2l-pos_diff_2r)/2 /time_diff])
+                                   
+                            else :
+                                if pos_diff_1l>0:
+                                    stat_list_len.append([x_coord,abs(pos_diff_1l) /time_diff]) 
+                                else:
+                                    stat_list_len.append([x_coord,abs(pos_diff_1r) /time_diff])
+                                if pos_diff_2l>0:
+                                    stat_list_height.append([x_coord,abs(pos_diff_2l) /time_diff]) 
+                                else:
+                                    stat_list_height.append([x_coord,abs(pos_diff_2r) /time_diff])
+                                
+                            
+    
+    
+    stat_list_len = np.array(stat_list_len)
+    stat_list_height = np.array(stat_list_height)
 
-def feature_displacement_comparison(*dataset_name_list):
-    plt.figure()
-    for dataset_names in dataset_name_list:
-        x2, y2 = feature_displacement(dataset_names, plot=False, return_smooth_approx=True)
-        plt.plot(x2, y2, label=f'{dataset_names}')
     title = (
-        f"Drift speed of features comparison between datasets \n {dataset_name_list}"
+        f"Variation of inter-feature distance with dataset \'{dataset_names}\',\n and {len(stat_list_len[:,0])} features tracked"
     )
-    plt.xlabel(r'$\leftarrow$ pole | center $\rightarrow$ ')
+
+    plt.figure()
+    mask1 = stat_list_len[:,0] <= pole_size
+    mask2 = stat_list_len[:,0] > pole_size
+    val1 = stat_list_len[mask1]
+    val2 = stat_list_len[mask2]
+    plt.hist(val1[:,1], color='gray', alpha=0.5, label = 'Near pole region', density=True)
+    plt.hist(val2[:,1], color='red', alpha=0.5, label = 'Near center region', density=True)
+    plt.xlabel(r'Variation of inter-feature distance $\mu m (min)^{-1}$')
     plt.legend()
     plt.title(title)
-    plt.show()    
+    
+    title = (
+        f"Variation of inter-feature amplitude with dataset \'{dataset_names}\',\n and {len(stat_list_len[:,0])} features tracked"
+    )
+    plt.figure()
+    mask1 = stat_list_height[:,0] <= pole_size
+    mask2 = stat_list_height[:,0] > pole_size
+    val1 = stat_list_height[mask1]
+    val2 = stat_list_height[mask2]
+    plt.hist(val1[:,1], color='gray', alpha=0.5, label = 'Near pole region', density=True)
+    plt.hist(val2[:,1], color='red', alpha=0.5, label = 'Near center region', density=True)
+    plt.xlabel(r'Variation of inter-feature amplitude $n m (min)^{-1}$')
+    plt.legend()
+    plt.title(title)
+    
+    
+    plt.show()         
+
+# def feature_displacement_comparison(*dataset_name_list):
+#     plt.figure()
+#     for dataset_names in dataset_name_list:
+#         x2, y2 = feature_displacement(dataset_names, plot=False, return_smooth_approx=True)
+#         plt.plot(x2, y2, label=f'{dataset_names}')
+#     title = (
+#         f"Drift speed of features comparison between datasets \n {dataset_name_list}"
+#     )
+#     plt.xlabel(r'$\leftarrow$ pole | center $\rightarrow$ ')
+#     plt.legend()
+#     plt.title(title)
+#     plt.show()    
     
    
 
@@ -528,9 +654,10 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    feature_creation('all')     #"WT_mc2_55/30-03-2015", "all""no_WT"
+    # feature_creation('all')     #"WT_mc2_55/30-03-2015", "all""no_WT"
     # peaks_trough_diff('all')
     # feature_creation_comparison("WT_drug",'WT_no_drug')
-    # feature_displacement("WT")
+    # feature_displacement("WT_mc2_55/30-03-2015") #"all"
+    feature_len_height_variation ("WT_mc2_55/30-03-2015")
     # feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
 # %%

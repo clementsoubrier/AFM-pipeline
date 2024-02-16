@@ -286,7 +286,8 @@ def save_mask(
     quality,
     roi_dirname,
     mask_index,
-    dataset_name
+    dataset_name,
+    division_break=False
 ):
     line = img_dict["centerlines"][mask_id]
     angle = img_dict['angle']
@@ -313,7 +314,7 @@ def save_mask(
     no_defect = no_defect and quality
     params = get_scaled_parameters(pixel_size=pixel_size, pnt_preprocessing=True, pnt_aligning=True)
     xs, ys = align_with_reference(
-        xs, ys, reference_xs, reference_ys, params, pixel_size
+        xs, ys, reference_xs, reference_ys, params, pixel_size, division=division_break
     )
     params = get_scaled_parameters(pixel_size=pixel_size, pnt_peaks_troughs=True)
     _, _, peaks, troughs = find_peaks_troughs(xs, ys, **params)
@@ -379,22 +380,41 @@ def save_roi(
         orientation = Orientation.UNKNOWN
     else:
         orientation = None
+    first_iter = True
     for mask_index, quality in zip(masks, masks_quality, strict=True):
         _, _, frame, mask_label = masks_list[mask_index]
         img_dict = main_dict[frame]
-        reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
-            img_dict,
-            mask_label - 1,
-            reference_line,
-            reference_xs,
-            reference_ys,
-            reference_angle,
-            orientation,
-            quality,
-            roi_dirname,
-            mask_index,
-            dataset_name
-        )
+        if first_iter and reference_line is not None:
+            reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
+                img_dict,
+                mask_label - 1,
+                reference_line,
+                reference_xs,
+                reference_ys,
+                reference_angle,
+                orientation,
+                quality,
+                roi_dirname,
+                mask_index,
+                dataset_name,
+                division_break=True
+            )
+        
+        else:
+            reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
+                img_dict,
+                mask_label - 1,
+                reference_line,
+                reference_xs,
+                reference_ys,
+                reference_angle,
+                orientation,
+                quality,
+                roi_dirname,
+                mask_index,
+                dataset_name
+            )
+        first_iter = False
     return (reference_line, reference_xs, reference_ys, reference_angle), missing_masks_quality
 
 
@@ -472,5 +492,5 @@ def main(datasets=None):
 
 
 if __name__ == "__main__":
-    # main(os.path.join("WT_mc2_55", "30-03-2015"))
-    main()
+    main(os.path.join("WT_mc2_55", "30-03-2015"))
+    # main()

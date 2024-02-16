@@ -10,7 +10,7 @@ if not package_path in sys.path:
     sys.path.append(package_path)
 
 from scaled_parameters import get_scaled_parameters
-from peaks_troughs.group_by_cell import load_dataset, get_peak_troughs_lineage_lists
+from peaks_troughs.group_by_cell import load_dataset, get_peak_troughs_lineage_lists, load_cell
 from peaks_troughs.preprocess import evenly_spaced_resample
 from peaks_troughs.stiffness_stats import extract_feature
 
@@ -34,10 +34,13 @@ def plot_cell_centerlines(*cells_and_id, dataset=''):   #first cell is the mothe
     cell_peaks=[]
     cell_troughs=[]
     cell_timestamps=[]
+    title = []
     base_time=cells_and_id[0][0][0]["timestamp"]
     for cell_id in cells_and_id:
         cell = cell_id[0]
         roi_id = cell_id[1]
+        title.append(roi_id)
+
         for frame_data in cell:
             cell_centerlines.append(np.vstack((frame_data["xs"],frame_data["ys"])))
             cell_peaks.append(frame_data["peaks"])
@@ -70,30 +73,38 @@ def plot_cell_centerlines(*cells_and_id, dataset=''):   #first cell is the mothe
                 coord_x.append(pnt_list[elem,3])
                 coord_y.append(pnt_list[elem,4] + 2*(pnt_list[elem,5]-base_time))
             plt.plot(coord_x, coord_y, color = 'b')
+        plt.xlabel(r'centerline length ($\mu m$)')
+        plt.ylabel(r'height ($nm$)')
         
         
-    
-    plt.title(roi_id)
+
+    plt.title(title)
     plt.show()
 
 def kymograph(*cells_and_id,  dataset=''):   #first cell is the mother, each argument is a tuple (cell, id)
     
     plt.figure()
     ax = plt.axes(projection='3d')
-    cell_centerlines=[]
-    cell_centerlines_renorm=[]
-    cell_peaks=[]
-    cell_troughs=[]
-    cell_timestamps=[]
+    
+
     base_time=cells_and_id[0][0][0]["timestamp"]
     pixelsize=[]
+    title = []
+    
+    
     for cell_id in cells_and_id:
         cell = cell_id[0]
+        title.append(cell_id[1])
         for frame_data in cell:
             pixelsize.append((frame_data["xs"][-1]-frame_data["xs"][0])/(len(frame_data["xs"])-1))
     
     step=min(pixelsize)
     for cell_id in cells_and_id:
+        cell_centerlines=[]
+        cell_centerlines_renorm=[]
+        cell_peaks=[]
+        cell_troughs=[]
+        cell_timestamps=[]
         cell = cell_id[0]
         roi_id = cell_id[1]
         for frame_data in cell:
@@ -173,7 +184,7 @@ def kymograph(*cells_and_id,  dataset=''):   #first cell is the mother, each arg
     ax.set_ylabel(r'time ($min$)')
     ax.set_xlabel(r' centerline lenght ($\mu m$)')
 
-    plt.title(roi_id)
+    plt.title(title)
 
     
 
@@ -194,11 +205,6 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
     
     plt.figure()
     ax = plt.axes(projection='3d')
-    cell_centerlines=[]
-    cell_centerlines_renorm=[]
-    cell_peaks=[]
-    cell_troughs=[]
-    cell_timestamps=[]
     base_time=cells_and_id[0][0][0]["timestamp"]
     pixelsize=[]
     for cell_id in cells_and_id:
@@ -208,6 +214,11 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
     
     step=min(pixelsize)
     for cell_id in cells_and_id:
+        cell_centerlines=[]
+        cell_centerlines_renorm=[]
+        cell_peaks=[]
+        cell_troughs=[]
+        cell_timestamps=[]
         cell = cell_id[0]
         roi_id = cell_id[1]
         for frame_data in cell:
@@ -301,13 +312,29 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
 def main():
     dataset = os.path.join("WT_mc2_55", "30-03-2015")
     # dataset = "delta_parB/18-01-2015"
+    params = get_scaled_parameters(paths_and_names=True)
+    data_direc = params["main_data_direc"]
+    roi_dic_name = params["roi_dict_name"]
+    roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+    
+    
+    
+    
+    
     for roi_id, cell in load_dataset(dataset, False):
         if len(cell)>1:
-            kymograph((cell, roi_id), dataset=dataset)
-            kymograph_feature((cell, roi_id), dataset=dataset)
+            for daughter_cell in roi_dic[roi_id]['Children']:
+                d_cell = load_cell(daughter_cell, dataset=dataset)
+                if len(d_cell)>1:
+                    lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+                    kymograph(*lineage, dataset=dataset)
+            # kymograph_feature((cell, roi_id), dataset=dataset)
         # plot_cell_centerlines((cell, roi_id), dataset=dataset)
-            plt.show()
-    plt.show()
+        plt.show()
+    
+    
+
+    
 
 
 

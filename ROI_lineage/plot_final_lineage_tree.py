@@ -663,42 +663,43 @@ def main(Directory= "all", plot=True):
 
 #%% running main function   
 if __name__ == "__main__":
-    Directory = os.path.join("WT_mc2_55", "30-03-2015") #"delta_parB/03-02-2015" 
-    plot_channel(Directory, 'DMTModulus_fwd')
+    Directory = "WT_mc2_55/03-09-2014/" #os.path.join("WT_mc2_55", "30-03-2015") "delta_parB/03-02-2015" 
+    plot_channel(Directory, 'Height_fwd')
+    # plot_channel(Directory, 'DMTModulus_fwd')
     # main(Directory = Directory )
     # main(plot=False)
 
-    '''
-    manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)
+    ''''''
+    # manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)
     
     
-    dic_name='Main_dictionnary.npz'
+    # dic_name='Main_dictionnary.npz'
 
-    list_name='masks_list.npz'
+    # list_name='masks_list.npz'
 
-    ROI_dict='ROI_dict.npz'
+    # ROI_dict='ROI_dict.npz'
 
-    linmat_name='non_trig_Link_matrix.npy'
+    # linmat_name='non_trig_Link_matrix.npy'
 
-    boolmatname="Bool_matrix.npy"
+    # boolmatname="Bool_matrix.npy"
 
-    linkmatname='Link_matrix.npy'
+    # linkmatname='Link_matrix.npy'
 
-    index_list_name='masks_ROI_list.npz'
+    # index_list_name='masks_ROI_list.npz'
     
     
-    colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
+    # colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
 
-    index_list=np.load(Directory+index_list_name, allow_pickle=True)['arr_0']
-    List_of_masks=np.load(Directory+list_name, allow_pickle=True)['arr_0']
-    main_dict=np.load(Directory+dic_name, allow_pickle=True)['arr_0'].item()
-    newdic=np.load(Directory+ROI_dict, allow_pickle=True)['arr_0'].item()
-    for ROI in newdic.keys():
-        print(newdic[ROI])
+    # index_list=np.load(Directory+index_list_name, allow_pickle=True)['arr_0']
+    # List_of_masks=np.load(Directory+list_name, allow_pickle=True)['arr_0']
+    # main_dict=np.load(Directory+dic_name, allow_pickle=True)['arr_0'].item()
+    # newdic=np.load(Directory+ROI_dict, allow_pickle=True)['arr_0'].item()
+    # for ROI in newdic.keys():
+    #     print(newdic[ROI])
     
-    print(newdic.keys())
-    plot_image_one_ROI('ROI 8',newdic,List_of_masks,main_dict)
-    plot_lineage_tree(newdic,List_of_masks,main_dict,colormask,Directory)
-    plot_image_lineage_tree(newdic,List_of_masks,main_dict,colormask,index_list,Directory)
+    # print(newdic.keys())
+    # # plot_image_one_ROI('ROI 8',newdic,List_of_masks,main_dict)
+    # # plot_lineage_tree(newdic,List_of_masks,main_dict,colormask,Directory)
+    # plot_image_lineage_tree(newdic,List_of_masks,main_dict,colormask,index_list,Directory)
     
-    '''
+    

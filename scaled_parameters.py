@@ -153,7 +153,7 @@ MDS_MAX_ITER = None        # adding a number of iterations for better speed (los
 PHYS_DERIV_PREC = 0.1      #mu m  length of the centerline to compute the vectors tangent to the centerlines
 PHYS_NORMAL_PREC =  0.2     #mu m 0.1 length of the averaged portion along the normal to the centerlines
 PHYS_TANGENT_PREC = 0.1    #mu m 0.1 length of the averaged portion along the tangent to the centerlines
-PHYS_CHAR_POLE_SIZE = 1.5  #mu m charachteristic size of a pole (region of )
+
 
 
 '''
@@ -206,7 +206,7 @@ SMOOTHING_HIST_COUNT = 3                # smoothing parameter for the feature co
 POLE_REGION_SIZE = 1.5                  # mu m physical size of the pole region
 DIV_MAX_SUPERPOSITION = 0.5             # mu m maximum superposition of the 2 daughter centerlines admissible
 DIV_MAX_DIST_FROM_MOTH = 1              # mu m maximum distance from mother closest boundary
-
+DIV_MIN_DAUGTHER_SIZE = 2               # mu m min size of other daughter if 1 daughter selected
 
 def get_scaled_parameters(
     paths_and_names=False,
@@ -310,7 +310,6 @@ def get_scaled_parameters(
         params["phys_deriv_prec"] = PHYS_DERIV_PREC 
         params["phys_normal_prec"] = PHYS_NORMAL_PREC
         params["phys_tangent_prec"] = PHYS_TANGENT_PREC
-        params["phys_pole_size"] = PHYS_CHAR_POLE_SIZE
         
     if pnt_preprocessing:
         params["kernel_len"] = 1 + round(KERNEL_SIZE / pixel_size)
@@ -354,6 +353,7 @@ def get_scaled_parameters(
          params["pole_region_size"] = POLE_REGION_SIZE
          params["div_max_superposition"] = DIV_MAX_SUPERPOSITION
          params["div_max_dist_from_moth"] = DIV_MAX_DIST_FROM_MOTH
+         params['div_min_daugther_size'] = DIV_MIN_DAUGTHER_SIZE
 
 
     return params

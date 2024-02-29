@@ -374,19 +374,20 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
     
     _, ax = plt.subplots()
     ax.boxplot([old_new_slopes[:,0], old_new_slopes[:,1], old_new_slopes[:,2], old_new_slopes[:,3]], showfliers=False)
-    ax.set_title(f"Pole elongation speed with dataset {datasetnames}")
+    ax.set_title(f"Pole elongation speed with dataset {datasetnames} and {len(old_new_slopes[:,0])} cells")
     ax.set_ylabel(r"elongation speed ($\mu m (min)^{-1}$)")
     ax.set_xticklabels(["New pole \n before NETO", "New pole \n after NETO","Old pole \n before NETO","Old pole \n after NETO"])
     pvalue = stats.ttest_ind(old_new_slopes[:,0],old_new_slopes[:,1]).pvalue
     pvalue2 = stats.ttest_ind(old_new_slopes[:,2],old_new_slopes[:,3]).pvalue
-    print(f"p value new pole {pvalue}, p value old pole {pvalue2}")
+    pvalue3 = stats.ttest_ind(old_new_slopes[:,1],old_new_slopes[:,2]).pvalue
+    pvalue4 = stats.ttest_ind(old_new_slopes[:,1],old_new_slopes[:,3]).pvalue
     
     x1 = 1
     x2 = 2 
-    y = 0.011
+    y = 0.015
     h=0.001
     ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e} *", ha='center', va='bottom')
+    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e} **", ha='center', va='bottom')
     
     x1 = 3
     x2 = 4
@@ -394,6 +395,21 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
     h=0.001
     ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y],  color = 'r')
     ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e}", ha='center', va='bottom')
+    
+    # x1 = 2
+    # x2 = 3 
+    # y = 0.0135
+    # h=0.001
+    # ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
+    # ax.text((x1+x2)*.5, y+h, f"P={pvalue3:.2e} ", ha='center', va='bottom')
+    
+    # x1 = 2
+    # x2 = 4 
+    # y = 0.018
+    # h=0.001
+    # ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
+    # ax.text((x1+x2)*.5, y+h, f"P={pvalue4:.2e} ", ha='center', va='bottom')
+    
     ax.set_ylim(top = 0.017)
     
     plt.show()   
@@ -404,5 +420,5 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
 
 
 if __name__ == "__main__":
-    # plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015")) #, outlier_detection=True
-    compute_growth_stats(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True)#'all' 'delta_lamA_03-08-2018' 'WT_no_drug'
+    plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True) #, outlier_detection=True
+    # compute_growth_stats('WT_no_drug', outlier_detection=True)#'all' 'delta_lamA_03-08-2018' 'WT_no_drug'

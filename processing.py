@@ -15,10 +15,11 @@ import cv2
 import numpy as np
 from numba import njit
 import tqdm
-from cellpose import utils, io, models
 import re
 import copy
 from multiprocessing import Pool
+
+from cellpose import utils, io, models
 
 import matplotlib.pyplot as plt
 from shutil import rmtree #erasing a whole directory
@@ -1357,7 +1358,7 @@ def main(Directory= "all"):
 
 if __name__ == "__main__":
     Directory= "WT_mc2_55/30-03-2015"
-    main(Directory = Directory )
-    main()
+    run_one_dataset_logs_only( Directory )
+    # main()
     
 

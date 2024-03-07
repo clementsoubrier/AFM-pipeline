@@ -187,9 +187,9 @@ def kymograph(*cells_and_id,  dataset='', division_point = None):   #first cell 
     ax.set_zlabel(r'height ($nm$)')
     ax.set_ylabel(r'time ($min$)')
     ax.set_xlabel(r' centerline lenght ($\mu m$)')
-    ax.set_xlim([-9, 4])
-    ax.set_zlim([0, 1000])
-    ax.set_ylim([0, 600])
+    # ax.set_xlim([-9, 4])
+    # ax.set_zlim([0, 1000])
+    # ax.set_ylim([0, 600])
 
     plt.title(title)
 

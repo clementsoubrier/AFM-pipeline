@@ -663,7 +663,7 @@ def main(Directory= "all", plot=True):
 
 #%% running main function   
 if __name__ == "__main__":
-    Directory = "WT_mc2_55/03-09-2014/" #os.path.join("WT_mc2_55", "30-03-2015") "delta_parB/03-02-2015" 
+    Directory = os.path.join("WT_mc2_55", "30-03-2015") #"delta_parB/03-02-2015" "WT_mc2_55/03-09-2014/" 
     plot_channel(Directory, 'Height_fwd')
     # plot_channel(Directory, 'DMTModulus_fwd')
     # main(Directory = Directory )

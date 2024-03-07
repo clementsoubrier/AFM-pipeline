@@ -101,7 +101,7 @@ Processing
 
 
 # cellpose
-CEL_MODEL_TYPE = 'cyto'       # Cellpose segmentation algo
+CEL_MODEL_TYPE = 'cyto'       # Cellpose segmentation algo default: 'cyto'   'cyto2' 'cyto3' 'bact_phase_cp3'
 CEL_CHANNELS = [0,0]          # Define channels to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
 CEL_DIAMETER_PARAM = 1      # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
 CEL_FLOW_THRESHOLD = 0.8    # oldparam : 0.9 (segmentation parameter)

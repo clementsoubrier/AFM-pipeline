@@ -158,11 +158,11 @@ def feature_creation(dataset_names):
     bin_num = params["bin_number_hist_feat_crea"]
     smooth_param = params["smoothing_hist_feat_crea"]
     
-    stat_list = []
+    stat_list = {'peaks':[], 'troughs':[]}
     stat_list_relat = []
     length_list = []
-    stat_list_np = []
-    stat_list_op = []
+    stat_list_np = {'peaks':[], 'troughs':[]}
+    stat_list_op = {'peaks':[], 'troughs':[]}
     
     
     for dataset in datasets:
@@ -181,6 +181,8 @@ def feature_creation(dataset_names):
                                 total_length =  abs(cell[generation]['xs'][0]-cell[generation]['xs'][-1])
                                 length_list.append(total_length)
                                 x_coord = abs(pnt_list[root][3]-cell[generation]['xs'][0])
+                                feat_ind = int(pnt_list[root][2])
+                                feature = feat_ind*'peaks' + (1-feat_ind)*'troughs'
                                 match orientation:
                                     case Orientation.UNKNOWN:
                                         if x_coord > total_length/2 :
@@ -189,44 +191,49 @@ def feature_creation(dataset_names):
                                     case Orientation.NEW_POLE_OLD_POLE:
                                         if x_coord > total_length/2 :
                                             x_coord = total_length - x_coord
-                                            stat_list_op.append(x_coord)
+                                            stat_list_op[feature].append(x_coord)
                                         else:
-                                            stat_list_np.append(x_coord)
+                                            stat_list_np[feature].append(x_coord)
                                             
                                     case Orientation.OLD_POLE_NEW_POLE:
                                         if x_coord > total_length/2 :
                                             x_coord = total_length - x_coord
-                                            stat_list_np.append(x_coord)
+                                            stat_list_np[feature].append(x_coord)
                                         else:
-                                            stat_list_op.append(x_coord)
-                                stat_list.append(x_coord)
+                                            stat_list_op[feature].append(x_coord)
+                                stat_list[feature].append(x_coord)
+ 
                                 stat_list_relat.append(x_coord/total_length)
                                 
                                 
                                 
     
-    stat_list = np.array(stat_list)
-    stat_list_relat = np.array(stat_list_relat)
-    length_list = np.array(length_list)
-    stat_list_op = np.array(stat_list_op)
-    stat_list_np = np.array(stat_list_np)
     
-    # density, bins = np.histogram(stat_list , bin_num)
-    # spl = splrep(bins[1:], density, s=smooth_param, per=False)
-    # x2 = np.linspace(bins[0], bins[-1], 200)
-    # y2 = splev(x2, spl)
+    
     
     plt.figure()
     title = (
-        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list)} features tracked"
+        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list['peaks']+stat_list['troughs'])} features tracked"
     )
-    # plt.plot(x2, y2, 'r-', label='smooth approximation')
-    plt.hist(stat_list, bin_num, color="grey", alpha=0.6, label= 'feature creation', density=True)
+    plt.hist(stat_list['peaks']+stat_list['troughs'], bin_num, color="grey", alpha=0.6, label= 'feature creation', density=True)
     plt.hist(length_list, bin_num, color="r", alpha=0.6, label= 'total length', density=True)
     plt.xlabel(r'Distance to the pole ($\mu m$) ')
     plt.legend()
     plt.title(title)
-    plt.show()
+    
+    plt.figure()
+    title = (
+        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list['peaks']+stat_list['troughs'])} features tracked"
+    )
+    res = stats.kstest(stat_list['peaks'], stat_list['troughs'])
+    print(res.statistic, res.pvalue)
+    plt.hist(stat_list['peaks'], bin_num, color="g", alpha=0.6,  label= 'peaks', density=True)
+    plt.hist(stat_list['troughs'], bin_num, color="b", alpha=0.6, label= 'troughs', density=True)
+    plt.annotate(f'pvalue = {res.pvalue:.2e}', (3,0.6))
+    plt.xlabel(r'Distance to the pole ($\mu m$) ')
+    plt.legend()
+    plt.title(title)
+
     
     plt.figure()
     title = (
@@ -236,23 +243,45 @@ def feature_creation(dataset_names):
     plt.xlabel(r' $\leftarrow \; \text{pole}\;|\; \text{center}\; \rightarrow$ ')
     plt.legend()
     plt.title(title)
-    plt.show()
-    
-    
-    plt.figure()
-    title = (
-        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list_op)+len(stat_list_np)} features tracked"
-    )
-    res = stats.kstest(stat_list_op,stat_list_np)
-    print(res.statistic, res.pvalue)
-    plt.hist(stat_list_op, bin_num, color="g", alpha=0.6,  label= 'old pole', density=True)
-    plt.hist(stat_list_np, bin_num, color="b", alpha=0.6, label= 'new pole', density=True)
-    plt.annotate(f'pvalue = {res.pvalue:.2e}', (3,0.6))
-    plt.xlabel(r'Distance to the pole ($\mu m$) ')
-    plt.legend()
-    plt.title(title)
-    plt.show()
 
+    
+    _, ax = plt.subplots()
+    ax.boxplot([stat_list_np['peaks'],
+                stat_list_op['peaks'],
+                stat_list_np['troughs'],
+                stat_list_op['troughs']]
+               ,  showfliers=False, showmeans=True, meanline=True) 
+    ax.set_xticklabels([f"Peaks new pole \n creation", f"Peaks old pole \n creation", f"Troughs new pole \n creation", f"Troughs old pole \n creation"])
+    ax.set_ylabel(r"Distance to the pole ($\mu m$)")
+    pvalue1 = stats.ttest_ind(stat_list_np['peaks'], stat_list_op['peaks']).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 2.8
+    h=0.1
+    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
+    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    pvalue1 = stats.ttest_ind(stat_list_np['peaks'], stat_list_np['troughs']).pvalue
+    x1 = 1
+    x2 = 3 
+    y = 3.1
+    h=0.1
+    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
+    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    pvalue1 = stats.ttest_ind(stat_list_op['peaks'], stat_list_op['troughs']).pvalue
+    x1 = 2
+    x2 = 4
+    y = 2.3
+    h=0.1
+    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
+    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    pvalue1 = stats.ttest_ind(stat_list_np['troughs'], stat_list_op['troughs']).pvalue
+    x1 = 3
+    x2 = 4 
+    y = 2
+    h=0.1
+    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
+    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    plt.show()
 
 
 
@@ -330,7 +359,7 @@ def feature_properties_pole(dataset_names):
                 whole_stat['lenght']['op']['troughs']]
                ,  showfliers=False, showmeans=True, meanline=True) 
     ax.set_xticklabels(["Peaks new pole", "Peaks old pole", "Troughs new pole", "Troughs old pole"])
-    ax.set_ylabel(r"($\mu m$)")
+    ax.set_ylabel(r"Distance ($\mu m$)")
     ax.set_title(f"Inter-feature distance with dataset \'{dataset_names}\',\n and {numbers} cells")
     pvalue1 = stats.ttest_ind(whole_stat['lenght']['np']['peaks'], whole_stat['lenght']['op']['peaks']).pvalue
     x1 = 1
@@ -370,7 +399,7 @@ def feature_properties_pole(dataset_names):
                 whole_stat['height']['op']['troughs']]
                ,  showfliers=False, showmeans=True, meanline=True) 
     ax.set_xticklabels(["Peaks new pole", "Peaks old pole", "Troughs new pole", "Troughs old pole"])
-    ax.set_ylabel(r"($n m$)")
+    ax.set_ylabel(r"Amplitude ($n m$)")
     ax.set_title(f"Inter-feature amplitude with dataset \'{dataset_names}\',\n and {numbers} cells")
     pvalue1 = stats.ttest_ind(whole_stat['height']['np']['peaks'], whole_stat['height']['op']['peaks']).pvalue
     x1 = 1
@@ -466,7 +495,7 @@ def feature_number(dataset_names):
     
     
 
-def peaks_trough_diff(dataset_names):
+def feature_general_properties(dataset_names):
     
     params = get_scaled_parameters(data_set=True,stats=True)
     if dataset_names in params.keys():
@@ -564,6 +593,9 @@ def peaks_trough_diff(dataset_names):
     
     
     plt.show()
+    
+    return stat_list, position_list, diff_list
+    
                     
                     
 
@@ -948,7 +980,7 @@ if __name__ == "__main__":
     # main()
     # feature_number('WT_no_drug')
     # feature_creation('WT_no_drug')     #"WT_mc2_55/30-03-2015", "all""no_WT"
-    # peaks_trough_diff('WT_no_drug')
+    # feature_general_properties("all")
     # feature_creation_comparison("WT_drug",'WT_no_drug')
     # feature_displacement("all") #"all"
     # feature_len_height_variation ("WT_mc2_55/30-03-2015")

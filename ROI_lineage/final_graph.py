@@ -88,7 +88,6 @@ def lineage_matrix(dic,maskslist,mat_vec,mat_ang,max_diff_time,threshold):
     diclist=list(dic.keys())
     for i in tqdm.trange(len(diclist)-1):
         fichier=diclist[i]
-        #print(fichier)
         base_time=dic[fichier]['time']
         child_fichier=dic[fichier]['child']
         timer=dic[child_fichier]['time']
@@ -102,7 +101,7 @@ def lineage_matrix(dic,maskslist,mat_vec,mat_ang,max_diff_time,threshold):
             
             mask_c=mask_transfert(mask_c,transfert)
             
-            if angle!=0:            #check on real data
+            if angle!=0:
                 dim1,dim2=np.shape(mask_p)
                 centerpoint=np.array([dim1//2,dim2//2],dtype=np.int32)
                 mask_p=rotation_img(angle,mask_p,centerpoint)
@@ -463,10 +462,10 @@ def main(Directory= "all"):
 
 if __name__ == "__main__":
 
-    # Directory=  "delta_parB/03-02-2015"
-    # main(Directory)
+    Directory=  "WT_mc2_55/30-03-2015"
+    main(Directory=Directory)
 
-    main()
+    # main()
     
     
 

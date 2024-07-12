@@ -19,7 +19,7 @@ import re
 import copy
 from multiprocessing import Pool
 
-from cellpose import utils, io, models
+from cellpose import utils, io, models, denoise
 
 import matplotlib.pyplot as plt
 from shutil import rmtree #erasing a whole directory
@@ -469,7 +469,7 @@ def dimension_def_logs_only(dir_im, temp_dir_info, dimensiondata, maxsize): #dir
                 
             newimg=bili_scale_image(newimg,log_para[0]/log_para[2],log_para[1]/log_para[3],dim_height,dim_len,prec,prec)
             if ratio>0:
-                newimg=cv2.resize(newimg,(int(dim_len*ratio),int(dim_height*ratio)))
+                newimg=cv2.resize(newimg,(int(dim_len*ratio),int(dim_height*ratio)), interpolation=cv2.INTER_CUBIC)
 
             datadir[channel]=newimg
 
@@ -489,6 +489,7 @@ def run_cel_logs_only(dir_im,seg,temp_dir_info,dimensiondata):
     params=get_scaled_parameters(cellpose=True)
 
     mod = params['cel_model_type']
+    denoise_mod = params['cel_denoise_model']
     chan = params['cel_channels']
     param_dia = params['cel_diameter_param']
     thres = params['cel_flow_threshold']
@@ -529,17 +530,26 @@ def run_cel_logs_only(dir_im,seg,temp_dir_info,dimensiondata):
         if gpuval:
             try:
                 # Specify that the cytoplasm Cellpose model for the segmentation. 
-                model = models.Cellpose(gpu=True, model_type=mod)
+                if denoise_mod is None:
+                    model = models.Cellpose(gpu=True, model_type=mod)
+                else:
+                    model = denoise.CellposeDenoiseModel(gpu=True, model_type=mod, restore_type=denoise_mod)
                 masks, flows, st, diams = model.eval(img, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
             except:
-                model = models.Cellpose(gpu=False, model_type=mod)
+                if denoise_mod is None:
+                    model = models.Cellpose(gpu=False, model_type=mod)
+                else:
+                    model = denoise.CellposeDenoiseModel(gpu=False, model_type=mod, restore_type=denoise_mod)
                 masks, flows, st, diams = model.eval(img, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
         else :
-            model = models.Cellpose(gpu=False, model_type=mod)
+            if denoise_mod is None:
+                model = models.Cellpose(gpu=False, model_type=mod)
+            else:
+                model = denoise.CellposeDenoiseModel(gpu=False, model_type=mod, restore_type=denoise_mod)
             masks, flows, st, diams = model.eval(img, diameter = dia, channels=chan, flow_threshold = thres, cellprob_threshold=celp)
 
         # save results
-        io.masks_flows_to_seg(img, masks, flows, diams, os.path.join(seg, filez[:-4]), chan)
+        io.masks_flows_to_seg(img, masks, flows, os.path.join(seg, filez[:-4]), channels=chan, diams=diams)
         
         
         
@@ -1357,7 +1367,7 @@ def main(Directory= "all"):
 #%% running main function   
 
 if __name__ == "__main__":
-    Directory= "WT_mc2_55/30-03-2015"
+    Directory= 'WT_INH_700min_2014' #'delta_lamA_03-08-2018' #"WT_mc2_55/30-03-2015"
     run_one_dataset_logs_only( Directory )
     # main()
     

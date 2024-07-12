@@ -82,7 +82,7 @@ MASKS_LIST_NAME = 'masks_list.npz'
 ROI_DICT_NAME = 'ROI_dict.npz'
 ROI_MASKS_LIST_NAME = 'masks_ROI_list.npz'
 
-LINEAGE_MATRIX_NAME = 'lineage_matrix.npy' #'non_trig_link_matrix.npy'
+LINEAGE_MATRIX_NAME = 'lineage_matrix.npy'      # non_trig_link_matrix.npy'
 BOOL_MATRIX_NAME = "bool_matrix.npy"
 LINK_MATRIX_NAME = 'link_matrix.npy'
 
@@ -101,18 +101,20 @@ Processing
 
 
 # cellpose
-CEL_MODEL_TYPE = 'cyto'       # Cellpose segmentation algo default: 'cyto'   'cyto2' 'cyto3' 'bact_phase_cp3'
-CEL_CHANNELS = [0,0]          # Define channels to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
-CEL_DIAMETER_PARAM = 1      # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
-CEL_FLOW_THRESHOLD = 0.8    # oldparam : 0.9 (segmentation parameter)
-CEL_PROB_THRESHOLD = 0.4  # oldparam : 0.0 (segmentation parameter)
-CEL_GPU = True               # if you have access to a GPU
+CEL_MODEL_TYPE = 'cyto'                 # Cellpose segmentation algo default: 'cyto' 'cyto2' 'cyto3'  'tissuenet_cp3' 'livecell_cp3' 'yeast_PhC_cp3' 'yeast_BF_cp3' 'bact_phase_cp3' 'bact_fluor_cp3' 'deepbacs_cp3' 'cyto2_cp3'
+DENOISING_MODEL = "denoise_cyto3"       # None or "denoise_cyto3", "deblur_cyto3", "upsample_cyto3", "denoise_nuclei", "deblur_nuclei", "upsample_nuclei"
+
+CEL_CHANNELS = [0,0]                    # Define channels to run segementation on grayscale=0, R=1, G=2, B=3; channels = [cytoplasm, nucleus]; nucleus=0 if no nucleus
+CEL_DIAMETER_PARAM = 1                  # parameter to adjust the expected size (in pixels) of bacteria. Incease if cellpose detects too small masks, decrease if it don't detects small mask/ fusion them. Should be around 1 
+CEL_FLOW_THRESHOLD = 0.8                # oldparam : 0.9 (segmentation parameter)
+CEL_PROB_THRESHOLD = 0.4                # oldparam : 0.0 (segmentation parameter)
+CEL_GPU = True                          # if you have access to a GPU
 
 # img_treament
-RATIO_ERASING_MASKS = 0.2     # erasing small masks That have a smaller relative size
-RATIO_SATURATION = 0.1        # erasing masks that have a ratio of saturated surface bigger than this fraction
-MAX_PIXEL_IM = 1024           # maximum height or len of a picture
-CENTERLINE_CROP_PARAM = 2     # minimum ratio of two brench length to erase the small branch
+RATIO_ERASING_MASKS = 0.2               # erasing small masks That have a smaller relative size
+RATIO_SATURATION = 0.1                  # erasing masks that have a ratio of saturated surface bigger than this fraction
+MAX_PIXEL_IM = 1024                     # maximum height or len of a picture
+CENTERLINE_CROP_PARAM = 2               # minimum ratio of two brench length to erase the small branch
 THRESHOLD_SCARS_DIRECTORY = {'Height':0.9,
                              "Peak Force Error": 0.1,
                              "other":0.5} # specific parameters for initial image tratment
@@ -134,25 +136,25 @@ IMAGE_FOLDER_VIDEO = '../Python_code/img/'
 VIDEO_NAME = 'video.avi'
 
 # lineage_tree
-FINAL_THRESH = 0.75         # minimal threshold to consider a daughter-mother relation (previously 0.8)
-THRES_MIN_DIVISION = 0.7    # threshold to consider that there is a division and not just a break in the ROI (previously 0.7 )
-COMPARISON_THRES = 0.7      # threshold to consider that two children are actually linked
-MIN_LEN_ROI = 3             # minimum number of frames in an ROI
-CHILD_DIV_THRES = 0.34      # fraction of the preserved area to consider child and parent relation for masks (should be less than 0.5 to take into account the division)
-MAX_DIFF_TIME = 70          # maximum time between 2 frames to compore them (in seconds)
+FINAL_THRESH = 0.75                     # minimal threshold to consider a daughter-mother relation (previously 0.8)
+THRES_MIN_DIVISION = 0.7                # threshold to consider that there is a division and not just a break in the ROI (previously 0.7 )
+COMPARISON_THRES = 0.7                  # threshold to consider that two children are actually linked
+MIN_LEN_ROI = 3                         # minimum number of frames in an ROI
+CHILD_DIV_THRES = 0.34                  # fraction of the preserved area to consider child and parent relation for masks (should be less than 0.5 to take into account the division)
+MAX_DIFF_TIME = 70                      # maximum time between 2 frames to compore them (in seconds)
 
 # mds
-TRANSLATION_PENALTY = 500   # nm/ mu m penalization ratio for mds alignment
-MDS_MAX_RELATIVE_TRANS = 0.1  # maximum relative lenght translation
+TRANSLATION_PENALTY = 500               # nm/ mu m penalization ratio for mds alignment
+MDS_MAX_RELATIVE_TRANS = 0.1            # maximum relative lenght translation
 COMP_RATIO = np.array([8,10], dtype=np.int16)   # ratio of the centerlines to compare example 8/10 of the centerline
-MIN_CENTERLINE_LEN = 1.5    # mu m  minimal size of the centerlines
-MDS_MAX_TRANS = 0.5    # mu m  maximum translation
-MDS_MAX_ITER = None        # adding a number of iterations for better speed (loss of precision)
+MIN_CENTERLINE_LEN = 1.5                # mu m  minimal size of the centerlines
+MDS_MAX_TRANS = 0.5                     # mu m  maximum translation
+MDS_MAX_ITER = None                     # adding a number of iterations for better speed (loss of precision)
 
 # physical_feature
-PHYS_DERIV_PREC = 0.1      #mu m  length of the centerline to compute the vectors tangent to the centerlines
-PHYS_NORMAL_PREC =  0.2     #mu m 0.1 length of the averaged portion along the normal to the centerlines
-PHYS_TANGENT_PREC = 0.1    #mu m 0.1 length of the averaged portion along the tangent to the centerlines
+PHYS_DERIV_PREC = 0.1                   # mu m  length of the centerline to compute the vectors tangent to the centerlines
+PHYS_NORMAL_PREC =  0.2                 # mu m 0.1 length of the averaged portion along the normal to the centerlines
+PHYS_TANGENT_PREC = 0.1                 # mu m 0.1 length of the averaged portion along the tangent to the centerlines
 
 
 
@@ -161,42 +163,42 @@ Peaks and troughs parameters (pnt_)
 '''
 
 # pnt_preprocessing
-KERNEL_SIZE = 0.1575  # micrometers
-SLOPE_STD_CUT = 2.5  # dimensionless
-WINDOW_SIZE = 0.1575  # micrometers
+KERNEL_SIZE = 0.1575                    # micrometers
+SLOPE_STD_CUT = 2.5                     # dimensionless
+WINDOW_SIZE = 0.1575                    # micrometers
 
 # pnt_peaks_troughs
-SMOOTH_KERNEL_STD = 0.118  # micrometers
-MIN_FEATURE_WIDTH = 0.315  # micrometers
-MIN_FEATURE_DEPTH = 11.75  # nanometers
+SMOOTH_KERNEL_STD = 0.118               # micrometers
+MIN_FEATURE_WIDTH = 0.315               # micrometers
+MIN_FEATURE_DEPTH = 11.75               # nanometers
 
-# pnt_filtering     # filtering bad centerlines
-MIN_CENTERLINE_LEN = 2.5  # micrometers
-MIN_PREPROCESSED_CENTERLINE_LEN = 1.5  # micrometers
-MAX_SLOPE_STD = 3  # dimensionless 5
-MAX_SLOPE = 1500 # dimensionless (nanometers per micrometers) 1500 
-MAX_VAR_SLOPE = 4000 # dimensionless (nanometers per micrometers)
+# pnt_filtering                         # filtering bad centerlines
+MIN_CENTERLINE_LEN = 2.5                # micrometers
+MIN_PREPROCESSED_CENTERLINE_LEN = 1.5   # micrometers
+MAX_SLOPE_STD = 3                       # dimensionless 5
+MAX_SLOPE = 1500                        # dimensionless (nanometers per micrometers) 1500 
+MAX_VAR_SLOPE = 4000                    # dimensionless (nanometers per micrometers)
 
-# pnt_aligning     # aligning centerlines of a same ROI 
-MAX_TRANSLATION = 1.18  # micrometers
-MAX_RELATIVE_TRANSLATION=0.5 #maximum relative translation for centerlines comparision
-ALIGNMENT_PENALTY = 10000 # dimensionless (nanometers per micrometers) 50 
-WINDOW_RELATIVE_SIZE = 0.1 # size of the window relative to the centerline size
+# pnt_aligning                          # aligning centerlines of a same ROI 
+MAX_TRANSLATION = 1.18                  # micrometers
+MAX_RELATIVE_TRANSLATION = 0.5            # maximum relative translation for centerlines comparision
+ALIGNMENT_PENALTY = 10000               # dimensionless (nanometers per micrometers) 50 
+WINDOW_RELATIVE_SIZE = 0.1              # size of the window relative to the centerline size
 if MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE>1:
     raise ValueError("MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE<=1 is required") 
-QUANTILE_SIZE = 0.3 # Quantile value to select alignment
-QUANTILE_SIZE_DIVISION = 0.4
-WINDOW_RELATIVE_SIZE_DIVISION = 0.2
+QUANTILE_SIZE = 0.3                     # Quantile value to select alignment
+QUANTILE_SIZE_DIVISION = 0.4            # Quantile value to select alignment after division
+WINDOW_RELATIVE_SIZE_DIVISION = 0.2     # 0.2 size of the window relative to the centerline size, for alignment after division
 if MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE_DIVISION>1:
     raise ValueError("MAX_RELATIVE_TRANSLATION+WINDOW_RELATIVE_SIZE_DIVISION<=1 is required") 
-ALIGNMENT_PENALTY_DIVISION = 20000 # dimensionless (nanometers per micrometers) 
+ALIGNMENT_PENALTY_DIVISION = 20000      # 20000 dimensionless (nanometers per micrometers), penalty when daughter cells are ticking inside mother cells 
+DEPTH_COMPARISON_ALIGN = 5              # int, number of centerline to compare for alignment
 
-
-# pnt_tracking      # tracking of the suface features (peaks and troughs over generations)
-MAX_TIME = 70       #mn  max time between 2 frames to compare them
-FIRST_MAX_XDRIFT = 0.5      #mu m  max x coordinate difference between 2 frames to compare them
-FINAL_MAX_XDRIFT = 0.8      #mu m  max x coordinate difference between 2 frames to compare them
-MAX_YDRIFT = 500    #NM  max y coordinate difference between 2 frames to compare them
+# pnt_tracking                          # tracking of the suface features (peaks and troughs over generations)
+MAX_TIME = 70                           # mn  max time between 2 frames to compare them
+FIRST_MAX_XDRIFT = 0.5                  # mu m  max x coordinate difference between 2 frames to compare them
+FINAL_MAX_XDRIFT = 0.8                  # mu m  max x coordinate difference between 2 frames to compare them
+MAX_YDRIFT = 500                        # nm  max y coordinate difference between 2 frames to compare them
 
 #stats
 BIN_NUMBER_HIST_FEAT_CREA = 20          # number of bins for the histogram for the feature creation plot
@@ -207,6 +209,10 @@ POLE_REGION_SIZE = 1.5                  # mu m physical size of the pole region
 DIV_MAX_SUPERPOSITION = 0.5             # mu m maximum superposition of the 2 daughter centerlines admissible
 DIV_MAX_DIST_FROM_MOTH = 1              # mu m maximum distance from mother closest boundary
 DIV_MIN_DAUGTHER_SIZE = 2               # mu m min size of other daughter if 1 daughter selected
+DIV_CURV_PHY_WINDOW = 0.2               # mu m min size of window for computing local curvature
+DIV_CURV_SMOOTH = 0.1                  # mu m min size of guassian smoothing std for computing local curvature
+
+
 
 def get_scaled_parameters(
     paths_and_names=False,
@@ -270,6 +276,7 @@ def get_scaled_parameters(
 
     if cellpose:
         params['cel_model_type'] = CEL_MODEL_TYPE
+        params['cel_denoise_model'] = DENOISING_MODEL
         params['cel_channels'] = CEL_CHANNELS
         params['cel_diameter_param'] = CEL_DIAMETER_PARAM
         params['cel_flow_threshold'] = CEL_FLOW_THRESHOLD
@@ -338,6 +345,7 @@ def get_scaled_parameters(
         params["quantile_size_division"] = QUANTILE_SIZE_DIVISION
         params["window_relative_size_division"] = WINDOW_RELATIVE_SIZE_DIVISION
         params["penalty_division"] = ALIGNMENT_PENALTY_DIVISION
+        params["depth_comparison_align"] = DEPTH_COMPARISON_ALIGN
     
     if pnt_tracking:
         params["max_time"] = MAX_TIME
@@ -354,6 +362,8 @@ def get_scaled_parameters(
          params["div_max_superposition"] = DIV_MAX_SUPERPOSITION
          params["div_max_dist_from_moth"] = DIV_MAX_DIST_FROM_MOTH
          params['div_min_daugther_size'] = DIV_MIN_DAUGTHER_SIZE
+         params['div_curv_phy_window'] = DIV_CURV_PHY_WINDOW
+         params['div_curv_smooth'] = DIV_CURV_SMOOTH
 
 
     return params

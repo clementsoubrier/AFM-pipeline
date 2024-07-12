@@ -291,18 +291,29 @@ def save_mask(
 ):
     line = img_dict["centerlines"][mask_id]
     angle = img_dict['angle']
-    xs, ys = img_dict["height_profiles_fwd"][mask_id]
-    xs_bwd, ys_bwd = img_dict["height_profiles_bwd"][mask_id]
-    if not line.size:
-        return reference_line, reference_xs, reference_ys, reference_angle, orientation
-    if reference_line is not None:
-        line, xs, ys, xs_bwd, ys_bwd = use_same_direction(
-            reference_line, line, reference_angle, angle, xs, ys, xs_bwd, ys_bwd
-        )
-    if orientation is None:
-        orientation = determine_orientation(reference_line, line)
     timestamp = img_dict["time"]
     pixel_size = img_dict["resolution"]
+    xs, ys = img_dict["height_profiles_fwd"][mask_id]
+    xs_bwd, ys_bwd = img_dict["height_profiles_bwd"][mask_id]
+    
+    params =  get_scaled_parameters(pnt_aligning=True, pixel_size=pixel_size)
+    alignment_depth = params["depth_comparison_align"]
+    
+    
+    if not line.size:
+        return reference_line, reference_xs, reference_ys, reference_angle, orientation
+    if reference_line != []:
+        line, xs, ys, xs_bwd, ys_bwd = use_same_direction(
+            reference_line[-1], line, reference_angle[-1], angle, xs, ys, xs_bwd, ys_bwd
+        )
+    else : 
+        reference_line = []
+        reference_xs = []
+        reference_ys = []
+        reference_angle = []
+    if orientation is None:
+        orientation = determine_orientation(reference_line[-1], line)
+    
     params = get_scaled_parameters(pixel_size=pixel_size, pnt_preprocessing=True, pnt_filtering=True)
     no_defect = keep_centerline(xs, ys, pixel_size, **params)
     if not no_defect and xs_bwd is not None:
@@ -340,15 +351,24 @@ def save_mask(
         dataset_name=dataset_name
     )
     length_current = xs[-1] - xs[0]
-    if reference_xs is None:
+    if  reference_xs == []:
         length_reference = None
     else:
-        length_reference = reference_xs[-1] - reference_xs[0]
+        length_reference = max([elem[-1]-elem[0] for elem in reference_xs])
     if no_defect or (
         len(line) >= 10
-        and (reference_line is None or length_current >= length_reference)
+        and (length_reference is None or length_current >= length_reference)
     ):
-        return line, xs, ys, angle, orientation
+        if len(reference_line) >= alignment_depth:
+            del(reference_line[0])
+            del(reference_xs[0])
+            del(reference_ys[0])
+            del(reference_angle[0])
+        reference_line.append(line)
+        reference_xs.append(xs)
+        reference_ys.append(ys)
+        reference_angle.append(angle)
+        
     return reference_line, reference_xs, reference_ys, reference_angle, orientation
 
 
@@ -376,7 +396,7 @@ def save_roi(
     except KeyError:
         missing_masks_quality = True
         masks_quality = [True] * len(masks)
-    if reference_line is None:
+    if reference_line == []:
         orientation = Orientation.UNKNOWN
     else:
         orientation = None
@@ -384,7 +404,11 @@ def save_roi(
     for mask_index, quality in zip(masks, masks_quality, strict=True):
         _, _, frame, mask_label = masks_list[mask_index]
         img_dict = main_dict[frame]
-        if first_iter and reference_line is not None:
+        if first_iter and reference_line != []:
+            reference_line = [reference_line[-1]]
+            reference_xs = [reference_xs[-1]]
+            reference_ys = [reference_ys[-1]]
+            reference_angle = [reference_angle[-1]]
             reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
                 img_dict,
                 mask_label - 1,
@@ -399,6 +423,11 @@ def save_roi(
                 dataset_name,
                 division_break=True
             )
+            if len(reference_line)>1:
+                del(reference_line[0])
+                del(reference_xs[0])
+                del(reference_ys[0])
+                del(reference_angle[0])
         
         else:
             reference_line, reference_xs, reference_ys, reference_angle, orientation = save_mask(
@@ -432,7 +461,7 @@ def save_dataset(dataset, log_progress=True):
     for roi_name in roi_names:
         roi = roi_dict[roi_name]
         roi_dir = os.path.join( "data", "cells", dataset, roi_name, "lines")
-        reference = references.pop(roi_name, (None, None, None, None))
+        reference = references.pop(roi_name, ([], [], [], []))
         reference, missing_masks_quality = save_roi(
             roi, *reference, masks_list, main_dict, roi_dir, dataset
         )
@@ -440,7 +469,8 @@ def save_dataset(dataset, log_progress=True):
             dataset_missing_masks_quality or missing_masks_quality
         )
         for child in roi["Children"]:
-            references[child] = reference
+            if reference != [] and len(reference[0]) >= 1:
+                references[child] = [[elem[-1]] for elem in reference]
     if dataset_missing_masks_quality:
         global datasets_missing_masks_quality
         datasets_missing_masks_quality.append(dataset)
@@ -492,5 +522,5 @@ def main(datasets=None):
 
 
 if __name__ == "__main__":
-    main(os.path.join("WT_mc2_55", "30-03-2015"))
+    main('WT_no_drug') #os.path.join("WT_mc2_55", "30-03-2015")
     # main()

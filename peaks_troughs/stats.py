@@ -952,7 +952,52 @@ def feature_len_height_variation(dataset_names):
     
    
 
-
+def datasets_statistics():
+    params = get_scaled_parameters(data_set=True, paths_and_names=True)
+    mask_number = 0
+    ROI_number = 0
+    WT_ROI_number = 0
+    WT_mask_number = 0
+    nd_WT_ROI_number = 0
+    nd_WT_mask_number = 0
+    
+    dicname = params["main_dict_name"]
+    data_direc = params["main_data_direc"]
+    
+    datasets = params['WT_no_drug']
+    for set in datasets:
+        for roi_id, cell in load_dataset(set, False):
+            if len(cell) > 5:
+                ROI_number+=1
+        dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        for fichier in dic:
+            mask_number += len(dic[fichier]['outlines'])
+    print(f'WT no drug mask number : {mask_number}')
+    print(f'WT no drug ROI number : {ROI_number}')
+    
+    datasets = params['WT_drug']
+    for set in datasets:
+        for roi_id, cell in load_dataset(set, False):
+            if len(cell) > 5:
+                ROI_number+=1
+        dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        for fichier in dic:
+            mask_number += len(dic[fichier]['outlines'])
+    print(f'WT mask number : {mask_number}')
+    print(f'WT ROI number : {ROI_number}')
+    
+    datasets = params['no_WT']
+    for set in datasets:
+        for roi_id, cell in load_dataset(set, False):
+            if len(cell) > 5:
+                ROI_number+=1
+        dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        for fichier in dic:
+            mask_number += len(dic[fichier]['outlines'])
+    
+    print(f'Total mask number : {mask_number}')
+    print(f'Total good ROI number : {ROI_number}')
+    
 
 
 
@@ -985,5 +1030,5 @@ if __name__ == "__main__":
     # feature_displacement("all") #"all"
     # feature_len_height_variation ("WT_mc2_55/30-03-2015")
     # feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    feature_properties_pole('all')
-
+    # feature_properties_pole('all')
+    datasets_statistics()

@@ -168,8 +168,11 @@ def kymograph(*cells_and_id,  dataset='', division_point = None):   #first cell 
                 troughs_y.extend(ys[troughs])
                 troughs_z.extend([timestamp]*len(troughs))
             ax.plot3D(xs, zs, ys,c="k", alpha=0.6)
-        ax.scatter(peaks_x,  peaks_z, peaks_y,c="red")
-        ax.scatter(troughs_x, troughs_z, troughs_y, c="green")
+            if division_point is not None and division_point[1] >= timestamp:
+                div_ind = np.argmin((xs-division_point[0])**2)
+                ax.plot3D(xs[div_ind], timestamp, ys[div_ind]+10, c="darkorange", marker='v', markersize = 8, alpha=1 )
+        ax.scatter(peaks_x,  peaks_z, peaks_y,c="k")
+        ax.scatter(troughs_x, troughs_z, troughs_y, c="r")
         
         
         pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
@@ -182,8 +185,7 @@ def kymograph(*cells_and_id,  dataset='', division_point = None):   #first cell 
                 coord_y.append(pnt_list[elem,4] )
                 coord_z.append(pnt_list[elem,5]-base_time)
             ax.plot(coord_x, coord_z, coord_y, color = 'b')
-    if division_point is not None:
-        ax.plot3D(division_point[0], division_point[1], division_point[2]+10, c="darkorange", marker='v', markersize = 7, alpha=1 )
+    
     ax.set_zlabel(r'height ($nm$)')
     ax.set_ylabel(r'time ($min$)')
     ax.set_xlabel(r' centerline lenght ($\mu m$)')
@@ -192,6 +194,7 @@ def kymograph(*cells_and_id,  dataset='', division_point = None):   #first cell 
     # ax.set_ylim([0, 600])
 
     plt.title(title)
+    plt.tight_layout()
 
     
 
@@ -316,35 +319,46 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
 
 
 
-def main():
-    dataset = os.path.join("WT_mc2_55", "30-03-2015")
-    # dataset = "WT_mc2_55/06-10-2015"
-    params = get_scaled_parameters(paths_and_names=True)
-    data_direc = params["main_data_direc"]
-    roi_dic_name = params["roi_dict_name"]
-    roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+def main(Directory='all'):
+    params = get_scaled_parameters(data_set=True)
+    if Directory in params.keys():
+        datasets = params[Directory]
+    elif isinstance(Directory, list)  : 
+        datasets = Directory
+    elif isinstance(Directory, str)  : 
+        raise NameError('This directory does not exist')
     
     
-    
-    
-    
-    for roi_id, cell in load_dataset(dataset, False):
-        if len(cell)>1:
-            if len(roi_dic[roi_id]['Children']) >= 1:
-                division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
-                if division_point is not None:
-                    division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
-                print(division_point)
-            for daughter_cell in roi_dic[roi_id]['Children']:
-                d_cell = load_cell(daughter_cell, dataset=dataset)
-                if len(d_cell)>1:
-                    lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+    for dataset in datasets:
+        params = get_scaled_parameters(paths_and_names=True)
+        data_direc = params["main_data_direc"]
+        roi_dic_name = params["roi_dict_name"]
+        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        
+        
+        
+        
+        
+        for roi_id, cell in load_dataset(dataset, False):
+            if len(cell)>10:
+                if len(roi_dic[roi_id]['Children']) >= 1:
                     
-                    kymograph(*lineage, dataset=dataset, division_point=division_point)
-            # kymograph_feature((cell, roi_id), dataset=dataset)
-            # kymograph((cell, roi_id), dataset=dataset)
-        # plot_cell_centerlines((cell, roi_id), dataset=dataset)
-        plt.show()
+                    
+                    division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
+                    if division_point is not None:
+                        division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
+                    for daughter_cell in roi_dic[roi_id]['Children']:
+                        d_cell = load_cell(daughter_cell, dataset=dataset)
+                        if len(d_cell)>5:
+                            lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+                            
+                            kymograph(*lineage, dataset=dataset, division_point=division_point)
+                
+                
+                # kymograph_feature((cell, roi_id), dataset=dataset)
+                # kymograph((cell, roi_id), dataset=dataset)
+                # plot_cell_centerlines((cell, roi_id), dataset=dataset)
+    plt.show()
     
     
 
@@ -353,4 +367,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(Directory='WT_no_drug')

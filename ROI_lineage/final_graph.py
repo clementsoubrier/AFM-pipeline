@@ -462,7 +462,7 @@ def main(Directory= "all"):
 
 if __name__ == "__main__":
 
-    Directory=  "WT_mc2_55/30-03-2015"
+    Directory= "WT_mc2_55/03-09-2014"  # "WT_mc2_55/30-03-2015" # "WT_mc2_55/06-10-2015"
     main(Directory=Directory)
 
     # main()

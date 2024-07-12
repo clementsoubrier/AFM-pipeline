@@ -81,10 +81,10 @@ def quantile_error_no_window(y_1, y_2, h_offset, quantile):
 @njit
 def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_size,use_quantile, division, penalty_division):
     if len(y_2) > len(y_1):
-        best_h_offset, best_v_offset = align_quantile(
+        best_h_offset, best_v_offset, best_error = align_quantile(
             y_2, y_1, max_translation, penalty, window, quantile, pixel_size,use_quantile, division, penalty_division
         )
-        return -best_h_offset, -best_v_offset
+        return -best_h_offset, -best_v_offset, best_error
     y_1 = y_1.astype(np.float32)
     y_2 = y_2.astype(np.float32)
     window_len = round(window * (len(y_2) - 1)) + 1
@@ -100,7 +100,7 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
          #physical superimposition zone
         
         min_v_offset, max_v_offset = compute_v_offset_range(
-            y_1, y_2, h_offset,v_offset_window_len
+            y_1, y_2, h_offset, v_offset_window_len
         )
         v_offset_sampling = math.ceil(max_v_offset - min_v_offset) + 1
         v_offsets = np.linspace(min_v_offset, max_v_offset, v_offset_sampling)
@@ -112,7 +112,7 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
             if division:
                 error = quantile_error(y_1, y_2 + v_offset, h_offset, window_len, quantile)
                 stick_in = min(max(0, h_offset), max(0, len(y_1) - len(y_2) - h_offset))
-                total_error = error / physical_length + stick_out_error + penalty_division * stick_in *pixel_size
+                total_error = error / physical_length + stick_out_error + penalty_division * stick_in * pixel_size
             else :
                 if window_len==1:
                     error = quantile_error_no_window(y_1, y_2, h_offset, quantile)
@@ -127,10 +127,10 @@ def align_quantile(y_1, y_2, max_translation, penalty, window, quantile, pixel_s
                 best_h_offset = h_offset
                 best_v_offset = v_offset
 
-    return best_h_offset, best_v_offset
+    return best_h_offset, best_v_offset, best_error
 
 
-def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True,smoothed=False, division=False):
+def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size, use_quantile_instead_of_min=True, smoothed=False, division=False):
     
 
     max_translation = params["max_translation"]
@@ -150,34 +150,70 @@ def align_with_reference(xs, ys, reference_xs, reference_ys, params, pixel_size,
         quantile_size=params["quantile_size"]
     
     physical_max_translation = max_translation * pixel_size
-    if reference_xs is None or reference_ys is None:
+    if reference_xs == [] or reference_ys == []:
         return xs, ys
     xs_p, ys_p = preprocess_centerline(
         xs, ys, params["kernel_len"], params["std_cut"], params["window"], pixel_size
     )
-    ref_xs_p, ref_ys_p = preprocess_centerline(
-        reference_xs, reference_ys, params["kernel_len"], params["std_cut"], params["window"], pixel_size
-    )
     if xs_p[-1] - xs_p[0] < physical_max_translation:
         xs_p, ys_p = evenly_spaced_resample(xs, ys, pixel_size)
-    if ref_xs_p[-1] - ref_xs_p[0] < physical_max_translation:
-        ref_xs_p, ref_ys_p = evenly_spaced_resample(
-            reference_xs, reference_ys, pixel_size
-        )
     if smoothed:
         ys_p = gaussian_filter1d(ys_p, smooth_std, mode="nearest")
-        ref_ys_p = gaussian_filter1d(ref_ys_p, smooth_std, mode="nearest")
-
-    relative_translation=min(max_relative_translation,physical_max_translation/min(abs(xs_p[-1] - xs_p[0]),abs(ref_xs_p[-1] - ref_xs_p[0])))
-
-    if len(ref_ys_p) < 5 or len(ys_p) < 5:
+    if len(ys_p) < 5:
         return xs, ys
+    
+    ref_data = {'delta' : [], 'v_delta' : [], 'score' : [], 'bad_quality' : [], 'x0_1st' : []}
+    for ref_cent in zip(reference_xs, reference_ys):
+        
+        ref_xs_p, ref_ys_p = preprocess_centerline(
+            ref_cent[0], ref_cent[1], params["kernel_len"], params["std_cut"], params["window"], pixel_size
+        )
+        
+        if ref_xs_p[-1] - ref_xs_p[0] < physical_max_translation:
+            ref_xs_p, ref_ys_p = evenly_spaced_resample(
+                ref_cent[0], ref_cent[1], pixel_size
+            )
+        
+        if smoothed:
+            ref_ys_p = gaussian_filter1d(ref_ys_p, smooth_std, mode="nearest")
 
-    # add max translation
-    delta, v_delta = align_quantile(ref_ys_p, ys_p, relative_translation, penalty, window_relative_size, quantile_size, pixel_size, use_quantile_instead_of_min, division, penalty_division)
-    h_translation = ref_xs_p[0] - xs_p[0] + delta * pixel_size
+        relative_translation=min(max_relative_translation, physical_max_translation/min(abs(xs_p[-1] - xs_p[0]),abs(ref_xs_p[-1] - ref_xs_p[0])))
 
-    return xs+ h_translation, ys+ v_delta    
+        if len(ref_ys_p) < 5 :
+            ref_data['bad_quality'].append(True)
+            ref_data['delta'].append(0)
+            ref_data['v_delta'].append(0)
+            ref_data['score'].append(0)
+            ref_data['x0_1st'].append(0)
+        else :    
+            # add max translation
+            delta, v_delta, score = align_quantile(ref_ys_p, ys_p, relative_translation, penalty, window_relative_size, quantile_size, pixel_size, use_quantile_instead_of_min, division, penalty_division)
+            
+            ref_data['bad_quality'].append(False)
+            ref_data['delta'].append(delta)
+            ref_data['v_delta'].append(v_delta)
+            ref_data['score'].append(score)
+            ref_data['x0_1st'].append(ref_xs_p[0])
+            
+    ref_data['bad_quality'] = np.array(ref_data['bad_quality'], dtype=bool)
+    ref_data['delta'] = np.array(ref_data['delta'])
+    ref_data['v_delta'] = np.array(ref_data['v_delta'])
+    ref_data['score'] = np.array(ref_data['score'])
+    ref_data['x0_1st'] = np.array(ref_data['x0_1st'])
+    
+    
+    
+    if np.all(ref_data['bad_quality']):
+        return xs, ys
+    
+    ref_data['score'][ref_data['bad_quality']] = np.max(ref_data['score'])+1
+    best_parent_ind = np.argmin(ref_data['score'])
+    
+    
+    h_translation = ref_data['x0_1st'][best_parent_ind] - xs_p[0] + ref_data['delta'][best_parent_ind] * pixel_size
+    v_delta  = ref_data['v_delta'][best_parent_ind]
+
+    return xs + h_translation, ys + v_delta    
 
 
 # def align_with_reference_division(xs, ys, xs2, ys2, reference_xs, reference_ys, params, pixel_size,use_quantile_instead_of_min=True,smoothed=False):

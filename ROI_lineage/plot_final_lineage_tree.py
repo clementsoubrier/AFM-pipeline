@@ -390,12 +390,14 @@ def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir
         plt.imshow(mask_RGB)
         
         # plot the centroids and the centerlines
-        centr=dic[fichier]['centroid']
-        line=dic[fichier]['centerlines']
+        centr = dic[fichier]['centroid']
+        line = dic[fichier]['centerlines']
+        out = dic[fichier]['outlines']
         for i in range(len(centr)):
             #centroids
             plt.plot(centr[i,1], centr[i,0], color='k',marker='o')
             plt.annotate(roi_ind_list[i], centr[i,::-1], xytext=[10,0], textcoords='offset pixels', color='lime')
+            plt.plot(out[i][:,1],out[i][:,0], color='r')
             if len(line[i])>1:
                 plt.plot(line[i][:,1],line[i][:,0], color='k')
         
@@ -435,12 +437,14 @@ def plot_image_lineage_tree(dic,maskcol,indexlist,directory,saving=False,img_dir
     plt.imshow(mask_RGB)
     
     # plot the centroids and the centerlines
-    centr=dic[fichier]['centroid']
-    line=dic[fichier]['centerlines']
+    centr = dic[fichier]['centroid']
+    line = dic[fichier]['centerlines']
+    out = dic[fichier]['outlines']
     for i in range(len(centr)):
         #centroids
         plt.plot(centr[i,1], centr[i,0], color='k',marker='o')
-        plt.annotate(roi_ind_list[i], centr[i,::-1], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
+        plt.annotate(roi_ind_list[i], centr[i,::-1], xytext=[10,0], textcoords='offset pixels', color='lime')
+        plt.plot(out[i][:,1],out[i][:,0], color='r')
         if len(line[i])>1:
             plt.plot(line[i][:,1],line[i][:,0], color='k')
     
@@ -641,6 +645,20 @@ def plot_channel(direc, channel):
     indexlist = np.load(os.path.join(data_direc, direc, indexlistname), allow_pickle=True)['arr_0']
     
     plot_image_lineage_tree(main_dict,colormask,indexlist,direc,channel=channel)
+
+def plot_lineage(direc):
+    params=get_scaled_parameters(paths_and_names=True,plot=True)
+    
+    data_direc = params["main_data_direc"]
+    colormask = params["masks_colors"]
+    dicname = params["main_dict_name"]
+    indexlistname = params['masks_list_name']
+    ROIdicname = params['roi_dict_name']
+    maindic=np.load(os.path.join(data_direc, direc, dicname), allow_pickle=True)['arr_0'].item()
+    ROIdic=np.load(os.path.join(data_direc, direc, ROIdicname), allow_pickle=True)['arr_0'].item()
+    ROIlist = np.load(os.path.join(data_direc, direc, indexlistname), allow_pickle=True)['arr_0']
+    
+    plot_lineage_tree(ROIdic, ROIlist, maindic, colormask, direc)
     
     
     
@@ -663,8 +681,9 @@ def main(Directory= "all", plot=True):
 
 #%% running main function   
 if __name__ == "__main__":
-    Directory = os.path.join("WT_mc2_55", "30-03-2015") #"delta_parB/03-02-2015" "WT_mc2_55/03-09-2014/" 
-    plot_channel(Directory, 'Height_fwd')
+    Directory = "WT_mc2_55/30-03-2015" # "WT_mc2_55/03-09-2014" #"WT_mc2_55/06-10-2015" #os.path.join("WT_mc2_55", "30-03-2015") #'delta_lamA_03-08-2018/'   "delta_parB/15-11-2014" "WT_mc2_55/03-09-2014/" 'WT_INH_700min_2014/'
+    plot_lineage(Directory)
+    # plot_channel(Directory, 'Height_fwd')
     # plot_channel(Directory, 'DMTModulus_fwd')
     # main(Directory = Directory )
     # main(plot=False)

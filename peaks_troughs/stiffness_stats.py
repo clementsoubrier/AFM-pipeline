@@ -160,7 +160,7 @@ def feature_pnt_stats(datasetnames, feature='DMTModulus_fwd', averaged=True):
 
 
 def phys_region_one_dataset(dataset, feature, averaged):
-    params = get_scaled_parameters(paths_and_names=True, physical_feature=True)
+    params = get_scaled_parameters(paths_and_names=True, physical_feature=True, stats=True)
     non_pole_list = []
     pole_list = []
     diff_list = []
@@ -168,7 +168,7 @@ def phys_region_one_dataset(dataset, feature, averaged):
     dicname = params["main_dict_name"]
     listname = params["masks_list_name"]
     data_direc = params["main_data_direc"]
-    pole_len = params["phys_pole_size"]
+    pole_len = params["pole_region_size"]
     
     masks_list = np.load(os.path.join(data_direc, dataset, listname), allow_pickle=True)['arr_0']
     main_dict = np.load(os.path.join(data_direc, dataset, dicname), allow_pickle=True)['arr_0'].item()

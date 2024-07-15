@@ -685,7 +685,7 @@ if __name__ == "__main__":
     plot_lineage(Directory)
     # plot_channel(Directory, 'Height_fwd')
     # plot_channel(Directory, 'DMTModulus_fwd')
-    # main(Directory = Directory )
+    main(Directory = Directory )
     # main(plot=False)
 
     ''''''

@@ -5,7 +5,10 @@ Created on Fri Oct 21 11:18:29 2022
 
 @author: c.soubrier
 """
+import os
+import shutil
 from multiprocessing import Pool
+
 
 from scaled_parameters import get_scaled_parameters
 
@@ -22,6 +25,31 @@ def run_one_direc(direc):
     plot_final_lineage_tree.run_whole_lineage_tree(direc,False)
     Images_to_video.create_video(direc)
     group_by_cell.compute_dataset(direc)
+    
+    if direc == 'WT_INH_700min_2014':
+        params = get_scaled_parameters(paths_and_names=True)
+        data_direc = params["main_data_direc"]
+        or_dir = os.path.join(data_direc, direc)
+        dir_im_a = os.path.join(data_direc, "INH_after_700")
+        dir_im_b = os.path.join(data_direc, "INH_before_700")
+        
+        if os.path.exists(dir_im_a):
+            for file in os.listdir(dir_im_a):
+                os.remove(os.path.join(dir_im_a, file))
+        else:
+            os.makedirs(dir_im_a)
+        if os.path.exists(dir_im_b):
+            for file in os.listdir(dir_im_b):
+                os.remove(os.path.join(dir_im_b, file))
+        else:
+            os.makedirs(dir_im_b)
+            
+        for file in os.listdir(or_dir) :
+            file_path = os.path.join(or_dir, file)
+            if os.path.isfile(file_path):
+                shutil.copy(file_path, os.path.join(dir_im_a, file))
+                shutil.copy(file_path, os.path.join(dir_im_b, file))
+            
 
 
 

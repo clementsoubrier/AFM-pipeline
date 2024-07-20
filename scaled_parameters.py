@@ -43,6 +43,16 @@ DATA_SET_NO_WT = ['delta_lamA_03-08-2018',
                   "delta_parB/18-11-2014",
                   "delta_ripA/14-10-2016"]
 
+DATA_SET_NO_DRUG = ["WT_mc2_55/06-10-2015",
+                    "WT_mc2_55/30-03-2015",
+                    "WT_mc2_55/03-09-2014",
+                    'delta_lamA_03-08-2018',
+                    'delta_LTD6_04-06-2017',
+                    "delta_parB/15-11-2014",
+                    "delta_parB/18-01-2015",
+                    "delta_parB/18-11-2014",
+                    "delta_ripA/14-10-2016"]
+
 DATA_SET_GOOD_QUAL = ["WT_mc2_55/30-03-2015",
                       "WT_mc2_55/03-09-2014"
                       ] #To precise
@@ -270,6 +280,7 @@ def get_scaled_parameters(
         params['WT_no_drug'] = DATA_SET_WT_NO_DRUG
         params['WT_drug'] = DATA_SET_WT_DRUG
         params['no_WT'] = DATA_SET_NO_WT
+        params['no_drug'] = DATA_SET_NO_DRUG
         params['good'] = DATA_SET_GOOD_QUAL
         params['data_with_feature'] = DATA_SET_FEAT
 

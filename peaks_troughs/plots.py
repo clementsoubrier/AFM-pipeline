@@ -341,22 +341,25 @@ def main(Directory='all'):
         
         for roi_id, cell in load_dataset(dataset, False):
             if len(cell)>10:
-                if len(roi_dic[roi_id]['Children']) >= 1:
+                # if len(roi_dic[roi_id]['Children']) >= 1:
                     
                     
-                    division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
-                    if division_point is not None:
-                        division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
-                    for daughter_cell in roi_dic[roi_id]['Children']:
-                        d_cell = load_cell(daughter_cell, dataset=dataset)
-                        if len(d_cell)>5:
-                            lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+                #     division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
+                #     if division_point is not None:
+                #         division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
+                #     for daughter_cell in roi_dic[roi_id]['Children']:
+                #         d_cell = load_cell(daughter_cell, dataset=dataset)
+                #         if len(d_cell)>5:
+                #             lineage = [(cell, roi_id),(d_cell, daughter_cell)]
                             
-                            kymograph(*lineage, dataset=dataset, division_point=division_point)
+                #             kymograph(*lineage, dataset=dataset, division_point=division_point)
                 
                 
                 # kymograph_feature((cell, roi_id), dataset=dataset)
-                # kymograph((cell, roi_id), dataset=dataset)
+                if len(roi_dic[roi_id]['Children']) >= 1:
+                    for daughter_cell in roi_dic[roi_id]['Children']:
+                        d_cell = load_cell(daughter_cell, dataset=dataset)
+                        kymograph((d_cell, daughter_cell), dataset=dataset)
                 # plot_cell_centerlines((cell, roi_id), dataset=dataset)
     plt.show()
     
@@ -367,4 +370,4 @@ def main(Directory='all'):
 
 
 if __name__ == "__main__":
-    main(Directory='WT_no_drug')
+    main(Directory="WT_mc2_55/03-09-2014")

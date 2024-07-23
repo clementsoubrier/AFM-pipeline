@@ -2,6 +2,7 @@ import itertools
 import os
 import sys
 import statistics
+import math
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,6 +15,17 @@ if not package_path in sys.path:
 from scaled_parameters import get_scaled_parameters
 from peaks_troughs.group_by_cell import Orientation, load_cell, load_dataset
 
+def p_value_to_str(p):
+    if math.isnan(p):
+        return 'NaN'
+    elif p>=0.05:
+        return f"P={p:.2e}"
+    elif p>=0.01:
+        return f"P={p:.2e} *"
+    elif p>=0.001:
+        return f"P={p:.2e} **"
+    else :
+        return f"P={p:.2e} ***"
 
 
 def extract_growth(roi):
@@ -143,7 +155,7 @@ def plot_piecewise_linear_reg(timestamps,old_pole_growth, new_pole_growth, overa
     
     
     if outlier_detection:
-        overall_times, overall_growth= remove_length_outliers(overall_times , overall_growth)
+        overall_times, overall_growth =   remove_length_outliers(overall_times , overall_growth)
         # new_times, new_pole_growth = remove_length_outliers(overall_times , new_pole_growth)
         # old_times, old_pole_growth = remove_length_outliers(overall_times , old_pole_growth)
         
@@ -293,7 +305,7 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
                 if outlier_detection:
                     new_times, new_pole_growth = remove_length_outliers(new_times, new_pole_growth)
                     old_times, old_pole_growth = remove_length_outliers(old_times, old_pole_growth)
-                    overall_times, overall_growth= remove_length_outliers(overall_times, overall_growth)
+                    overall_times, overall_growth =   remove_length_outliers(overall_times, overall_growth)
                     
                 a_1, a_2, _, t = piecewise_pointwise_linear_regression(new_times, new_pole_growth)
                 
@@ -313,7 +325,6 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
                     mat[:, 0] = old_times
                     mat[:, 1] = 1
                     a_5, _ = np.linalg.lstsq(mat, old_pole_growth, None)[0]
-                    # a_5 = stats.linregress(old_times, old_pole_growth).slope
                     
                     old_new_slopes.append([new_a_1, new_a_2, a_3, a_4, a_5])
                 
@@ -330,7 +341,7 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
     ax.set_title(f"Neto statistics with 2 methods and dataset {datasetnames}")
     pvalue = stats.ttest_ind(old_new_neto,overall_neto).pvalue
     print(pvalue)
-    ax.annotate(f"P={pvalue:.2e}",(1.3,120))
+    ax.annotate(p_value_to_str(pvalue),(1.3,120))
     
     
     _, ax = plt.subplots()
@@ -340,7 +351,7 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
     ax.set_xticklabels(["Before NETO", "After NETO","Difference before/after"])
     pvalue = stats.ttest_ind(overall_slopes[:,0],overall_slopes[:,1]).pvalue
     print(pvalue)
-    ax.annotate(f"P={pvalue:.2e}",(1.3,0.02))
+    ax.annotate(p_value_to_str(pvalue),(1.3,0.02))
 
     
     
@@ -354,9 +365,9 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
     x1 = 1
     x2 = 2 
     y = 0.015
-    h=0.001
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e}", ha='center', va='bottom')
+    h = 0.001
+    ax.plot([x1, x2], [y, y], color = 'r')
+    ax.text((x1+x2)*.5, y+ h, p_value_to_str(pvalue), ha='center', va='bottom')
     ax.set_ylim(top = 0.017)
     
     
@@ -368,8 +379,6 @@ def compute_growth_stats(datasetnames, outlier_detection=False):
 def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False):
     
     tot_growth = []
-    overall_neto = []
-    old_new_neto = []
     overall_slopes = []  # first, second
     old_new_slopes = []  # first new, second new, old
     params = get_scaled_parameters(data_set=True)
@@ -391,41 +400,40 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
                 if outlier_detection:
                     new_times, new_pole_growth = remove_length_outliers(new_times, new_pole_growth)
                     old_times, old_pole_growth = remove_length_outliers(old_times, old_pole_growth)
-                    overall_times, overall_growth= remove_length_outliers(overall_times, overall_growth)
+                    overall_times, overall_growth =   remove_length_outliers(overall_times, overall_growth)
  
-                # selecting a real Neto : increase in overall elongation speed
+                # the neto is computed from the overall length because it is more stable
                 a_1, a_2, b, t = piecewise_pointwise_linear_regression(overall_times, overall_growth)
                 overall_slopes.append([a_1,a_2])
-                if 0<a_1<=a_2:
-                    # the neto is computed from the overall length because it is more stable
-                    new_a_1, new_a_2, c, = compute_slopes(new_times, new_pole_growth, t)
-                    a_3, a_4, d = compute_slopes(old_times, old_pole_growth, t)
                     
-                    old_new_slopes.append([new_a_1, new_a_2, a_3, a_4])
-                    if plot:
-                        
-                        plt.figure()
-                        plt.scatter(overall_times, overall_growth - overall_growth[0]+1, color = 'k', label = 'overall growth')
-                        plt.scatter(old_times, old_pole_growth +0.5, color = 'r', label = 'new pole growth')
-                        plt.scatter(new_times, new_pole_growth, color = 'b', label = 'old pole growth')
-                        plt.plot([0, t, overall_times[-1]], [b-a_1*t - overall_growth[0]+1, b - overall_growth[0]+1, b - overall_growth[0]+1 + a_2* (overall_times[-1]-t)], color = 'k')
-                        plt.plot([0, t, new_times[-1]], [c-new_a_1*t, c, c+ new_a_2* (new_times[-1]-t)], color = 'b')
-                        mat = np.zeros((len(old_times), 2))
-                        mat[:, 0] = old_times
-                        mat[:, 1] = 1
-                        sl, b_o = np.linalg.lstsq(mat, old_pole_growth, None)[0]
-                        plt.plot([0, old_times[-1]], [b_o+0.5,b_o+0.5+sl*old_times[-1]], color = 'r')
-                        plt.plot(
-                            [t, t],
-                            [0, overall_growth[-1]- overall_growth[0]+1],
-                            linestyle="dashed",
-                            label=f"NETO",
-                            color="k",)
-                        plt.legend()
-                        plt.title(f'Cell and pole elongation of {roi_id}, \n with dataset {datasetnames}')
-                        plt.xlabel(r'time $(min)$')
-                        plt.ylabel(r'elongation $\mu m$')
-                        plt.tight_layout()
+                new_a_1, new_a_2, c, = compute_slopes(new_times, new_pole_growth, t)
+                a_3, a_4, d = compute_slopes(old_times, old_pole_growth, t)
+                
+                old_new_slopes.append([new_a_1, new_a_2, a_3, a_4])
+                if plot:
+                    
+                    plt.figure()
+                    plt.scatter(overall_times, overall_growth - overall_growth[0]+1, color = 'k', label = 'overall growth')
+                    plt.scatter(old_times, old_pole_growth +0.5, color = 'r', label = 'new pole growth')
+                    plt.scatter(new_times, new_pole_growth, color = 'b', label = 'old pole growth')
+                    plt.plot([0, t, overall_times[-1]], [b-a_1*t - overall_growth[0]+1, b - overall_growth[0]+1, b - overall_growth[0]+1 + a_2* (overall_times[-1]-t)], color = 'k')
+                    plt.plot([0, t, new_times[-1]], [c-new_a_1*t, c, c+ new_a_2* (new_times[-1]-t)], color = 'b')
+                    mat = np.zeros((len(old_times), 2))
+                    mat[:, 0] = old_times
+                    mat[:, 1] = 1
+                    sl, b_o = np.linalg.lstsq(mat, old_pole_growth, None)[0]
+                    plt.plot([0, old_times[-1]], [b_o+0.5,b_o+0.5+sl*old_times[-1]], color = 'r')
+                    plt.plot(
+                        [t, t],
+                        [0, overall_growth[-1]- overall_growth[0]+1],
+                        linestyle="dashed",
+                        label=f"NETO",
+                        color="k",)
+                    plt.legend()
+                    plt.title(f'Cell and pole elongation of {roi_id}, \n with dataset {datasetnames}')
+                    plt.xlabel(r'time $(min)$')
+                    plt.ylabel(r'elongation $\mu m$')
+                    plt.tight_layout()
                         
                         
                         
@@ -438,7 +446,7 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     
     
     _, ax = plt.subplots()
-    box_plot = ax.boxplot([old_new_slopes[:,0], old_new_slopes[:,1], old_new_slopes[:,2], old_new_slopes[:,3]], showfliers=False, medianprops=dict(color='k'))
+    ax.boxplot([old_new_slopes[:,0], old_new_slopes[:,1], old_new_slopes[:,2], old_new_slopes[:,3]], showfliers=False, medianprops=dict(color='k'))
     ax.set_title(f"Pole elongation speed \n with dataset {datasetnames} and {len(old_new_slopes[:,0])} cells")
     ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
     ax.set_xticklabels(["New pole \n before NETO", "New pole \n after NETO","Old pole \n before NETO","Old pole \n after NETO"])
@@ -449,26 +457,385 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     
     x1 = 1
     x2 = 2 
-    y = 13
-    h=0.001
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'k')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e} ***", ha='center', va='bottom')
+    y = 11
+    h = 0.2
+    ax.plot([x1,  x2], [y,  y], color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue), ha='center', va='bottom')
     
     x1 = 3
     x2 = 4
-    y = 13
-    h=0.001
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y],  color = 'k')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e}", ha='center', va='bottom')
+    y = 17
+    h = 0.2
+    ax.plot([x1, x2], [y,  y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
+    
+    ax.set_ylim(-5,20)
+    plt.tight_layout()
+    plt.show()   
+
+def compare_INH_pole_growth(outlier_detection=False):
+    datasetname1, datasetname2 = "INH_before_700", "INH_after_700"
+    
+    tot_growth1 = []
+    overall_slopes1 = []  # first, second
+    old_new_slopes1 = [] 
+    tot_growth2 = []
+    overall_slopes2 = []  # first, second
+    old_new_slopes2 = [] # first new, second new, old
+    
+    params = get_scaled_parameters(data_set=True)
+    
+    if datasetname1 in params.keys():
+        datasets1 = params[datasetname1]
+    elif isinstance(datasetname1, str): 
+        raise NameError('This directory does not exist')
+    else :
+        datasets1 = datasetname1
+    
+    if datasetname2 in params.keys():
+        datasets2 = params[datasetname2]
+    elif isinstance(datasetname2, str): 
+        raise NameError('This directory does not exist')
+    else :
+        datasets2 = datasetname2
+    
+    
+    for dataset in datasets1:
+        for roi_id, roi in load_dataset(dataset, False):
+            timestamps, old_pole_growth, new_pole_growth, overall_growth = extract_growth(roi)
+            if len(timestamps)>=6 and timestamps[-1]-timestamps[0] > 100:
+                tot_growth1.append((overall_growth[-1]-overall_growth[0])/(timestamps[-1]-timestamps[0]))
+                new_times = old_times = overall_times = timestamps
+                
+                if outlier_detection:
+                    new_times, new_pole_growth = remove_length_outliers(new_times, new_pole_growth)
+                    old_times, old_pole_growth = remove_length_outliers(old_times, old_pole_growth)
+                    overall_times, overall_growth =   remove_length_outliers(overall_times, overall_growth)
  
+                # the neto is computed from the overall length because it is more stable
+                a_1, a_2, _, t = piecewise_pointwise_linear_regression(overall_times, overall_growth)
+                overall_slopes1.append([a_1,a_2])
+
+                
+                new_a_1, new_a_2, _, = compute_slopes(new_times, new_pole_growth, t)
+                a_3, a_4, _ = compute_slopes(old_times, old_pole_growth, t)
+                
+                
+                mat = np.zeros((len(old_times), 2))
+                mat[:, 0] = old_times
+                mat[:, 1] = 1
+                sl, _ = np.linalg.lstsq(mat, old_pole_growth, None)[0]
+                old_new_slopes1.append([new_a_1, new_a_2, a_3, a_4,sl])
+                
+                
+    for dataset in datasets2:
+        for _, roi in load_dataset(dataset, False):
+            timestamps, old_pole_growth, new_pole_growth, overall_growth = extract_growth(roi)
+            if len(timestamps)>=6 and timestamps[-1]-timestamps[0] > 100:
+                tot_growth2.append((overall_growth[-1]-overall_growth[0])/(timestamps[-1]-timestamps[0]))
+                new_times = old_times = overall_times = timestamps
+                
+                if outlier_detection:
+                    new_times, new_pole_growth = remove_length_outliers(new_times, new_pole_growth)
+                    old_times, old_pole_growth = remove_length_outliers(old_times, old_pole_growth)
+                    overall_times, overall_growth =   remove_length_outliers(overall_times, overall_growth)
+ 
+                # the neto is computed from the overall length because it is more stable
+                a_1, a_2, _, t = piecewise_pointwise_linear_regression(overall_times, overall_growth)
+                overall_slopes2.append([a_1,a_2])
+                    
+                new_a_1, new_a_2, _, = compute_slopes(new_times, new_pole_growth, t)
+                a_3, a_4, _ = compute_slopes(old_times, old_pole_growth, t)
+                
+                
+                mat = np.zeros((len(old_times), 2))
+                mat[:, 0] = old_times
+                mat[:, 1] = 1
+                sl, _ = np.linalg.lstsq(mat, old_pole_growth, None)[0]
+                old_new_slopes2.append([new_a_1, new_a_2, a_3, a_4,sl])
+            
+                        
+                        
+                        
+                    
+                
+                
+                
+    overall_slopes1 = 1000*np.array(overall_slopes1)      
+    old_new_slopes1 = 1000*np.array(old_new_slopes1)
+    overall_slopes2 = 1000*np.array(overall_slopes2)      
+    old_new_slopes2 = 1000*np.array(old_new_slopes2)
+    
+    
+    _, ax = plt.subplots()
+    ax.boxplot([old_new_slopes1[:,0], old_new_slopes1[:,1], old_new_slopes2[:,0], old_new_slopes2[:,1]], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(f"New pole elongation speed \n with dataset {datasetname1} and {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells")
+    ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
+    ax.set_xticklabels(["Before NETO, \n before INH", "After NETO,\n before INH","Before NETO,\n after INH", "After NETO,\n after INH"])
+    pvalue = stats.ttest_ind(old_new_slopes1[:,0],old_new_slopes1[:,1]).pvalue
+    pvalue2 = stats.ttest_ind(old_new_slopes2[:,0],old_new_slopes2[:,1]).pvalue
+    pvalue3 = stats.ttest_ind(old_new_slopes1[:,0],old_new_slopes2[:,0]).pvalue
+    pvalue4 = stats.ttest_ind(old_new_slopes1[:,1],old_new_slopes2[:,1]).pvalue
+    
+    x1 = 1
+    x2 = 2 
+    y = 40
+    h = 0.6
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    x1 = 3
+    x2 = 4
+    y = 8
+    h = 0.6
+    ax.plot([x1, x2], [y, y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
+    
+    x1 = 1
+    x2 = 3
+    y = 44
+    h = 0.6
+    ax.plot([x1, x2], [y, y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue3), ha='center', va='bottom')
+    
+    x1 = 2
+    x2 = 4
+    y = 48
+    h = 0.6
+    ax.plot([x1, x2], [y, y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue4), ha='center', va='bottom')
+    
+    
+    ax.set_ylim(-5,53)
+
+    plt.tight_layout()
+    
+    
+    
+    _, ax = plt.subplots()
+    ax.boxplot([old_new_slopes1[:,2], old_new_slopes1[:,3], old_new_slopes2[:,2], old_new_slopes2[:,3]], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(f"Old pole elongation speed \n with dataset {datasetname1} and {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells")
+    ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
+    ax.set_xticklabels(["Before NETO, \n before INH", "After NETO,\n before INH","Before NETO,\n after INH", "After NETO,\n after INH"])
+    pvalue = stats.ttest_ind(old_new_slopes1[:,2],old_new_slopes1[:,3]).pvalue
+    pvalue2 = stats.ttest_ind(old_new_slopes2[:,2],old_new_slopes2[:,3]).pvalue
+    pvalue3 = stats.ttest_ind(old_new_slopes1[:,3],old_new_slopes2[:,2]).pvalue
+    pvalue4 = stats.ttest_ind(old_new_slopes1[:,3],old_new_slopes2[:,3]).pvalue
+    
+    x1 = 1
+    x2 = 2 
+    y = 26
+    h = 0.6
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    x1 = 3
+    x2 = 4
+    y = 7
+    h = 0.6
+    ax.plot([x1, x2], [y, y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
+    
+    x1 = 1
+    x2 = 3
+    y = 29
+    h = 0.6
+    ax.plot([x1, x2], [y, y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue3), ha='center', va='bottom')
+    
+    x1 = 2
+    x2 = 4
+    y = 32
+    h = 0.6
+    ax.plot([x1, x2], [y, y],  color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue4), ha='center', va='bottom')
+    
+    
+    ax.set_ylim(-10,35)
+    
     plt.tight_layout()
     plt.show()   
 
 
 
 
+def compare_dataset_pole_growth(datasetname1, datasetname2, y, h, lim, outlier_detection=False):
+    tot_growth1 = []
+    overall_slopes1 = []  
+    old_new_slopes1 = [] 
+    tot_growth2 = []
+    overall_slopes2 = []  
+    old_new_slopes2 = [] 
+    
+    params = get_scaled_parameters(data_set=True)
+    
+    if datasetname1 in params.keys():
+        datasets1 = params[datasetname1]
+    elif isinstance(datasetname1, str): 
+        raise NameError('This directory does not exist')
+    else :
+        datasets1 = datasetname1
+    
+    if datasetname2 in params.keys():
+        datasets2 = params[datasetname2]
+    elif isinstance(datasetname2, str): 
+        raise NameError('This directory does not exist')
+    else :
+        datasets2 = datasetname2
+    
+    
+    for dataset in datasets1:
+        for _, roi in load_dataset(dataset, False):
+            timestamps, old_pole_growth, new_pole_growth, overall_growth = extract_growth(roi)
+            if len(timestamps)>=6 and timestamps[-1]-timestamps[0] > 100:
+                tot_growth1.append((overall_growth[-1]-overall_growth[0])/(timestamps[-1]-timestamps[0]))
+                new_times = old_times = overall_times = timestamps
+                
+                if outlier_detection:
+                    new_times, new_pole_growth = remove_length_outliers(new_times, new_pole_growth)
+                    old_times, old_pole_growth = remove_length_outliers(old_times, old_pole_growth)
+                    overall_times, overall_growth =   remove_length_outliers(overall_times, overall_growth)
+
+                # the neto is computed from the overall length because it is more stable
+                a_1, a_2, b, t = piecewise_pointwise_linear_regression(overall_times, overall_growth)
+                overall_slopes1.append([a_1,a_2])
+                    
+                
+                
+                new_a_1, new_a_2, _, = compute_slopes(new_times, new_pole_growth, t)
+                a_3, a_4, _ = compute_slopes(old_times, old_pole_growth, t)
+                
+                
+                mat = np.zeros((len(old_times), 2))
+                mat[:, 0] = old_times
+                mat[:, 1] = 1
+                sl, _ = np.linalg.lstsq(mat, old_pole_growth, None)[0]
+                old_new_slopes1.append([new_a_1, new_a_2, a_3, a_4,sl])
+                    
+                    
+    for dataset in datasets2:
+        for _, roi in load_dataset(dataset, False):
+            timestamps, old_pole_growth, new_pole_growth, overall_growth = extract_growth(roi)
+            if len(timestamps)>=6 and timestamps[-1]-timestamps[0] > 100:
+                tot_growth2.append((overall_growth[-1]-overall_growth[0])/(timestamps[-1]-timestamps[0]))
+                new_times = old_times = overall_times = timestamps
+                
+                if outlier_detection:
+                    new_times, new_pole_growth = remove_length_outliers(new_times, new_pole_growth)
+                    old_times, old_pole_growth = remove_length_outliers(old_times, old_pole_growth)
+                    overall_times, overall_growth =   remove_length_outliers(overall_times, overall_growth)
+
+                # the neto is computed from the overall length because it is more stable
+                a_1, a_2, _, t = piecewise_pointwise_linear_regression(overall_times, overall_growth)
+                overall_slopes2.append([a_1,a_2])
+
+                    
+                new_a_1, new_a_2, _, = compute_slopes(new_times, new_pole_growth, t)
+                a_3, a_4, _ = compute_slopes(old_times, old_pole_growth, t)
+                
+                
+                mat = np.zeros((len(old_times), 2))
+                mat[:, 0] = old_times
+                mat[:, 1] = 1
+                sl, _ = np.linalg.lstsq(mat, old_pole_growth, None)[0]
+                old_new_slopes2.append([new_a_1, new_a_2, a_3, a_4,sl])
+            
+                        
+                        
+                        
+                    
+                
+                
+                
+    overall_slopes1 = 1000*np.array(overall_slopes1)      
+    old_new_slopes1 = 1000*np.array(old_new_slopes1)
+    overall_slopes2 = 1000*np.array(overall_slopes2)      
+    old_new_slopes2 = 1000*np.array(old_new_slopes2)
+    
+    
+    _, ax = plt.subplots()
+    ax.boxplot([old_new_slopes1[:,0], old_new_slopes1[:,1], old_new_slopes2[:,0], old_new_slopes2[:,1]], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(f"New pole elongation speed \n with dataset {datasetname1} and \n {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells")
+    ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
+    ax.set_xticklabels(["Before NETO, \n 1st dataset", "After NETO,\n 1st dataset","Before NETO,\n 2nd dataset", "After NETO,\n 2nd dataset"])
+    pvalue = stats.ttest_ind(old_new_slopes1[:,0],old_new_slopes1[:,1]).pvalue
+    pvalue2 = stats.ttest_ind(old_new_slopes2[:,0],old_new_slopes2[:,1]).pvalue
+    pvalue3 = stats.ttest_ind(old_new_slopes1[:,0],old_new_slopes2[:,0]).pvalue
+    pvalue4 = stats.ttest_ind(old_new_slopes1[:,1],old_new_slopes2[:,1]).pvalue
+    
+    x1 = 1
+    x2 = 2 
+    ax.plot([x1, x2], [y[0], y[0]], color = 'k')
+    ax.text((x1+x2)*.5, y[0] + h , p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    x1 = 3
+    x2 = 4
+    ax.plot([x1, x2], [y[1], y[1]],  color = 'k')
+    ax.text((x1+x2)*.5, y[1] + h , p_value_to_str(pvalue2), ha='center', va='bottom')
+    
+    x1 = 1
+    x2 = 3
+    ax.plot([x1, x2], [y[2], y[2]],  color = 'k')
+    ax.text((x1+x2)*.5, y[2] + h , p_value_to_str(pvalue3), ha='center', va='bottom')
+    
+    x1 = 2
+    x2 = 4
+    ax.plot([x1, x2], [y[3], y[3]],  color = 'k')
+    ax.text((x1+x2)*.5, y[3] + h , p_value_to_str(pvalue4), ha='center', va='bottom')
+    
+    ax.set_ylim(lim[0],lim[1])
+
+    plt.tight_layout()
+    
+    
+    
+    _, ax = plt.subplots()
+    ax.boxplot([old_new_slopes1[:,2], old_new_slopes1[:,3], old_new_slopes2[:,2], old_new_slopes2[:,3]], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(f"Old pole elongation speed \n with dataset {datasetname1} and \n {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells")
+    ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
+    ax.set_xticklabels(["Before NETO, \n 1st dataset", "After NETO,\n 1st dataset","Before NETO,\n 2nd dataset", "After NETO,\n 2nd dataset"])
+    pvalue = stats.ttest_ind(old_new_slopes1[:,2],old_new_slopes1[:,3]).pvalue
+    pvalue2 = stats.ttest_ind(old_new_slopes2[:,2],old_new_slopes2[:,3]).pvalue
+    pvalue3 = stats.ttest_ind(old_new_slopes1[:,3],old_new_slopes2[:,2]).pvalue
+    pvalue4 = stats.ttest_ind(old_new_slopes1[:,3],old_new_slopes2[:,3]).pvalue
+    
+    x1 = 1
+    x2 = 2 
+    ax.plot([x1, x2], [y[4], y[4]], color = 'k')
+    ax.text((x1+x2)*.5, y[4] + h , p_value_to_str(pvalue) , ha='center', va='bottom')
+    
+    x1 = 3
+    x2 = 4
+    ax.plot([x1, x2], [y[5], y[5]],  color = 'k')
+    ax.text((x1+x2)*.5, y[5] + h , p_value_to_str(pvalue2), ha='center', va='bottom')
+    
+    x1 = 1
+    x2 = 3
+    ax.plot([x1, x2], [y[6], y[6]],  color = 'k')
+    ax.text((x1+x2)*.5, y[6] + h ,p_value_to_str(pvalue3), ha='center', va='bottom')
+    
+    x1 = 2
+    x2 = 4
+    ax.plot([x1, x2], [y[7], y[7]],  color = 'k')
+    ax.text((x1+x2)*.5, y[7] + h , p_value_to_str(pvalue4), ha='center', va='bottom')
+    
+    
+    ax.set_ylim(-5,33)
+    ax.set_ylim(lim[2],lim[3])
+    plt.tight_layout()
+    plt.show()   
 
 
 if __name__ == "__main__":
     # plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True) #, outlier_detection=True
-    compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = True)
+    compute_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False)
+    compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = False)
+    compare_INH_pole_growth(outlier_detection=False)
+    compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_CCCP_irrigation_2016", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_filamentation_cipro_2015",  [12,12,15,17,19,19,21.5,24], 0.4, [-6,21, -10,27], outlier_detection=False)
+    compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "INH_after_700", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "delta_parB/15-11-2014",  [12,8,15,17,19,16,21.5,24], 0.4, [-10,21, -6,27], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", 'delta_LTD6_04-06-2017', [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", 'delta_lamA_03-08-2018', [15,18,25,28,19,18,22,25], 0.4, [-10,32, -11,28], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_mc2_55/03-09-2014",  [12,8,15,17,19,16,21.5,24], 0.4, [-10,21, -6,27], outlier_detection=False)
+    

@@ -12,6 +12,7 @@ if not package_path in sys.path:
 from scipy.ndimage import gaussian_filter1d
 
 from scaled_parameters import get_scaled_parameters
+from peaks_troughs.growth_stats import p_value_to_str, extract_growth
 from peaks_troughs.group_by_cell import Orientation, load_dataset, load_cell, load_data
 from peaks_troughs.stats import feature_general_properties
 
@@ -119,13 +120,13 @@ def division_statistics(datasetnames, use_one_daughter=False):
         f"Division position with dataset \'{datasetnames}\',\n and {len(div_list_ori)} individual features"
     )
     _, ax = plt.subplots()
-    ax.boxplot([div_list_ori], showfliers=False, showmeans=True, meanline=True)
+    ax.boxplot([div_list_ori], showfliers=False, medianprops=dict(color='k'))
     ax.set_xticklabels(['Division position'])
     ax.set_ylabel(r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
     ax.set_title(title)
     # ax.set_ylim(0.38,0.62)
     pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
-    ax.text(1.2, 0.5, f"P={pvalue:.2e} *", ha='center', va='bottom')
+    ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
     
     
     
@@ -140,6 +141,74 @@ def division_statistics(datasetnames, use_one_daughter=False):
     plt.show()
     
 
+
+def division_statistics_INH_after_700(use_one_daughter=False):
+    """Computing relative division position
+
+    Args:
+        datasetnames (str): dataset name
+        use_one_daughter (bool, optional): Using division data with only 1 daughter cell. Defaults to False.
+
+    Raises:
+        NameError: wrong directory
+    """
+    
+    dataset = 'WT_INH_700min_2014'
+    
+    div_list_ori= []
+    
+    params = get_scaled_parameters(paths_and_names=True)
+    data_direc = params["main_data_direc"]
+    roi_dic_name = params["roi_dict_name"]
+    roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+
+    for roi_id, mother_ROI in load_dataset(dataset, False):
+        if len(mother_ROI)>1:
+            mother = mother_ROI[-1]
+            if mother['timestamp']>= 700:
+                div_index = detect_division(mother, roi_id, roi_dic, dataset, use_one_daughter)
+                if div_index is not None:
+                    orientation = Orientation(mother['orientation'])
+                    moth_len = mother['xs'][-1] - mother['xs'][0]
+                    x_coord = mother['xs'][div_index] - mother['xs'][0]
+                    match orientation:
+                        case Orientation.NEW_POLE_OLD_POLE:
+                            
+                            div_list_ori.append(x_coord/moth_len)
+                        case Orientation.OLD_POLE_NEW_POLE:
+                            div_list_ori.append((moth_len-x_coord)/moth_len)
+                        case _:
+                            first_pole = np.array([elem['xs'][0] for elem in mother_ROI])
+                            second_pole = np.array([elem['xs'][-1] for elem in mother_ROI])
+                            time = np.array([elem['timestamp'] for elem in mother_ROI])
+                            mat = np.zeros((len(time), 2))
+                            mat[:, 0] = time
+                            mat[:, 1] = 1
+                            sl1, _ = np.linalg.lstsq(mat, first_pole, None)[0]
+                            sl2, _ = np.linalg.lstsq(mat, second_pole, None)[0]
+                            
+                            if sl1 >= 1.2 * sl2:
+                                div_list_ori.append((moth_len-x_coord)/moth_len)
+                            elif sl2 >= 1.2 * sl1:
+                                div_list_ori.append(x_coord/moth_len)
+                     
+                    
+    div_list_ori = np.array(div_list_ori) 
+    title = (
+        f"Division position with dataset \' INH_after_700\',\n and {len(div_list_ori)} individual features"
+    )
+    _, ax = plt.subplots()
+    ax.boxplot([div_list_ori], showfliers=False, medianprops=dict(color='k'))
+    ax.set_xticklabels(['Division position'])
+    ax.set_ylabel(r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
+    ax.set_title(title)
+    # ax.set_ylim(0.38,0.62)
+    pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
+    ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    plt.show()
+    
+    
+    
 def closest_feature_amplitude(ind_feature, feature, frame_data):
     non_feature = 'troughs'
     if feature == 'troughs':
@@ -220,7 +289,7 @@ def division_pnt(datasetnames, use_one_daughter=False):
                     
 
                     
-    diff_list, _, _ = feature_general_properties(datasetnames)        
+    diff_list, _, _ = feature_general_properties(datasetnames, plot=False)        
                     
     pnt_dist_peak = np.array(pnt_dist_peak) 
     pnt_dist_trough = np.array(pnt_dist_trough) 
@@ -230,17 +299,18 @@ def division_pnt(datasetnames, use_one_daughter=False):
         f"Division distance to feature with dataset \'{datasetnames}\',\n and {len(pnt_dist_peak)+len(pnt_dist_trough)} individual features"
     )
     _, ax = plt.subplots()
-    ax.boxplot([pnt_dist_peak, pnt_dist_trough], showfliers=False, showmeans=True, meanline=True)
+    ax.boxplot([pnt_dist_peak, pnt_dist_trough], showfliers=False,medianprops=dict(color='k'))
     ax.set_xticklabels(["Peak", "Trough"])
     ax.set_ylabel(r'Distance $\mu m $')
     ax.set_title(title)
     pvalue = stats.ttest_ind(pnt_dist_peak, pnt_dist_trough).pvalue
     x1 = 1
     x2 = 2 
-    y = 2.2
-    h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e}", ha='center', va='bottom')
+    y = 2.7
+    h=0.05
+    ax.plot([x1,  x2], [y,  y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.set_ylim(-0.2,3.2)
     
     
     title = (
@@ -250,7 +320,7 @@ def division_pnt(datasetnames, use_one_daughter=False):
     ax.boxplot([pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks'],
                 pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs'],
                 diff_list],
-               showfliers=False, showmeans=True, meanline=True)
+               showfliers=False, medianprops=dict(color='k'))
     
     ax.set_xticklabels(["Peak", "Trough", 'whole features'])
     ax.set_ylabel(r'Amplitude $nm $')
@@ -258,25 +328,26 @@ def division_pnt(datasetnames, use_one_daughter=False):
     pvalue = stats.ttest_ind(pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks'], pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs']).pvalue
     x1 = 1
     x2 = 2 
-    y = 450
-    h=20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e}", ha='center', va='bottom')
+    y = 370
+    h=0
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
     pvalue = stats.ttest_ind(pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks'],diff_list).pvalue
     x1 = 1
     x2 = 3 
-    y = 500
-    h=20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e}***", ha='center', va='bottom')
+    y = 410
+    h=0
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
     pvalue = stats.ttest_ind(diff_list, pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs']).pvalue
     x1 = 2
     x2 = 3 
-    y = 550
-    h=20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e}***", ha='center', va='bottom')
-    plt.show()
+    y = 450
+    h=0
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.set_ylim(-50,500)
+    # plt.show()
 
 
 
@@ -345,7 +416,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                     
                     
                     times = np.array([elem['timestamp'] for elem in lineage])
-                    mask= times<=mother_time-100
+                    mask= times<=mother_time-90
                     
                     
                     if np.any(mask):
@@ -409,25 +480,27 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                     
                 
     title = (
-        f"Curvature value with dataset \'{datasetnames}\'"
+        f"Curvature value with dataset \'{datasetnames}\' \n and {len(stat_list), len(stat_mid), len(stat_mid2), len(stat_old)} divisions"
     )
     _, ax = plt.subplots()
-    ax.boxplot([stat_list, stat_mid, stat_mid2, stat_old], showfliers=False, showmeans=True, meanline=True)
+    ax.boxplot([stat_list, stat_mid, stat_mid2, stat_old], showfliers=False, medianprops=dict(color='k'))
     ax.set_title(title)
-    ax.set_xticklabels(["At division", "100 mn before", "150 mn before", 'After previous division'])
+    ax.set_xticklabels(["At division", "90 mn before", "150 mn before", 'Previous division'])
     ax.set_ylabel(r'Curvature at division site $\mu m^{-1} $')
     
     pvalue = stats.wilcoxon(stat_list, method='exact').pvalue  #stats.wilcoxon
-    ax.text(1.3, 0.3, f"P={pvalue:.2e} *", ha='center', va='bottom')
+    ax.text(1.3, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_mid, method='exact').pvalue 
-    ax.text(2.2, 0.3, f"P={pvalue:.2e} ", ha='center', va='bottom')
+    ax.text(2.2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_mid2, method='exact').pvalue 
-    ax.text(3.2, 0.3, f"P={pvalue:.2e} ", ha='center', va='bottom')
+    ax.text(3.2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_old, method='exact').pvalue 
-    ax.text(4.2, 0.3, f"P={pvalue:.2e} ", ha='center', va='bottom')
+    ax.text(4.2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.set_ylim([-0.05,0.35])
+    plt.tight_layout()
     plt.show()
 
 
@@ -527,7 +600,12 @@ def division_local_curvature_trajectories(datasetnames, use_one_daughter=False, 
 
 
 if __name__ == "__main__":
-    # division_statistics('WT_INH_700min_2014', use_one_daughter=True) #'all'"WT_mc2_55/30-03-2015", use_one_daughter=True
-    # division_pnt('all', use_one_daughter=True) #
+    division_statistics_INH_after_700(use_one_daughter=True) 
+    division_statistics('WT_INH_700min_2014', use_one_daughter=True)
+    division_statistics("WT_no_drug", use_one_daughter=True)
+    division_pnt('WT', use_one_daughter=True)
+    division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
+    division_pnt('WT_no_drug', use_one_daughter=True)
+    division_pnt('all', use_one_daughter=True)
     division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
     division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)

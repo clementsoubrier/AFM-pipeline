@@ -59,6 +59,8 @@ DATA_SET_GOOD_QUAL = ["WT_mc2_55/30-03-2015",
 
 DATA_SET_HEIGHT_ONLY = ['WT_INH_700min_2014']
                         
+INH_BEF = ["INH_before_700"]
+INH_AFT = ["INH_after_700"]
 
 DATA_SET_FEAT = ["WT_mc2_55/06-10-2015",
                   "WT_mc2_55/03-09-2014",
@@ -86,6 +88,7 @@ DIR_PLOT_STAT = os.path.join(RESULT_DIR,'plot_stat') # result directory stats
 DATA_CELL = os.path.join('data', 'cells')       # directory of the ROIs
 LINE_DIR = "lines"                              # data of the ROIs (centerlines, peaks and troughs)
 FEATURES_TRACKING = "features_tracking"         # peaks and troughs tracking directory
+FINAL_IMG_DIR = os.path.join("..","Images","All_images")
 
 MAIN_DICTIONNARY_NAME = 'main_dictionnary.npz'
 MASKS_LIST_NAME = 'masks_list.npz'
@@ -254,6 +257,7 @@ def get_scaled_parameters(
         params["dir_cells"] = DATA_CELL    
         params["dir_cells_data"] = LINE_DIR 
         params["dir_cells_list"] = FEATURES_TRACKING 
+        params["final_img_dir"] = FINAL_IMG_DIR
 
         params["main_dict_name"] = MAIN_DICTIONNARY_NAME
         params["masks_list_name"] = MASKS_LIST_NAME
@@ -283,6 +287,8 @@ def get_scaled_parameters(
         params['no_drug'] = DATA_SET_NO_DRUG
         params['good'] = DATA_SET_GOOD_QUAL
         params['data_with_feature'] = DATA_SET_FEAT
+        params["INH_before_700"] = INH_BEF
+        params["INH_after_700"] = INH_AFT
 
 
     if cellpose:

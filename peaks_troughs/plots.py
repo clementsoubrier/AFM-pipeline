@@ -82,7 +82,7 @@ def plot_cell_centerlines(*cells_and_id, dataset=''):   #first cell is the mothe
     plt.title(title)
     plt.show()
 
-def kymograph(*cells_and_id,  dataset='', division_point = None):   #first cell is the mother, each argument is a tuple (cell, id)
+def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, saving_name='',  dir_im=''):   #first cell is the mother, each argument is a tuple (cell, id)
     
     plt.figure()
     ax = plt.axes(projection='3d')
@@ -192,9 +192,14 @@ def kymograph(*cells_and_id,  dataset='', division_point = None):   #first cell 
     # ax.set_xlim([-9, 4])
     # ax.set_zlim([0, 1000])
     # ax.set_ylim([0, 600])
-
+    ax.view_init(elev=60, azim=-88, roll=0)
     plt.title(title)
     plt.tight_layout()
+    if saving:
+
+        plt.savefig(os.path.join(dir_im, saving_name + '.svg'), format='svg')
+        plt.close()
+            
 
     
 
@@ -319,7 +324,7 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
 
 
 
-def main(Directory='all'):
+def main(Directory='all', saving=False):
     params = get_scaled_parameters(data_set=True)
     if Directory in params.keys():
         datasets = params[Directory]
@@ -333,33 +338,45 @@ def main(Directory='all'):
         params = get_scaled_parameters(paths_and_names=True)
         data_direc = params["main_data_direc"]
         roi_dic_name = params["roi_dict_name"]
-        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        final_img_dir = params["final_img_dir"]
         
+        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        if saving:
+            dir_im = os.path.join(final_img_dir,'kymographs',dataset) 
+            
+            if os.path.exists(dir_im):
+                for file in os.listdir(dir_im):
+                    os.remove(os.path.join(dir_im, file))
+            else:
+                os.makedirs(dir_im)
         
         
         
         
         for roi_id, cell in load_dataset(dataset, False):
-            if len(cell)>10:
-                # if len(roi_dic[roi_id]['Children']) >= 1:
+            if len(cell)>5:
+                if len(roi_dic[roi_id]['Children']) >= 1:
                     
                     
-                #     division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
-                #     if division_point is not None:
-                #         division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
-                #     for daughter_cell in roi_dic[roi_id]['Children']:
-                #         d_cell = load_cell(daughter_cell, dataset=dataset)
-                #         if len(d_cell)>5:
-                #             lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+                    division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
+                    if division_point is not None:
+                        division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
+                    for daughter_cell in roi_dic[roi_id]['Children']:
+                        d_cell = load_cell(daughter_cell, dataset=dataset)
+                        if len(d_cell)>5:
+                            lineage = [(cell, roi_id),(d_cell, daughter_cell)]
                             
-                #             kymograph(*lineage, dataset=dataset, division_point=division_point)
+                            kymograph(*lineage, dataset=dataset, division_point=division_point, saving=saving, saving_name=roi_id.replace(" ","")+'+'+daughter_cell.replace(" ",""), dir_im=dir_im)
                 
                 
                 # kymograph_feature((cell, roi_id), dataset=dataset)
-                if len(roi_dic[roi_id]['Children']) >= 1:
-                    for daughter_cell in roi_dic[roi_id]['Children']:
-                        d_cell = load_cell(daughter_cell, dataset=dataset)
-                        kymograph((d_cell, daughter_cell), dataset=dataset)
+                
+                
+                # if len(roi_dic[roi_id]['Children']) >= 1:
+                #     for daughter_cell in roi_dic[roi_id]['Children']:
+                #         d_cell = load_cell(daughter_cell, dataset=dataset)
+                #         kymograph((d_cell, daughter_cell), dataset=dataset)
+                
                 # plot_cell_centerlines((cell, roi_id), dataset=dataset)
     plt.show()
     
@@ -370,4 +387,4 @@ def main(Directory='all'):
 
 
 if __name__ == "__main__":
-    main(Directory="WT_mc2_55/03-09-2014")
+    main(Directory="all", saving = True)

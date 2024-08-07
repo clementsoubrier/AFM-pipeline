@@ -304,9 +304,20 @@ def extract_roi_list_from_dic(ROI_dic,masks_list):
 
 
 
-def plot_image_one_ROI(ROI,ROI_dic,masks_list,dic):
-    plotlist=ROI_dic[ROI]['Mask IDs']
-    Roi_index=ROI_dic[ROI]['index']
+def plot_image_one_ROI(dataset, ROI_ind):
+    params=get_scaled_parameters(paths_and_names=True,plot=True,lineage_tree=True)
+    
+    dicname = params["main_dict_name"]
+    listname = params["masks_list_name"]
+    ROIdict = params["roi_dict_name"]
+    data_direc = params["main_data_direc"]
+   
+    masks_list = np.load(os.path.join(data_direc, dataset, listname), allow_pickle=True)['arr_0']
+    dic = np.load(os.path.join(data_direc, dataset, dicname), allow_pickle=True)['arr_0'].item()
+    ROI_dic = np.load(os.path.join(data_direc, dataset, ROIdict), allow_pickle=True)['arr_0'].item()
+    
+    plotlist=ROI_dic[ROI_ind]['Mask IDs']
+    Roi_index=ROI_dic[ROI_ind]['index']
     for maskindex in plotlist:
         file=masks_list[maskindex][2]
         index=masks_list[maskindex][3]
@@ -321,7 +332,7 @@ def plot_image_one_ROI(ROI,ROI_dic,masks_list,dic):
         plt.annotate(Roi_index, centroid[::-1], xytext=[10,0], textcoords='offset pixels', color='dimgrey')
         if len(center)>1:
             plt.plot(center[:,1],center[:,0], color='k')
-        plt.show()
+    plt.show()
         
 
 
@@ -681,44 +692,14 @@ def main(Directory= "all", plot=True):
 
 #%% running main function   
 if __name__ == "__main__":
-    Directory = "WT_mc2_55/30-03-2015" # "WT_mc2_55/03-09-2014" #"WT_mc2_55/06-10-2015" #os.path.join("WT_mc2_55", "30-03-2015") #'delta_lamA_03-08-2018/'   "delta_parB/15-11-2014" "WT_mc2_55/03-09-2014/" 'WT_INH_700min_2014/'
-    plot_lineage(Directory)
-    # plot_channel(Directory, 'Height_fwd')
+    Directory = "WT_mc2_55/30-03-2015" # "WT_mc2_55/03-09-2014" #"WT_mc2_55/06-10-2015" "WT_mc2_55/30-03-2015" 'delta_lamA_03-08-2018/'   "delta_parB/15-11-2014" "WT_mc2_55/03-09-2014/" 'WT_INH_700min_2014/'
+    # plot_lineage(Directory)
+    # plot_image_one_ROI("WT_mc2_55/06-10-2015", 'ROI 157')
+    plot_channel(Directory, 'Height_fwd')
     # plot_channel(Directory, 'DMTModulus_fwd')
-    main(Directory = Directory )
+    # main(Directory = Directory )
     # main(plot=False)
 
-    ''''''
-    # manually_regluing(Directory,ROI_dictionary,index_list_name,'1/100','5/',division=False)
-    
-    
-    # dic_name='Main_dictionnary.npz'
 
-    # list_name='masks_list.npz'
-
-    # ROI_dict='ROI_dict.npz'
-
-    # linmat_name='non_trig_Link_matrix.npy'
-
-    # boolmatname="Bool_matrix.npy"
-
-    # linkmatname='Link_matrix.npy'
-
-    # index_list_name='masks_ROI_list.npz'
-    
-    
-    # colormask=[[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,204,130],[130,255,204],[130,0,255],[130,204,255]]
-
-    # index_list=np.load(Directory+index_list_name, allow_pickle=True)['arr_0']
-    # List_of_masks=np.load(Directory+list_name, allow_pickle=True)['arr_0']
-    # main_dict=np.load(Directory+dic_name, allow_pickle=True)['arr_0'].item()
-    # newdic=np.load(Directory+ROI_dict, allow_pickle=True)['arr_0'].item()
-    # for ROI in newdic.keys():
-    #     print(newdic[ROI])
-    
-    # print(newdic.keys())
-    # # plot_image_one_ROI('ROI 8',newdic,List_of_masks,main_dict)
-    # # plot_lineage_tree(newdic,List_of_masks,main_dict,colormask,Directory)
-    # plot_image_lineage_tree(newdic,List_of_masks,main_dict,colormask,index_list,Directory)
     
     

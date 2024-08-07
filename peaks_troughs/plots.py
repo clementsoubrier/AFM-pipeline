@@ -171,8 +171,8 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
             if division_point is not None and division_point[1] >= timestamp:
                 div_ind = np.argmin((xs-division_point[0])**2)
                 ax.plot3D(xs[div_ind], timestamp, ys[div_ind]+10, c="darkorange", marker='v', markersize = 8, alpha=1 )
-        ax.scatter(peaks_x,  peaks_z, peaks_y,c="k")
-        ax.scatter(troughs_x, troughs_z, troughs_y, c="r")
+        ax.scatter(peaks_x,  peaks_z, peaks_y,c="r")
+        ax.scatter(troughs_x, troughs_z, troughs_y, c="k")
         
         
         pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
@@ -186,9 +186,10 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
                 coord_z.append(pnt_list[elem,5]-base_time)
             ax.plot(coord_x, coord_z, coord_y, color = 'b')
     
-    ax.set_zlabel(r'height ($nm$)')
+    ax.set_zlabel(r'height ($ m$)')
     ax.set_ylabel(r'time ($min$)')
-    ax.set_xlabel(r' centerline lenght ($\mu m$)')
+    ax.set_xlabel(r' centerline length ($\mu m$)')
+    ax.zaxis.labelpad=10
     # ax.set_xlim([-9, 4])
     # ax.set_zlim([0, 1000])
     # ax.set_ylim([0, 600])
@@ -297,8 +298,8 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
                 troughs_y.extend(ys[troughs])
                 troughs_z.extend([timestamp]*len(troughs))
             ax.plot3D(xs, zs, ys,c="k")
-        ax.scatter(peaks_x,  peaks_z, peaks_y,c="red")
-        ax.scatter(troughs_x, troughs_z, troughs_y, c="green")
+        ax.scatter(peaks_x,  peaks_z, peaks_y,c="r")
+        ax.scatter(troughs_x, troughs_z, troughs_y, c="k")
         
         
         # pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
@@ -316,7 +317,7 @@ def kymograph_feature(*cells_and_id,  dataset='', feature='DMTModulus_fwd', aver
     
     ax.set_zlabel(f'{feature} ({unit})')
     ax.set_ylabel(r'time ($min$)')
-    ax.set_xlabel(r' centerline lenght ($\mu m$)')
+    ax.set_xlabel(r' centerline length ($\mu m$)')
 
     plt.title(roi_id + f', {feature}')
 
@@ -370,7 +371,7 @@ def main(Directory='all', saving=False):
                 
                 
                 # kymograph_feature((cell, roi_id), dataset=dataset)
-                
+                # kymograph((cell, roi_id), dataset=dataset)
                 
                 # if len(roi_dic[roi_id]['Children']) >= 1:
                 #     for daughter_cell in roi_dic[roi_id]['Children']:
@@ -388,3 +389,5 @@ def main(Directory='all', saving=False):
 
 if __name__ == "__main__":
     main(Directory="all", saving = True)
+    # main(Directory="WT_mc2_55/30-03-2015")
+    

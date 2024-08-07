@@ -15,6 +15,7 @@ if not package_path in sys.path:
     sys.path.append(package_path)
 
 from peaks_troughs.group_by_cell import Orientation, load_dataset, get_peak_troughs_lineage_lists
+from peaks_troughs.growth_stats import p_value_to_str, print_stats
 from scaled_parameters import get_scaled_parameters
 
 #%% Statistics on peaks and troughs without lineage
@@ -141,6 +142,7 @@ def plot_peak_trough_lengths(dataset, peak_lengths, trough_lengths):
 def plot_stats(dataset, /, peak_counter, trough_counter, peak_lengths, trough_lengths):
     plot_peak_trough_counters(dataset, peak_counter, trough_counter)
     plot_peak_trough_lengths(dataset, peak_lengths, trough_lengths)
+    plt.tight_layout()
     plt.show()
 
 
@@ -159,7 +161,7 @@ def feature_creation(dataset_names):
     smooth_param = params["smoothing_hist_feat_crea"]
     
     stat_list = {'peaks':[], 'troughs':[]}
-    stat_list_relat = []
+    stat_list_relat = {'peaks':[], 'troughs':[]}
     length_list = []
     stat_list_np = {'peaks':[], 'troughs':[]}
     stat_list_op = {'peaks':[], 'troughs':[]}
@@ -203,7 +205,7 @@ def feature_creation(dataset_names):
                                             stat_list_op[feature].append(x_coord)
                                 stat_list[feature].append(x_coord)
  
-                                stat_list_relat.append(x_coord/total_length)
+                                stat_list_relat[feature].append(x_coord/total_length)
                                 
                                 
                                 
@@ -211,82 +213,123 @@ def feature_creation(dataset_names):
     
     
     
-    plt.figure()
+    _, ax = plt.subplots()
     title = (
         f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list['peaks']+stat_list['troughs'])} features tracked"
     )
-    plt.hist(stat_list['peaks']+stat_list['troughs'], bin_num, color="grey", alpha=0.6, label= 'feature creation', density=True)
-    plt.hist(length_list, bin_num, color="r", alpha=0.6, label= 'total length', density=True)
-    plt.xlabel(r'Distance to the pole ($\mu m$) ')
-    plt.legend()
-    plt.title(title)
+    ax.boxplot([stat_list['peaks']+stat_list['troughs'], np.array(length_list)/2],  showfliers=False, medianprops=dict(color='k'))
+    print(title)
+    print_stats([stat_list['peaks']+stat_list['troughs'], np.array(length_list)/2])
+    ax.set_xticklabels([f'Feature creation distance \n to pole', 'half cell length'])
+    ax.set_ylabel(r"($\mu m$)")
+    pvalue1 = stats.ttest_ind(stat_list['peaks']+stat_list['troughs'], np.array(length_list)/2).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 4
+    h=0.01
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     
-    plt.figure()
-    title = (
-        f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list['peaks']+stat_list['troughs'])} features tracked"
-    )
-    res = stats.kstest(stat_list['peaks'], stat_list['troughs'])
-    print(res.statistic, res.pvalue)
-    plt.hist(stat_list['peaks'], bin_num, color="g", alpha=0.6,  label= 'peaks', density=True)
-    plt.hist(stat_list['troughs'], bin_num, color="b", alpha=0.6, label= 'troughs', density=True)
-    plt.annotate(f'pvalue = {res.pvalue:.2e}', (3,0.6))
-    plt.xlabel(r'Distance to the pole ($\mu m$) ')
-    plt.legend()
-    plt.title(title)
+    ax.set_title(title)
+    
+    
+    # plt.figure()
+    # title = (
+    #     f"Distribution of feature creation with dataset \'{dataset_names}\',\n and {len(stat_list['peaks']+stat_list['troughs'])} features tracked"
+    # )
+    # res = stats.kstest(stat_list['peaks'], stat_list['troughs'])
+    # print(res.statistic, res.pvalue)
+    # plt.hist(stat_list['peaks'], bin_num, color="g", alpha=0.6,  label= 'peaks', density=True)
+    # plt.hist(stat_list['troughs'], bin_num, color="b", alpha=0.6, label= 'troughs', density=True)
+    # plt.annotate(f'pvalue = {res.pvalue:.2e}', (3,0.6))
+    # plt.xlabel(r'Distance to the pole ($\mu m$) ')
+    # plt.legend()
+    # plt.title(title)
 
     
+    plt.figure()
+    title = (
+        f"Feature creation with dataset \'{dataset_names}\',\n and {len(stat_list_relat['peaks'])+len(stat_list_relat['troughs'])} features tracked, normalized total lenght"
+    )
+    plt.hist(stat_list_relat['peaks'], bin_num, color="grey", alpha=0.6, label= 'feature creation peaks')
+    plt.hist(stat_list_relat['troughs'], bin_num, color="red", alpha=0.6, label= 'feature creation troughs')
+    plt.xlabel(r' $\leftarrow \; \text{pole}\;|\; \text{center}\; \rightarrow$ ')
+    print(title)
+    print_stats([stat_list_relat['peaks'],stat_list_relat['troughs']])
+    plt.legend()
+    plt.title(title)
+    
+    
+    stat_list_relat = stat_list_relat['peaks'] + stat_list_relat['troughs']
     plt.figure()
     title = (
         f"Feature creation with dataset \'{dataset_names}\',\n and {len(stat_list_relat)} features tracked, normalized total lenght"
     )
-    plt.hist(stat_list_relat, bin_num, color="grey", alpha=0.6, label= 'feature creation')
+    plt.hist(stat_list_relat, bin_num, color="grey", alpha=0.6, label= 'feature creation peaks')
+    plt.hist(stat_list_relat, bin_num, color="red", alpha=0.6, label= 'feature creation troughs')
     plt.xlabel(r' $\leftarrow \; \text{pole}\;|\; \text{center}\; \rightarrow$ ')
+    print(title)
+    print_stats([stat_list_relat])
+    density, bins = np.histogram(stat_list_relat , bin_num)
+    spl = splrep(bins[1:], density,s=3*len(stat_list_relat), per=False)
+    x2 = np.linspace(bins[0], bins[-1], 100)
+    y2 = splev(x2, spl)
+    y2[y2<0]=0
+    plt.plot(x2, y2, '--', color = 'k', label= 'smooth approximation', )
+    
     plt.legend()
     plt.title(title)
 
     
-    _, ax = plt.subplots()
-    ax.boxplot([stat_list_np['peaks'],
-                stat_list_op['peaks'],
-                stat_list_np['troughs'],
-                stat_list_op['troughs']]
-               ,  showfliers=False, showmeans=True, meanline=True) 
-    ax.set_xticklabels([f"Peaks new pole \n creation", f"Peaks old pole \n creation", f"Troughs new pole \n creation", f"Troughs old pole \n creation"])
-    ax.set_ylabel(r"Distance to the pole ($\mu m$)")
-    pvalue1 = stats.ttest_ind(stat_list_np['peaks'], stat_list_op['peaks']).pvalue
-    x1 = 1
-    x2 = 2 
-    y = 2.8
-    h=0.1
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
-    pvalue1 = stats.ttest_ind(stat_list_np['peaks'], stat_list_np['troughs']).pvalue
-    x1 = 1
-    x2 = 3 
-    y = 3.1
-    h=0.1
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
-    pvalue1 = stats.ttest_ind(stat_list_op['peaks'], stat_list_op['troughs']).pvalue
-    x1 = 2
-    x2 = 4
-    y = 2.3
-    h=0.1
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
-    pvalue1 = stats.ttest_ind(stat_list_np['troughs'], stat_list_op['troughs']).pvalue
-    x1 = 3
-    x2 = 4 
-    y = 2
-    h=0.1
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    # _, ax = plt.subplots()
+    # ax.boxplot([stat_list_np['peaks'],
+    #             stat_list_op['peaks'],
+    #             stat_list_np['troughs'],
+    #             stat_list_op['troughs']]
+    #            ,  showfliers=False, medianprops=dict(color='k')) 
+    # print(title)
+    # print_stats([stat_list_np['peaks'],
+    #             stat_list_op['peaks'],
+    #             stat_list_np['troughs'],
+    #             stat_list_op['troughs']])
+    # ax.set_xticklabels([f"Peaks new pole \n creation", f"Peaks old pole \n creation", f"Troughs new pole \n creation", f"Troughs old pole \n creation"])
+    # ax.set_ylabel(r"Distance to the pole ($\mu m$)")
+    # pvalue1 = stats.ttest_ind(stat_list_np['peaks'], stat_list_op['peaks']).pvalue
+    # x1 = 1
+    # x2 = 2 
+    # y = 2.8
+    # h=0.01
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    # pvalue1 = stats.ttest_ind(stat_list_np['peaks'], stat_list_np['troughs']).pvalue
+    # x1 = 1
+    # x2 = 3 
+    # y = 3.1
+    # h=0.01
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    # pvalue1 = stats.ttest_ind(stat_list_op['peaks'], stat_list_op['troughs']).pvalue
+    # x1 = 2
+    # x2 = 4
+    # y = 2.5
+    # h=0.01
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    # pvalue1 = stats.ttest_ind(stat_list_np['troughs'], stat_list_op['troughs']).pvalue
+    # x1 = 3
+    # x2 = 4 
+    # y = 2.1
+    # h=0.01
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    # ax.set_ylim(0,3.5)
+    
     plt.show()
 
 
 
 #comparision of old pole / new pole distributions
-def feature_properties_pole(dataset_names):
+def feature_properties_pole_feature(dataset_names):
     params = get_scaled_parameters(data_set=True, stats=True)
     if dataset_names in params.keys():
         datasets = params[dataset_names]
@@ -349,89 +392,214 @@ def feature_properties_pole(dataset_names):
                                 whole_stat[prop][pole][feat].append(np.average(np.array(l)))
 
                     
-                                
-
-    numbers = [len(whole_stat['height'][pole][feat])for pole in ['np', 'op']for feat in ['peaks', 'troughs']]
+    numbers = [len(whole_stat['height'][pole][feat])for pole in ['np', 'op']for feat in ['peaks', 'troughs']]                        
+    title =f"Inter-feature distance with dataset \'{dataset_names}\',\n and {numbers} features"
+    
     _, ax = plt.subplots()
     ax.boxplot([whole_stat['lenght']['np']['peaks'],
                 whole_stat['lenght']['op']['peaks'],
                 whole_stat['lenght']['np']['troughs'],
                 whole_stat['lenght']['op']['troughs']]
-               ,  showfliers=False, showmeans=True, meanline=True) 
+               ,  showfliers=False, medianprops=dict(color='k')) 
+    print(title)
+    print_stats([whole_stat['lenght']['np']['peaks'],
+                whole_stat['lenght']['op']['peaks'],
+                whole_stat['lenght']['np']['troughs'],
+                whole_stat['lenght']['op']['troughs']])
     ax.set_xticklabels(["Peaks new pole", "Peaks old pole", "Troughs new pole", "Troughs old pole"])
     ax.set_ylabel(r"Distance ($\mu m$)")
-    ax.set_title(f"Inter-feature distance with dataset \'{dataset_names}\',\n and {numbers} cells")
+    ax.set_title(title)
     pvalue1 = stats.ttest_ind(whole_stat['lenght']['np']['peaks'], whole_stat['lenght']['op']['peaks']).pvalue
     x1 = 1
     x2 = 2 
-    y = 2.5
-    h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 2.6
+    h=0.02
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     pvalue2 = stats.ttest_ind(whole_stat['lenght']['np']['troughs'], whole_stat['lenght']['op']['troughs']).pvalue
     x1 = 3
     x2 = 4 
-    y = 3.2
-    h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e} ", ha='center', va='bottom')
+    y =  2.8
+    h=0.02
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
     pvalue1 = stats.ttest_ind(whole_stat['lenght']['np']['peaks'], whole_stat['lenght']['np']['troughs']).pvalue
     x1 = 1
     x2 = 3 
-    y = 2.85
-    h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 3.1
+    h=0.02
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     pvalue2 = stats.ttest_ind(whole_stat['lenght']['op']['troughs'], whole_stat['lenght']['op']['peaks']).pvalue
     x1 = 2
     x2 = 4 
-    y = 3.55
-    h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e} ", ha='center', va='bottom')
+    y = 3.4
+    h=0.02
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
+    ax.set_ylim(0,3.6)
     
     
-    
+    title = f"Inter-feature amplitude with dataset \'{dataset_names}\',\n and {numbers} features"
     _, ax = plt.subplots()
     ax.boxplot([whole_stat['height']['np']['peaks'],
                 whole_stat['height']['op']['peaks'],
                 whole_stat['height']['np']['troughs'],
                 whole_stat['height']['op']['troughs']]
-               ,  showfliers=False, showmeans=True, meanline=True) 
+               ,  showfliers=False, medianprops=dict(color='k')) 
+    print(title)
+    print_stats([whole_stat['height']['np']['peaks'],
+                whole_stat['height']['op']['peaks'],
+                whole_stat['height']['np']['troughs'],
+                whole_stat['height']['op']['troughs']])
     ax.set_xticklabels(["Peaks new pole", "Peaks old pole", "Troughs new pole", "Troughs old pole"])
     ax.set_ylabel(r"Amplitude ($n m$)")
-    ax.set_title(f"Inter-feature amplitude with dataset \'{dataset_names}\',\n and {numbers} cells")
+    ax.set_title(title)
     pvalue1 = stats.ttest_ind(whole_stat['height']['np']['peaks'], whole_stat['height']['op']['peaks']).pvalue
     x1 = 1
     x2 = 2 
-    y = 360
-    h = 20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 300
+    h = 2
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     pvalue2 = stats.ttest_ind(whole_stat['height']['np']['troughs'], whole_stat['height']['op']['troughs']).pvalue
     x1 = 3
     x2 = 4 
-    y = 480
-    h = 20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e} ", ha='center', va='bottom')
+    y = 410
+    h = 2
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
     pvalue1 = stats.ttest_ind(whole_stat['height']['np']['peaks'], whole_stat['height']['np']['troughs']).pvalue
     x1 = 1
     x2 = 3 
-    y = 520
-    h=20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 350
+    h=2
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     pvalue2 = stats.ttest_ind(whole_stat['height']['op']['troughs'], whole_stat['height']['op']['peaks']).pvalue
     x1 = 2
     x2 = 4 
-    y = 580
-    h=20
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e} ", ha='center', va='bottom')
-    
+    y = 450
+    h=2
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
+    ax.set_ylim(0,490)
     plt.show()
-                                
+                             
+
+def feature_properties_pole(dataset_names):
+    params = get_scaled_parameters(data_set=True, stats=True)
+    if dataset_names in params.keys():
+        datasets = params[dataset_names]
+    else : 
+        datasets = dataset_names
+    pole_size = params["pole_region_size"] 
+    whole_stat = {}
+    for prop in ['lenght', 'height']:
+        whole_stat[prop] = {}
+        for pole in ['np', 'op']:
+            whole_stat[prop][pole]=[]
+    
+    
+    for dataset in datasets:
+        
+        for _, cell in load_dataset(dataset, False):
+            stat = {}
+            for prop in ['lenght', 'height']:
+                stat[prop] = {}
+                for pole in ['np', 'op']:
+                    stat[prop][pole] = []
+            if len(cell) > 1:
+                orientation = Orientation(cell[0]['orientation'])
+                if orientation == Orientation.UNKNOWN:
+                    continue
+                for frame_data in cell:
+                    if len(frame_data['peaks']) >=1 and len(frame_data['troughs'])>=1:
+                        feature = np.zeros(len(frame_data['peaks']) + len(frame_data['troughs']), dtype=int)
+                        if frame_data['peaks'][0] < frame_data['troughs'][0]:
+                            feature[::2] = frame_data['peaks']
+                            feature[1::2] = frame_data['troughs']
+                        else :
+                            feature[1::2] = frame_data['peaks']
+                            feature[::2] = frame_data['troughs']
+                        height = np.absolute (frame_data['ys'][feature][:-1] - frame_data['ys'][feature][1:])
+                        length = np.absolute (frame_data['xs'][feature][:-1] - frame_data['xs'][feature][1:])
+                        
+                        mask = frame_data['xs'][feature] - frame_data['xs'][0] <= pole_size
+                        mask = mask [:-1]
+                        match orientation:
+                            case Orientation.NEW_POLE_OLD_POLE:
+                                pole = 'np'
+                            case Orientation.OLD_POLE_NEW_POLE:
+                                pole = 'op'
+                        if np.any(mask):
+                                    stat['lenght'][pole].extend(list(length[mask])) 
+                                    stat['height'][pole].extend(list(height[mask]))
+                        
+                        mask = frame_data['xs'][-1] - frame_data['xs'][feature] <= pole_size
+                        mask = mask [1:]
+                        match orientation:
+                            case Orientation.NEW_POLE_OLD_POLE:
+                                pole = 'np'
+                            case Orientation.OLD_POLE_NEW_POLE:
+                                pole = 'op'
+                        if np.any(mask):
+                                    stat['lenght'][pole].extend(list(length[mask])) 
+                                    stat['height'][pole].extend(list(height[mask]))
+                                    
+                                    
+                        
+            for prop in ['lenght', 'height']:
+                    for pole in ['np', 'op']:
+                            l = stat[prop][pole]
+                            if len(l)>0:
+                                whole_stat[prop][pole].append(np.average(np.array(l)))
+
+    
+    
+    plt.show()            
+    numbers = [len(whole_stat['height'][pole])for pole in ['np', 'op']]                        
+    title =f"Inter-feature distance, amplitude \n with dataset \'{dataset_names}\',\n and {numbers} features"
+    
+    fig, ax = plt.subplots(1,2)
+    fig.suptitle(title)
+    ax[0].boxplot([whole_stat['lenght']['np'],
+                whole_stat['lenght']['op'],]
+               ,  showfliers=False, medianprops=dict(color='k'), widths = 0.5) 
+    print(title)
+    print_stats([whole_stat['lenght']['np'],
+                whole_stat['lenght']['op'], 
+                whole_stat['height']['np'],
+                whole_stat['height']['op']])
+    ax[0].set_xticklabels(["New pole", "Old pole"])
+    ax[0].set_ylabel(r"Distance ($\mu m$)")
+    pvalue1 = stats.ttest_ind(whole_stat['lenght']['np'], whole_stat['lenght']['op']).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 1.5 # 1.05
+    h=0.02
+    ax[0].plot([x1, x2], [y, y], color = 'k')
+    ax[0].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    ax[0].set_ylim(0,2)
+    # ax[0].set_ylim(0,1.25)
+    
+    ax[1].boxplot([whole_stat['height']['np'],
+                whole_stat['height']['op']]
+               ,  showfliers=False, medianprops=dict(color='k'), widths = 0.5) 
+    ax[1].set_xticklabels(["New pole", "Old pole"])
+    ax[1].set_ylabel(r"Amplitude ($n m$)")
+    pvalue1 = stats.ttest_ind(whole_stat['height']['np'], whole_stat['height']['op']).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 140
+    h = 2
+    ax[1].plot([x1, x2], [y, y], color = 'k')
+    ax[1].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    ax[1].set_ylim(0,220)
+    # ax[1].set_ylim(0,160)
+    plt.tight_layout()
+    plt.show()
+       
 
 def feature_number(dataset_names):
     params = get_scaled_parameters(data_set=True, paths_and_names=True)
@@ -443,8 +611,10 @@ def feature_number(dataset_names):
     
     peak_root = []
     peak_leaf = []
+    peak_var = []
     trough_root = []
     trough_leaf = []
+    trough_var = []
     count = 0
     
     for dataset in datasets:
@@ -460,6 +630,8 @@ def feature_number(dataset_names):
                     trough_root.append(len(cell[0]['troughs']))
                     peak_leaf.append(len(cell[-1]['peaks']))
                     trough_leaf.append(len(cell[-1]['troughs']))
+                    peak_var.append(len(cell[-1]['peaks'])-len(cell[0]['peaks']))
+                    trough_var.append(len(cell[-1]['troughs'])-len(cell[0]['troughs']))
                     count += 1
                 elif  roi_dic[roi_id]['Parent'] != '':
                     peak_root.append(len(cell[0]['peaks']))
@@ -473,29 +645,36 @@ def feature_number(dataset_names):
                     
                 
     _, ax = plt.subplots()
-    ax.boxplot([peak_root, peak_leaf, trough_root, trough_leaf], showfliers=False, showmeans=True, meanline=True)
-    ax.set_xticklabels([f"Peaks \n after division", f"Peaks \n before division", f"Troughs \n after division", f"Troughs \n before division"])
+    print(trough_leaf, trough_var)
+    title = f"Number of features with dataset \'{dataset_names}\',\n and {count} cells"
+    ax.boxplot([peak_root, peak_leaf, peak_var, trough_root, trough_leaf, trough_var], showfliers=False, medianprops=dict(linewidth= 1.5,color='k'))
+    print(title)
+    print_stats([peak_root, peak_leaf, peak_var, trough_root, trough_leaf, trough_var])
+    ax.set_xticklabels([f"Peaks  after \n division", f"Peaks \n before division", f"Peaks \n variation", f"Troughs \n after division", f"Troughs  before \n division", f"Troughs \n variation"])
     ax.set_ylabel("Feature number")
-    ax.set_title(f"Number of features with dataset \'{dataset_names}\',\n and {count} cells")
+    ax.set_title(title)
     pvalue1 = stats.ttest_ind(peak_root, peak_leaf).pvalue
     pvalue2 = stats.ttest_ind( trough_root, trough_leaf).pvalue
     x1 = 1
     x2 = 2 
     y = 6.2
     h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ***", ha='center', va='bottom')
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     
-    x1 = 3
-    x2 = 4 
+    x1 = 4
+    x2 = 5 
     y = 6.2
     h=0.2
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue2:.2e} ***", ha='center', va='bottom')
-    
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
+    ax.set_ylim(-0.5,7)
+    plt.tight_layout()
+    plt.show()
     
 
-def feature_general_properties(dataset_names):
+
+def feature_general_properties(dataset_names, plot=True):
     
     params = get_scaled_parameters(data_set=True,stats=True)
     if dataset_names in params.keys():
@@ -503,10 +682,11 @@ def feature_general_properties(dataset_names):
     else : 
         datasets = dataset_names
     
-    bin_num = params["bin_number_hist_feat_crea"]
     stat_list = []
     position_list = []
     diff_list = []
+    dist_list = {'peaks':[], 'troughs':[]}
+    amp_list = {'peaks':[], 'troughs':[]}
     
     for dataset in datasets:
         for _, cell in load_dataset(dataset, False):
@@ -516,20 +696,45 @@ def feature_general_properties(dataset_names):
                     xs = frame_data["xs"]-frame_data["xs"][0]
                     peaks = frame_data["peaks"]
                     troughs = frame_data["troughs"]
+                    if len(peaks)>=2:
+                        dist_list['peaks'].append(xs[peaks][1:]-xs[peaks][:-1])
+                    if len(troughs)>=2:
+                        dist_list['troughs'].append(xs[troughs][1:]-xs[troughs][:-1])
+                    
                     totlen = len(peaks)+len(troughs)
                     if totlen>=2:
-                        feature = np.zeros(totlen, dtype=int)
+                        feature = np.zeros(totlen)
                         x_coord = np.zeros(totlen)
                         if peaks[0]<troughs[0]:
                             feature[::2] = ys[peaks]
                             feature[1::2] = ys[troughs]
                             x_coord[::2] = xs[peaks]
                             x_coord[1::2] = xs[troughs]
+                            
+                            D = np.absolute(feature[1:] - feature[:-1])
+                            if len(D) >= 2:
+                                D = [np.absolute(feature[1]-feature[0])] + list(0.5* D[1:] + 0.5* D[:-1]) + [np.absolute(feature[-1]-feature[-2])]
+                            else: 
+                                D = 2*list(D)
+                            D = np.array(D)
+                            amp_list['peaks'].append(D[::2])
+                            amp_list['troughs'].append(D[1::2])
+                            
                         else:
                             feature[1::2] = ys[peaks]
                             feature[::2] = ys[troughs]
                             x_coord[1::2] = xs[peaks]
                             x_coord[::2] = xs[troughs]
+                            
+                            D = np.absolute(feature[1:] - feature[:-1])
+                            if len(D) >= 2:
+                                D = [np.absolute(feature[1]-feature[0])] + list(0.5* D[1:] + 0.5* D[:-1]) + [np.absolute(feature[-1]-feature[-2])]
+                            else: 
+                                D = 2*list(D)
+                            D = np.array(D)
+                            amp_list['peaks'].append(D[1::2])
+                            amp_list['troughs'].append(D[::2])
+                            
                         stat_list.append(np.absolute(feature[:-1]-feature[1:]))
                         diff_list.append(x_coord[1:]-x_coord[:-1])
                         for elem in x_coord[:-1]:
@@ -548,51 +753,100 @@ def feature_general_properties(dataset_names):
     position_list = position_list[good_ind]
     diff_list = diff_list[good_ind]
     
-    
-    fig, ax = plt.subplots(1,2)
-    title = (
-        f" dataset \'{dataset_names}\',\n and {len(stat_list)} individual features"
-    )
-    plt.title(title)
-    ax[0].boxplot(stat_list, showfliers=False, showmeans=True, meanline=True) 
-    ax[0].set_xticklabels(['Inter-feature amplitude'])
-    ax[0].set_ylabel(r'($n m$) ')
+    if plot:
+        fig, ax = plt.subplots(1,2)
+        title = (
+            f" Feature properties dataset \'{dataset_names}\',\n and {len(stat_list)} individual features"
+        )
+        plt.title(title)
+        ax[0].boxplot(stat_list, showfliers=False, showmeans=True, meanline=True, medianprops=dict(color='k'),meanprops=dict(color='k')) 
+        print(title)
+        print_stats([stat_list])
+        ax[0].set_xticklabels(['Inter-feature amplitude'])
+        ax[0].set_ylabel(r'($n m$) ')
 
+        
+        ax[1].boxplot(diff_list, showfliers=False, showmeans=True, meanline=True, medianprops=dict(color='k'),meanprops=dict(color='k')) 
+        print(title)
+        print_stats([diff_list])
+        ax[1].set_xticklabels(['Inter-feature distance'])
+        ax[1].set_ylabel(r'($\mu m$) ')
+        
+        plt.tight_layout()
+        
+        dist_list['peaks'] = np.concatenate(dist_list['peaks'] )
+        dist_list['troughs'] = np.concatenate(dist_list['troughs'])
+        amp_list['peaks'] = np.concatenate(amp_list['peaks'])
+        amp_list['troughs'] = np.concatenate(amp_list['troughs'])
+        
+        _, ax = plt.subplots()
+        title = (
+            f"Feature distance with \'{dataset_names}\',\n and {[len(dist_list['peaks']), len(dist_list['troughs'])]} features tracked"
+        )
+        ax.boxplot([dist_list['peaks'], dist_list['troughs']],  showfliers=False, medianprops=dict(color='k'))
+        print(title)
+        print_stats([dist_list['peaks'], dist_list['troughs']])
+        ax.set_xticklabels(['Peaks distance', 'Troughs distance'])
+        ax.set_ylabel(r"($\mu m$)")
+        ax.set_title(title)
+        pvalue1 = stats.ttest_ind(dist_list['peaks'], dist_list['troughs']).pvalue
+        x1 = 1
+        x2 = 2 
+        y = 2.5
+        h = 0.05
+        ax.plot([x1, x2], [y, y], color = 'k')
+        ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+        plt.tight_layout()
+        
+        _, ax = plt.subplots()
+        title = (
+            f"Feature amplitude with \'{dataset_names}\',\n and {[len(amp_list['peaks']), len(amp_list['troughs'])]} features tracked"
+        )
+        ax.boxplot([ amp_list['peaks'], amp_list['troughs']],  showfliers=False, medianprops=dict(color='k'))
+        print(title)
+        print_stats([ amp_list['peaks'], amp_list['troughs']])
+        ax.set_xticklabels([ 'Peaks amplitude', 'Troughs amplitude'])
+        ax.set_ylabel(r"($n m$)")
+        ax.set_title(title)
+        pvalue1 = stats.ttest_ind(amp_list['peaks'], amp_list['troughs']).pvalue
+        x1 = 1
+        x2 = 2 
+        y = 120
+        h = 1
+        ax.plot([x1, x2], [y, y], color = 'k')
+        ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+        plt.tight_layout()
+        
+        
     
-    ax[1].boxplot(diff_list, showfliers=False, showmeans=True, meanline=True) 
-    ax[1].set_xticklabels(['Inter-feature distance'])
-    ax[1].set_ylabel(r'($\mu m$) ')
-    
-    
-    
-    
-    plt.figure()
-    title = (
-        f"Feature height with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features, normalized total lenght"
-    )
-    # plt.scatter(position_list, stat_list, marker='.')
-    bins = 10
-    data_list = []
-    for elem in range(bins):
-        data_list.append([])
-    for i, elem in enumerate(position_list):
-        index = int(elem *2*bins)
-        if index == 10:
-            index = 9
-        data_list[index].append(stat_list[i])
+        '''
+        plt.figure()
+        title = (
+            f"Feature height with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features, normalized total lenght"
+        )
+        # plt.scatter(position_list, stat_list, marker='.')
+        bins = 10
+        data_list = []
+        for elem in range(bins):
+            data_list.append([])
+        for i, elem in enumerate(position_list):
+            index = int(elem *2*bins)
+            if index == 10:
+                index = 9
+            data_list[index].append(stat_list[i])
 
-    plt.boxplot(data_list,labels= np.linspace(0.5,5,10)/10, showfliers=False)       #, showmeans=True, meanline=True
-    # slope, intercept = statistics.linear_regression(position_list, stat_list)
-    # min_x= np.min(position_list)
-    # max_x= np.max(position_list)
-    # plt.plot([min_x,max_x], [slope*min_x+intercept, slope*max_x+intercept], color='r', label='linear interpolation')
-    plt.xlabel(r' $\leftarrow \;\text{pole}\;|\;  \text{center} \;\rightarrow$')
-    plt.ylabel(r'Height ($n m$)')
-    # plt.legend()
-    plt.title(title)
-    
-    
-    plt.show()
+        plt.boxplot(data_list,labels= np.linspace(0.5,5,10)/10, showfliers=False)       #, showmeans=True, meanline=True
+        # slope, intercept = statistics.linear_regression(position_list, stat_list)
+        # min_x= np.min(position_list)
+        # max_x= np.max(position_list)
+        # plt.plot([min_x,max_x], [slope*min_x+intercept, slope*max_x+intercept], color='r', label='linear interpolation')
+        plt.xlabel(r' $\leftarrow \;\text{pole}\;|\;  \text{center} \;\rightarrow$')
+        plt.ylabel(r'Height ($n m$)')
+        # plt.legend()
+        plt.title(title)
+        
+        '''
+        plt.show()
     
     return stat_list, position_list, diff_list
     
@@ -659,7 +913,7 @@ def feature_creation_comparison(dataset_names1, dataset_names2):
     plt.figure()
     plt.hist(stat_list1, bin_num, alpha=0.5, label=f' dataset {dataset_names1}, {len(stat_list1)} features', density=True)
     plt.hist(stat_list2, bin_num, alpha=0.5, label=f' dataset {dataset_names2}, {len(stat_list2)} features', density=True)
-    plt.annotate(f"P={pvalue:.2e}",(0.4,3))
+    plt.annotate(p_value_to_str(pvalue),(0.4,3))
     plt.xlabel(r'$\leftarrow$ pole | center $\rightarrow$ ')
     plt.legend()
     plt.title("Comparision of feature creation distributions")
@@ -758,41 +1012,43 @@ def feature_displacement(dataset_names, plot=True, return_smooth_approx=False):
     
 
     title = (
-    f"Variation of feature position and height with dataset \'{dataset_names}\',\n and {len(stat_list_p),len(stat_list_c) } features tracked"
+    f"Variation of feature position and height \n with dataset \'{dataset_names}\',\n and {len(stat_list_p),len(stat_list_c) } features tracked"
 )
-    _, ax = plt.subplots(1,2)
-    ax[0].boxplot([stat_list_p*1000,stat_list_c*1000], widths = 0.5,  showfliers=False, showmeans=True, meanline=True) 
+    
+    fig, ax = plt.subplots(1,2)
+    fig.suptitle(title)
+    ax[0].boxplot([stat_list_p*1000,stat_list_c*1000], widths = 0.5,  showfliers=False, medianprops=dict(color='k')) 
+    print(title)
+    print_stats([stat_list_p*1000,stat_list_c*1000])
     ax[0].set_xticklabels(['Near pole', 'Near center'])
     ax[0].set_ylabel(f'Variation of feature : \n position '+r'$n m (min)^{-1}$')
     # ax[0].set_title(title)
     pvalue1 = stats.ttest_ind(stat_list_p,stat_list_c).pvalue
     x1 = 1
     x2 = 2 
-    y = 10
-    h = 0.5
-    ax[0].plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax[0].text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 9
+    h = 0.1
+    ax[0].plot([x1, x2], [y, y], color = 'k')
+    ax[0].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     
     
-    
-    title = (
-    f"Variation of feature height with dataset \'{dataset_names}\',\n and {len(stat_list_p),len(stat_list_c) } features tracked"
-)
+
     # _, ax = plt.subplots()
-    ax[1].boxplot([height_list_p,height_list_c], widths = 0.5,  showfliers=False, showmeans=True, meanline=True) 
+    ax[1].boxplot([height_list_p,height_list_c], widths = 0.5,  showfliers=False, medianprops=dict(color='k')) 
+    print_stats([height_list_p,height_list_c])
     ax[1].set_xticklabels(['Near pole', 'Near center'])
     ax[1].set_ylabel(r'height $nm (min)^{-1}$')
     # ax.set_title(title)
     pvalue1 = stats.ttest_ind(height_list_p,height_list_c).pvalue
     x1 = 1
     x2 = 2 
-    y = 1.42
-    h = 0.05
-    ax[1].plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax[1].text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 0.8
+    h = 0.01
+    ax[1].plot([x1, x2], [y, y], color = 'k')
+    ax[1].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
 
-
-
+    
+    plt.tight_layout()
 
     
     plt.show()            
@@ -818,84 +1074,39 @@ def feature_len_height_variation(dataset_names):
             if len(cell) > 1:
                 pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
                 for key in pnt_ROI:
-                    if len(pnt_ROI[key]) >= 2:
-                        root = pnt_ROI[key][0]
-                        leaf = pnt_ROI[key][-1]
-                        time_diff = pnt_list[leaf][-2] - pnt_list[root][-2]
-                        if time_diff >= 50:
-                            feature_type = bool(pnt_list[root][2])
-                            feature = feature_type * 'peaks' + (1-feature_type) * 'troughs'
-                            non_feature = (1-feature_type) * 'peaks' + feature_type * 'troughs'
-                            generation_root = int(pnt_list[root][1]) 
-                            generation_leaf = int(pnt_list[leaf][1]) 
-                            
-                            total_length =  abs(cell[generation_root]['xs'][0]-cell[generation_root]['xs'][-1])
-                            x_coord = abs(pnt_list[root][3]-cell[generation_root]['xs'][0]) 
+                    if len(pnt_ROI[key]) >= 5:
+                        
+                        dist_list = []
+                        for elem in pnt_ROI[key]:
+                            ind, generation = get_feature_ind(elem, cell, pnt_list)
+                            total_length = abs(cell[generation]['xs'][-1]-cell[generation]['xs'][0])
+                            x_coord = abs(cell[generation]['xs'][ind] - cell[generation]['xs'][0])
                             if x_coord > 0.5 * total_length:
                                 x_coord = total_length - x_coord
+                            dist_list.append(x_coord)
+                        dist_list = np.array(dist_list)
+                        if (dist_list[0] <= pole_size) == (dist_list[-1] <= pole_size):
+                            root = pnt_ROI[key][0]
+                            leaf = pnt_ROI[key][-1]
+                            _update_len_height_variation(leaf, root, pnt_list, cell, stat_list_len, stat_list_height)
+                        elif dist_list[0] <= pole_size and dist_list[-1] > pole_size :
+                            swi_ind = np.argmax(dist_list> pole_size)
+                            root = pnt_ROI[key][0]
+                            leaf = pnt_ROI[key][swi_ind]
+                            _update_len_height_variation(leaf, root, pnt_list, cell, stat_list_len, stat_list_height)
+                            root = pnt_ROI[key][swi_ind]
+                            leaf = pnt_ROI[key][-1]
+                            _update_len_height_variation(leaf, root, pnt_list, cell, stat_list_len, stat_list_height)
                             
-                            ind_root = np.nonzero(cell[generation_root][feature + '_index'] == root)[0][0]
-                            root_pos = cell[generation_root][feature][ind_root]
-                            
-                            ind_leaf = np.nonzero(cell[generation_leaf][feature + '_index'] == leaf)[0][0]
-                            leaf_pos = cell[generation_leaf][feature][ind_leaf]
-                            
-                            pos_diff_1l = 0
-                            pos_diff_2l = 0
-                            pos_diff_1r = 0
-                            pos_diff_2r = 0
-                            
-                            mask_r = cell[generation_root][non_feature]<root_pos
-                            mask_l = cell[generation_leaf][non_feature]<leaf_pos
-                            
-                            if np.any(mask_r) and np.any(mask_l):
-                                    left_root = cell[generation_root][non_feature][np.nonzero(mask_r)[0][-1]]
-                                    left_leaf = cell[generation_leaf][non_feature][np.nonzero(mask_l)[0][-1]]
-                                    pos_diff_1l = cell[generation_leaf]['xs'][leaf_pos] - cell[generation_leaf]['xs'][left_leaf]\
-                                                    - cell[generation_root]['xs'][root_pos] + cell[generation_root]['xs'][left_root] 
-                                    # stat_list_len.append([x_coord, abs(pos_diff_1l)/time_diff]) 
-                                    
-                                    pos_diff_2l = cell[generation_leaf]['ys'][leaf_pos] - cell[generation_leaf]['ys'][left_leaf]\
-                                                    - cell[generation_root]['ys'][root_pos] + cell[generation_root]['ys'][left_root] 
-                                    # stat_list_height.append([x_coord, abs(pos_diff_2l)/time_diff])
-                                    
-                            mask_r = cell[generation_root][non_feature]>root_pos
-                            mask_l = cell[generation_leaf][non_feature]>leaf_pos
-                            
-                            if np.any(mask_r) and np.any(mask_l):
-                                    right_root = cell[generation_root][non_feature][np.nonzero(mask_r)[0][0]]
-                                    right_leaf = cell[generation_leaf][non_feature][np.nonzero(mask_l)[0][0]]
-                                    pos_diff_1r =  cell[generation_leaf]['xs'][leaf_pos] - cell[generation_leaf]['xs'][right_leaf]\
-                                                    - cell[generation_root]['xs'][root_pos] + cell[generation_root]['xs'][right_root] 
-                                    # stat_list_len.append([x_coord, abs(pos_diff_1r)/time_diff])
-                                    
-                                    pos_diff_2r = cell[generation_leaf]['ys'][leaf_pos] - cell[generation_leaf]['ys'][right_leaf]\
-                                                    - cell[generation_root]['ys'][root_pos] + cell[generation_root]['ys'][right_root] 
-                                    # stat_list_height.append([x_coord, abs(pos_diff_2r)/time_diff])
-                                    
-                            if pos_diff_1l>0 + pos_diff_1r>0 == 2:
-
-                                stat_list_len.append([x_coord,abs(pos_diff_1l-pos_diff_1r)/2 /time_diff]) 
-                                stat_list_height.append([x_coord,abs(pos_diff_2l-pos_diff_2r)/2 /time_diff])
-                                   
-                            else :
-                                if pos_diff_1l>0:
-                                    stat_list_len.append([x_coord,abs(pos_diff_1l) /time_diff]) 
-                                else:
-                                    stat_list_len.append([x_coord,abs(pos_diff_1r) /time_diff])
-                                if pos_diff_2l>0:
-                                    stat_list_height.append([x_coord,abs(pos_diff_2l) /time_diff]) 
-                                else:
-                                    stat_list_height.append([x_coord,abs(pos_diff_2r) /time_diff])
-                                
-                            
-    
+                        
+                        
+                      
     
     stat_list_len = np.array(stat_list_len)
     stat_list_height = np.array(stat_list_height)
 
     title = (
-        f"Variation of inter-feature distance with dataset \'{dataset_names}\',\n and {len(stat_list_len[:,0])} features tracked"
+        f"Variation of inter-feature distance with dataset \'{dataset_names}\',\n and {np.sum(stat_list_height[:,0] <= pole_size) } + {np.sum(stat_list_height[:,0] > pole_size) } features tracked"
     )
 
     _, ax = plt.subplots()
@@ -903,39 +1114,114 @@ def feature_len_height_variation(dataset_names):
     mask2 = stat_list_len[:,0] > pole_size
     val1 = stat_list_len[mask1]
     val2 = stat_list_len[mask2]
-    ax.boxplot([val1[:,1],val2[:,1]],  showfliers=False, showmeans=True, meanline=True) 
-    ax.set_xticklabels(['Near pole region', 'Near center region'])
-    ax.set_ylabel(r'Variation of inter-feature distance $\mu m (min)^{-1}$')
-    ax.set_title(title)
-    pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
-    x1 = 1
-    x2 = 2 
-    y = 0.01
-    h = 0.002
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
-    
-    title = (
-        f"Variation of inter-feature amplitude with dataset \'{dataset_names}\',\n and {len(stat_list_len[:,0])} features tracked"
-    )
-    _, ax = plt.subplots()
-    mask1 = stat_list_height[:,0] <= pole_size
-    mask2 = stat_list_height[:,0] > pole_size
-    val1 = stat_list_height[mask1]
-    val2 = stat_list_height[mask2]
-    ax.boxplot([val1[:,1],val2[:,1]],  showfliers=False, showmeans=True, meanline=True) 
+    bp=ax.boxplot([1000*val1[:,1],1000*val2[:,1]],  showfliers=False, medianprops=dict(color='k')) 
+    print(title)
+    print_stats([1000*val1[:,1],1000*val2[:,1]])
     ax.set_xticklabels(['Near pole region', 'Near center region'])
     ax.set_ylabel(r'Variation of inter-feature distance $n m (min)^{-1}$')
     ax.set_title(title)
     pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
     x1 = 1
     x2 = 2 
-    y = 0.01
-    h = 0.002
-    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    ax.text((x1+x2)*.5, y+h, f"P={pvalue1:.2e} ", ha='center', va='bottom')
+    y = 6
+    h = 0.02
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     
-    plt.show()         
+    title = (
+        f"Variation of inter-feature amplitude with dataset \'{dataset_names}\',\n and {np.sum(stat_list_height[:,0] <= pole_size) } + {np.sum(stat_list_height[:,0] > pole_size) } features tracked"
+    )
+    _, ax = plt.subplots()
+    mask1 = stat_list_height[:,0] <= pole_size
+    mask2 = stat_list_height[:,0] > pole_size
+    val1 = stat_list_height[mask1]
+    val2 = stat_list_height[mask2]
+    ax.boxplot([val1[:,1],val2[:,1]],  showfliers=False, medianprops=dict(color='k')) 
+    
+    print(title)
+    print_stats([val1[:,1],val2[:,1]])
+    
+    ax.set_xticklabels(['Near pole region', 'Near center region'])
+    ax.set_ylabel(r'Variation of inter-feature amplitude $n m (min)^{-1}$')
+    ax.set_title(title)
+    pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 0.4
+    h = 0.002
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    
+    plt.show()        
+    
+    
+def _update_len_height_variation(leaf, root, pnt_list, cell, stat_list_len, stat_list_height):
+    time_diff = pnt_list[leaf][-2] - pnt_list[root][-2]
+    if time_diff >= 100:
+        feature_type = bool(pnt_list[root][2])
+        feature = feature_type * 'peaks' + (1-feature_type) * 'troughs'
+        non_feature = (1-feature_type) * 'peaks' + feature_type * 'troughs'
+        generation_root = int(pnt_list[root][1]) 
+        generation_leaf = int(pnt_list[leaf][1]) 
+        
+        total_length =  abs(cell[generation_root]['xs'][0]-cell[generation_root]['xs'][-1])
+        x_coord = abs(pnt_list[root][3]-cell[generation_root]['xs'][0]) 
+        if x_coord > 0.5 * total_length:
+            x_coord = total_length - x_coord
+        
+        ind_root = np.nonzero(cell[generation_root][feature + '_index'] == root)[0][0]
+        root_pos = cell[generation_root][feature][ind_root]
+        
+        ind_leaf = np.nonzero(cell[generation_leaf][feature + '_index'] == leaf)[0][0]
+        leaf_pos = cell[generation_leaf][feature][ind_leaf]
+        
+        pos_diff_1l = 0
+        pos_diff_2l = 0
+        pos_diff_1r = 0
+        pos_diff_2r = 0
+        
+        mask_r = cell[generation_root][non_feature]<root_pos
+        mask_l = cell[generation_leaf][non_feature]<leaf_pos
+        
+        if np.any(mask_r) and np.any(mask_l):
+                left_root = cell[generation_root][non_feature][np.nonzero(mask_r)[0][-1]]
+                left_leaf = cell[generation_leaf][non_feature][np.nonzero(mask_l)[0][-1]]
+                pos_diff_1l = cell[generation_leaf]['xs'][leaf_pos] - cell[generation_leaf]['xs'][left_leaf]\
+                                - cell[generation_root]['xs'][root_pos] + cell[generation_root]['xs'][left_root] 
+                # stat_list_len.append([x_coord, abs(pos_diff_1l)/time_diff]) 
+                
+                pos_diff_2l = cell[generation_leaf]['ys'][leaf_pos] - cell[generation_leaf]['ys'][left_leaf]\
+                                - cell[generation_root]['ys'][root_pos] + cell[generation_root]['ys'][left_root] 
+                # stat_list_height.append([x_coord, abs(pos_diff_2l)/time_diff])
+                
+        mask_r = cell[generation_root][non_feature]>root_pos
+        mask_l = cell[generation_leaf][non_feature]>leaf_pos
+        
+        if np.any(mask_r) and np.any(mask_l):
+                right_root = cell[generation_root][non_feature][np.nonzero(mask_r)[0][0]]
+                right_leaf = cell[generation_leaf][non_feature][np.nonzero(mask_l)[0][0]]
+                pos_diff_1r =  cell[generation_leaf]['xs'][leaf_pos] - cell[generation_leaf]['xs'][right_leaf]\
+                                - cell[generation_root]['xs'][root_pos] + cell[generation_root]['xs'][right_root] 
+                # stat_list_len.append([x_coord, abs(pos_diff_1r)/time_diff])
+                
+                pos_diff_2r = cell[generation_leaf]['ys'][leaf_pos] - cell[generation_leaf]['ys'][right_leaf]\
+                                - cell[generation_root]['ys'][root_pos] + cell[generation_root]['ys'][right_root] 
+                # stat_list_height.append([x_coord, abs(pos_diff_2r)/time_diff])
+                
+        if pos_diff_1l>0 + pos_diff_1r>0 == 2:
+
+            stat_list_len.append([x_coord,abs(pos_diff_1l-pos_diff_1r)/2 /time_diff]) 
+            stat_list_height.append([x_coord,abs(pos_diff_2l-pos_diff_2r)/2 /time_diff])
+                
+        else :
+            if pos_diff_1l>0:
+                stat_list_len.append([x_coord,abs(pos_diff_1l) /time_diff]) 
+            else:
+                stat_list_len.append([x_coord,abs(pos_diff_1r) /time_diff])
+            if pos_diff_2l>0:
+                stat_list_height.append([x_coord,abs(pos_diff_2l) /time_diff]) 
+            else:
+                stat_list_height.append([x_coord,abs(pos_diff_2r) /time_diff])
 
 # def feature_displacement_comparison(*dataset_name_list):
 #     plt.figure()
@@ -950,23 +1236,20 @@ def feature_len_height_variation(dataset_names):
 #     plt.title(title)
 #     plt.show()    
     
-   
+ 
+         
 
 def datasets_statistics():
     params = get_scaled_parameters(data_set=True, paths_and_names=True)
     mask_number = 0
     ROI_number = 0
-    WT_ROI_number = 0
-    WT_mask_number = 0
-    nd_WT_ROI_number = 0
-    nd_WT_mask_number = 0
     
     dicname = params["main_dict_name"]
     data_direc = params["main_data_direc"]
     
     datasets = params['WT_no_drug']
     for set in datasets:
-        for roi_id, cell in load_dataset(set, False):
+        for _, cell in load_dataset(set, False):
             if len(cell) > 5:
                 ROI_number+=1
         dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
@@ -977,7 +1260,7 @@ def datasets_statistics():
     
     datasets = params['WT_drug']
     for set in datasets:
-        for roi_id, cell in load_dataset(set, False):
+        for _, cell in load_dataset(set, False):
             if len(cell) > 5:
                 ROI_number+=1
         dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
@@ -988,7 +1271,7 @@ def datasets_statistics():
     
     datasets = params['no_WT']
     for set in datasets:
-        for roi_id, cell in load_dataset(set, False):
+        for _, cell in load_dataset(set, False):
             if len(cell) > 5:
                 ROI_number+=1
         dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
@@ -1023,12 +1306,12 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    # feature_number('WT_no_drug')
-    # feature_creation('WT_no_drug')     #"WT_mc2_55/30-03-2015", "all""no_WT"
-    # feature_general_properties("all")
+    # feature_number("WT_mc2_55/30-03-2015")
+    # feature_creation("WT_mc2_55/30-03-2015")     #"WT_mc2_55/30-03-2015", "all""no_WT"
+    # feature_general_properties("WT_mc2_55/30-03-2015")
     # feature_creation_comparison("WT_drug",'WT_no_drug')
-    # feature_displacement("all") #"all"
+    feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'
     # feature_len_height_variation ("WT_mc2_55/30-03-2015")
-    # feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    # feature_properties_pole('all')
-    datasets_statistics()
+    ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
+    feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"
+    # datasets_statistics()

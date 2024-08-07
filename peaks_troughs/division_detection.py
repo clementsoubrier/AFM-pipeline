@@ -12,7 +12,7 @@ if not package_path in sys.path:
 from scipy.ndimage import gaussian_filter1d
 
 from scaled_parameters import get_scaled_parameters
-from peaks_troughs.growth_stats import p_value_to_str, extract_growth
+from peaks_troughs.growth_stats import p_value_to_str, extract_growth, print_stats
 from peaks_troughs.group_by_cell import Orientation, load_dataset, load_cell, load_data
 from peaks_troughs.stats import feature_general_properties
 
@@ -121,6 +121,8 @@ def division_statistics(datasetnames, use_one_daughter=False):
     )
     _, ax = plt.subplots()
     ax.boxplot([div_list_ori], showfliers=False, medianprops=dict(color='k'))
+    print(title)
+    print_stats([div_list_ori])
     ax.set_xticklabels(['Division position'])
     ax.set_ylabel(r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
     ax.set_title(title)
@@ -199,6 +201,8 @@ def division_statistics_INH_after_700(use_one_daughter=False):
     )
     _, ax = plt.subplots()
     ax.boxplot([div_list_ori], showfliers=False, medianprops=dict(color='k'))
+    print(title)
+    print_stats([div_list_ori])
     ax.set_xticklabels(['Division position'])
     ax.set_ylabel(r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
     ax.set_title(title)
@@ -300,6 +304,8 @@ def division_pnt(datasetnames, use_one_daughter=False):
     )
     _, ax = plt.subplots()
     ax.boxplot([pnt_dist_peak, pnt_dist_trough], showfliers=False,medianprops=dict(color='k'))
+    print(title)
+    print_stats([pnt_dist_peak, pnt_dist_trough])
     ax.set_xticklabels(["Peak", "Trough"])
     ax.set_ylabel(r'Distance $\mu m $')
     ax.set_title(title)
@@ -321,7 +327,10 @@ def division_pnt(datasetnames, use_one_daughter=False):
                 pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs'],
                 diff_list],
                showfliers=False, medianprops=dict(color='k'))
-    
+    print(title)
+    print_stats([pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks'],
+                pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs'],
+                diff_list])
     ax.set_xticklabels(["Peak", "Trough", 'whole features'])
     ax.set_ylabel(r'Amplitude $nm $')
     ax.set_title(title)
@@ -484,6 +493,8 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
     )
     _, ax = plt.subplots()
     ax.boxplot([stat_list, stat_mid, stat_mid2, stat_old], showfliers=False, medianprops=dict(color='k'))
+    print(title)
+    print_stats([stat_list, stat_mid, stat_mid2, stat_old])
     ax.set_title(title)
     ax.set_xticklabels(["At division", "90 mn before", "150 mn before", 'Previous division'])
     ax.set_ylabel(r'Curvature at division site $\mu m^{-1} $')

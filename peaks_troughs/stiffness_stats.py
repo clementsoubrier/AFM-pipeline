@@ -13,6 +13,8 @@ package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/a
 if not package_path in sys.path:
     sys.path.append(package_path)
 from scaled_parameters import get_scaled_parameters
+from peaks_troughs.growth_stats import p_value_to_str, print_stats
+from peaks_troughs.division_detection import detect_division
 from peaks_troughs.group_by_cell import load_dataset
 from functools import partial
 
@@ -96,13 +98,16 @@ def area_mask(pos, shape, n_vec, t_vec, tangential_precision, normal_precision):
 
 
 def phys_feature_one_dataset(dataset, feature, averaged):
-    params = get_scaled_parameters(paths_and_names=True)
+    params = get_scaled_parameters(paths_and_names=True, physical_feature=True, stats=True)
     peaks_list = []
+    peaks_non_pole = []
     troughs_list = []
+    troughs_non_pole = []
 
     dicname = params["main_dict_name"]
     listname = params["masks_list_name"]
     data_direc = params["main_data_direc"]
+    pole_len = params["pole_region_size"]
     
     masks_list = np.load(os.path.join(data_direc, dataset, listname), allow_pickle=True)['arr_0']
     main_dict = np.load(os.path.join(data_direc, dataset, dicname), allow_pickle=True)['arr_0'].item()
@@ -113,9 +118,16 @@ def phys_feature_one_dataset(dataset, feature, averaged):
                 peaks = frame_data["peaks"]
                 troughs = frame_data["troughs"]
                 if len(troughs)+len(peaks)>=3:
-                    peaks_list.append(ys[peaks])
-                    troughs_list.append(ys[troughs])
-    return peaks_list, troughs_list
+                    xs = frame_data['xs'] - frame_data["xs"][0]
+                    if xs[-1] >= 2.5*pole_len:
+                        mask = (xs>=pole_len) & (xs<=xs[-1]-pole_len)
+                        peaks_list.append(ys[peaks])
+                        peaks_non_pole.append(mask[peaks])
+                        
+                        troughs_list.append(ys[troughs])
+                        troughs_non_pole.append(mask[troughs])
+                    
+    return peaks_list, troughs_list, peaks_non_pole, troughs_non_pole
         
         
         
@@ -139,22 +151,86 @@ def feature_pnt_stats(datasetnames, feature='DMTModulus_fwd', averaged=True):
     
     peaks_list = []
     troughs_list = []
+    peaks_non_pole = []
+    troughs_non_pole = []
      
     func=partial(phys_feature_one_dataset, feature=feature, averaged=averaged)
     with Pool(processes=8) as pool:
-        for pl, tl in pool.imap_unordered(func, datasets):
+        for pl, tl, pnp, tnp in pool.imap_unordered(func, datasets):
             peaks_list.extend(pl)
             troughs_list.extend(tl)
+            peaks_non_pole.extend(pnp)
+            troughs_non_pole.extend(tnp)
 
     peaks_list = np.concatenate(peaks_list)      
-    troughs_list = np.concatenate(troughs_list) 
+    troughs_list = np.concatenate(troughs_list)
+    
+    peaks_non_pole = np.concatenate(peaks_non_pole)      
+    troughs_non_pole = np.concatenate(troughs_non_pole) 
+    
+    title = (f"{feature} with dataset {datasetnames} \n and {len(peaks_list)} + {len(troughs_list)} features")
     _, ax = plt.subplots()
-    ax.boxplot([peaks_list, troughs_list], showfliers=False)
-    ax.set_title(f"{feature} with dataset {datasetnames} and {len(peaks_list)+len(troughs_list)} features")
+    ax.boxplot([peaks_list, troughs_list], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(title)
+    print(title)
+    print_stats([peaks_list, troughs_list])
     ax.set_ylabel(f"{feature} ({unit})")
     ax.set_xticklabels(["Peaks", "Troughs"])
-
+    pvalue1 = stats.ttest_ind(peaks_list, troughs_list).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 16
+    h=0.01
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    
+    
     plt.show()
+    
+    
+    title = (f"{feature} with dataset {datasetnames} \n and {len(peaks_list[peaks_non_pole])} + {len(troughs_list[troughs_non_pole])} + {len(peaks_list[np.logical_not(peaks_non_pole)])} + {len(troughs_list[np.logical_not(troughs_non_pole)])} features")
+    _, ax = plt.subplots()
+    ax.boxplot([peaks_list[peaks_non_pole], troughs_list[troughs_non_pole], peaks_list[np.logical_not(peaks_non_pole)], troughs_list[np.logical_not(troughs_non_pole)]], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(title)
+    print(title)
+    print_stats([peaks_list[peaks_non_pole], troughs_list[troughs_non_pole], peaks_list[np.logical_not(peaks_non_pole)], troughs_list[np.logical_not(troughs_non_pole)]])
+    ax.set_ylabel(f"{feature} ({unit})")
+    ax.set_xticklabels(["Peaks center", "Troughs center", "Peaks pole", "Troughs pole"])
+    
+    pvalue = stats.ttest_ind(peaks_list[peaks_non_pole], troughs_list[troughs_non_pole]).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 16
+    h=0.05
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    pvalue = stats.ttest_ind(peaks_list[np.logical_not(peaks_non_pole)], troughs_list[np.logical_not(troughs_non_pole)]).pvalue
+    x1 = 3
+    x2 = 4 
+    y = 14
+    h=0.05
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    pvalue = stats.ttest_ind(peaks_list[peaks_non_pole],peaks_list[np.logical_not(peaks_non_pole)]).pvalue
+    x1 = 1
+    x2 = 3 
+    y = 21
+    h=0.05
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    pvalue = stats.ttest_ind(troughs_list[troughs_non_pole], troughs_list[np.logical_not(troughs_non_pole)]).pvalue
+    x1 = 2
+    x2 = 4 
+    y = 23
+    h=0.05
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
+    # ax.set_ylim(-1,26)
+    plt.show()
+    
     
 
 
@@ -220,22 +296,107 @@ def feature_region_stats(datasetnames, feature='DMTModulus_fwd', averaged=True):
     non_pole_list = np.array(non_pole_list) 
     diff_list = np.array(diff_list)
     
+    
+    title = f"Region-averaged {feature} with dataset {datasetnames} \n and {len(non_pole_list)} cells"
     _, ax = plt.subplots()
-    ax.boxplot([pole_list, non_pole_list, diff_list], showfliers=False)
-    ax.set_title(f"Region-averaged {feature} with dataset {datasetnames} \n and {len(non_pole_list)} cells")
+    ax.boxplot([pole_list, non_pole_list, diff_list], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(title)
+    print(title)
+    print_stats([pole_list, non_pole_list, diff_list])
     ax.set_ylabel(f"{feature} ({unit})")
     ax.set_xticklabels(["Pole", "Non Pole", "Difference Non Pole / Pole"])
-    # pvalue = stats.ttest_ind(pole_list,non_pole_list).pvalue
+    pvalue = stats.ttest_ind(pole_list,non_pole_list).pvalue
     
-    # x1 = 1
-    # x2 = 2 
-    # y = 0.011
-    # h=0.001
-    # ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y], color = 'r')
-    # ax.text((x1+x2)*.5, y+h, f"P={pvalue:.2e} *", ha='center', va='bottom')
+    x1 = 1
+    x2 = 2 
+    y = 23
+    h=0.5
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
 
+    pvalue = stats.wilcoxon(diff_list, method='exact').pvalue  #stats.wilcoxon
+    ax.text(3, 20, p_value_to_str(pvalue), ha='center', va='bottom')
+    # ax.set_ylim(-7,26)
+    plt.show()
+   
+   
+   
+    
+def division_site_vs_troughs(datasetnames, feature='DMTModulus_fwd', averaged=True, use_one_daughter=False):
+    params = get_scaled_parameters(data_set=True, paths_and_names=True, physical_feature=True, stats=True)
+    
+    if datasetnames in params.keys():
+        datasets = params[datasetnames]
+    elif isinstance(datasetnames, str): 
+        raise NameError('This directory does not exist')
+    else :
+        datasets = datasetnames 
+    
+    
+    data_direc = params["main_data_direc"]
+    roi_dic_name = params["roi_dict_name"]
+    dicname = params["main_dict_name"] 
+    data_direc = params["main_data_direc"]
+    listname = params["masks_list_name"]
+    pole_len = params["pole_region_size"]
+    
+    main_dict = np.load(os.path.join(data_direc, datasets[0], dicname), allow_pickle=True)['arr_0'].item()   
+    unit = main_dict[next(iter(main_dict))]['units'][feature]
+    
+    div_list = []
+    feat_list = []
+    
+    
+    for dataset in datasets:
+        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        masks_list = np.load(os.path.join(data_direc, dataset, listname), allow_pickle=True)['arr_0']
+        main_dict = np.load(os.path.join(data_direc, dataset, dicname), allow_pickle=True)['arr_0'].item()
+        for roi_id, mother in load_dataset(dataset, False):
+            if len(mother)>3:
+                mother = mother[-1]
+                ys = extract_feature(mother, main_dict, masks_list, feature, averaged)
+                div_index = detect_division(mother, roi_id, roi_dic, dataset, use_one_daughter)
+                if div_index is not None and len(mother["peaks"])+len(mother["troughs"])>3:
+                    div_list.append(ys[div_index])
+                    peaks = mother["peaks"]
+                    troughs = mother["troughs"]
+                    xs = mother['xs'] - mother["xs"][0]
+                    if xs[-1] >= 2.5*pole_len:
+                        mask = (xs>=pole_len) & (xs<=xs[-1]-pole_len)
+                        mask2 = mask[peaks]
+                        feat_list.append(ys[peaks[mask2]])
+                        mask2 = mask[troughs]
+                        feat_list.append(ys[troughs[mask2]])
+                        div_list.append(ys[div_index])
+
+    # func=partial(phys_feature_one_dataset, feature=feature, averaged=averaged)
+    # with Pool(processes=8) as pool:
+    #     for _, tl, _, tnp in pool.imap_unordered(func, datasets):
+    #         feat_list.extend(tl)
+    #         # troughs_list.extend(tnp)
+
+    feat_list = np.concatenate(feat_list)
+    
+    title = (f"{feature} with dataset {datasetnames} \n and {len(div_list)} + {len(feat_list)} features")
+    _, ax = plt.subplots()
+    ax.boxplot([div_list, feat_list], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(title)
+    print(title)
+    print_stats([div_list, feat_list])
+    ax.set_ylabel(f"{feature} ({unit})")
+    ax.set_xticklabels(["division site", "Center features"])
+    pvalue1 = stats.ttest_ind(div_list, feat_list).pvalue
+    x1 = 1
+    x2 = 2 
+    y = 35
+    h=0.5
+    ax.plot([x1, x2], [y, y], color = 'k')
+    ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
     plt.show()
     
 if __name__ == "__main__":
-    # feature_pnt_stats("WT_mc2_55/06-10-2015") #'data_with_feature'
-    feature_region_stats('WT_no_drug', averaged=False) # 'data_with_feature'
+    feature_pnt_stats("WT_mc2_55/06-10-2015") 
+    feature_region_stats("WT_mc2_55/06-10-2015") 
+    # feature_pnt_stats("WT_mc2_55/30-03-2015") 
+    # feature_region_stats("WT_mc2_55/30-03-2015", averaged=True) 
+    # division_site_vs_troughs("WT_mc2_55/30-03-2015", averaged=True, use_one_daughter=True)

@@ -485,7 +485,7 @@ def dimension_def_logs_only(dir_im, temp_dir_info, dimensiondata, maxsize): #dir
     
 
 #%% Running cellpose and saving the results
-def run_cel_logs_only(dir_im,seg,temp_dir_info,dimensiondata):
+def run_cel_logs_only(dir_im,seg,temp_dir_info,dimensiondata, pref_channel=None):
     params=get_scaled_parameters(cellpose=True)
 
     mod = params['cel_model_type']
@@ -517,7 +517,10 @@ def run_cel_logs_only(dir_im,seg,temp_dir_info,dimensiondata):
         datadir=np.load(os.path.join(dir_im, filez),allow_pickle=True)['arr_0'].item()
         
         keys=datadir.keys()
-        if "Height_fwd" in keys and "Peak Force Error_fwd" in keys and "Peak Force Error_bwd" in keys:
+        if pref_channel is not None:
+            img=datadir[pref_channel]
+            print( f'Using {pref_channel} for segmentation')
+        elif "Height_fwd" in keys and "Peak Force Error_fwd" in keys and "Peak Force Error_bwd" in keys:
             img=renorm_img(datadir["Height_fwd"])/3*2+renorm_img(np.maximum(datadir["Peak Force Error_fwd"],np.zeros(np.shape(datadir["Peak Force Error_fwd"])))+np.maximum(datadir["Peak Force Error_bwd"],np.zeros(np.shape(datadir["Peak Force Error_bwd"]))))/3
         elif "Height_fwd" in keys and "Peak Force Error_fwd" in keys:
             img=renorm_img(datadir["Height_fwd"])/3*2+renorm_img(datadir["Peak Force Error_fwd"])/3
@@ -1319,7 +1322,10 @@ def run_one_dataset_logs_only(Main_directory):
     
     print(Main_directory,"run_cel",step)
     step+=1
-    run_cel_logs_only(final_data,segments_path,temp_dir_info,dimension_data)
+    if Main_directory == "WT_mc2_55/06-10-2015":
+        run_cel_logs_only(final_data, segments_path, temp_dir_info, dimension_data, pref_channel='DMTModulus_fwd')
+    else:
+        run_cel_logs_only(final_data,segments_path,temp_dir_info,dimension_data)
     
     print(Main_directory,"download_dict",step)
     step+=1
@@ -1351,13 +1357,13 @@ def main(Directory= "all"):
     params = get_scaled_parameters(data_set=True)
     if Directory in params.keys():
         with Pool(processes=8) as pool:
-            for direc in pool.imap_unordered(run_one_dataset_logs_only, params[Directory]):
+            for _ in pool.imap_unordered(run_one_dataset_logs_only, params[Directory]):
                 pass
-    elif isinstance(Directory, list)  : 
+    elif isinstance(Directory, list): 
         with Pool(processes=8) as pool:
-            for direc in pool.imap_unordered(run_one_dataset_logs_only, Directory):
+            for _ in pool.imap_unordered(run_one_dataset_logs_only, Directory):
                 pass
-    elif isinstance(Directory, str)  : 
+    elif isinstance(Directory, str): 
         raise NameError('This directory does not exist')
     
     

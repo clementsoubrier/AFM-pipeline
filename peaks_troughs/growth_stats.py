@@ -428,9 +428,9 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
                 if plot:
                     
                     plt.figure()
-                    plt.scatter(overall_times, overall_growth - overall_growth[0]+1, color = 'k', label = 'overall growth')
-                    plt.scatter(old_times, old_pole_growth +0.5, color = 'r', label = 'old pole growth')
-                    plt.scatter(new_times, new_pole_growth, color = 'b', label = 'new pole growth')
+                    plt.scatter(overall_times, overall_growth - overall_growth[0]+1, color = 'k', label = 'overall')
+                    plt.scatter(old_times, old_pole_growth +0.5, color = 'r', label = 'old pole')
+                    plt.scatter(new_times, new_pole_growth, color = 'b', label = 'new pole')
                     plt.plot([0, t, overall_times[-1]], [b-a_1*t - overall_growth[0]+1, b - overall_growth[0]+1, b - overall_growth[0]+1 + a_2* (overall_times[-1]-t)], color = 'k')
                     plt.plot([0, t, new_times[-1]], [c-new_a_1*t, c, c+ new_a_2* (new_times[-1]-t)], color = 'b')
                     mat = np.zeros((len(old_times), 2))
@@ -481,12 +481,12 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     
     x1 = 3
     x2 = 4
-    y = 17
+    y = 19
     h = 0.2
     ax.plot([x1, x2], [y,  y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
     
-    ax.set_ylim(-5,20)
+    ax.set_ylim(-5,22)
     plt.tight_layout()
     plt.show()   
 
@@ -854,7 +854,9 @@ def compare_dataset_pole_growth(datasetname1, datasetname2, y, h, lim, outlier_d
 if __name__ == "__main__":
     # plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True) #, outlier_detection=True
     # compute_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False)
+    plt.rcParams.update({'font.size': 14})
     compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = True)
+    plt.rcParams.update({'font.size': 10})
     compare_INH_pole_growth(outlier_detection=False)
     compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_CCCP_irrigation_2016", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_filamentation_cipro_2015",  [12,12,15,17,19,19,21.5,24], 0.4, [-6,21, -10,27], outlier_detection=False)

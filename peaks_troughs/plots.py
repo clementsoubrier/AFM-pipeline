@@ -186,7 +186,7 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
                 coord_z.append(pnt_list[elem,5]-base_time)
             ax.plot(coord_x, coord_z, coord_y, color = 'b')
     
-    ax.set_zlabel(r'height ($ m$)')
+    ax.set_zlabel(r'height ($n m$)')
     ax.set_ylabel(r'time ($min$)')
     ax.set_xlabel(r' centerline length ($\mu m$)')
     ax.zaxis.labelpad=10
@@ -342,6 +342,7 @@ def main(Directory='all', saving=False):
         final_img_dir = params["final_img_dir"]
         
         roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        dir_im = ''
         if saving:
             dir_im = os.path.join(final_img_dir,'kymographs',dataset) 
             

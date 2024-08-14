@@ -356,6 +356,13 @@ def division_pnt(datasetnames, use_one_daughter=False):
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
     ax.set_ylim(-50,500)
+    
+    
+    print('Comparing features')
+    print_stats([pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks']+
+                pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs'],
+                diff_list])
+    print(stats.ttest_ind(diff_list, pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks']+pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs']).pvalue)
     # plt.show()
 
 
@@ -611,12 +618,15 @@ def division_local_curvature_trajectories(datasetnames, use_one_daughter=False, 
 
 
 if __name__ == "__main__":
-    division_statistics_INH_after_700(use_one_daughter=True) 
-    division_statistics('WT_INH_700min_2014', use_one_daughter=True)
-    division_statistics("WT_no_drug", use_one_daughter=True)
+    plt.rcParams.update({'font.size': 13})
+    # division_statistics_INH_after_700(use_one_daughter=True) 
+    # division_statistics('WT_INH_700min_2014', use_one_daughter=True)
+    # division_statistics("WT_no_drug", use_one_daughter=True)
     division_pnt('WT', use_one_daughter=True)
-    division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
-    division_pnt('WT_no_drug', use_one_daughter=True)
-    division_pnt('all', use_one_daughter=True)
-    division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
-    division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
+    # division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
+    # division_pnt('WT_no_drug', use_one_daughter=True)
+    # division_pnt('all', use_one_daughter=True)
+    # division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
+    # division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
+    plt.rcParams.update({'font.size': 10})
+    plt.show()

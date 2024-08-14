@@ -1020,32 +1020,33 @@ def feature_displacement(dataset_names, plot=True, return_smooth_approx=False):
     ax[0].boxplot([stat_list_p*1000,stat_list_c*1000], widths = 0.5,  showfliers=False, medianprops=dict(color='k')) 
     print(title)
     print_stats([stat_list_p*1000,stat_list_c*1000])
-    ax[0].set_xticklabels(['Near pole', 'Near center'])
+    ax[0].set_xticklabels(['Pole', 'Center'])
     ax[0].set_ylabel(f'Variation of feature : \n position '+r'$n m (min)^{-1}$')
     # ax[0].set_title(title)
     pvalue1 = stats.ttest_ind(stat_list_p,stat_list_c).pvalue
     x1 = 1
     x2 = 2 
-    y = 9
+    y = 11.5
     h = 0.1
     ax[0].plot([x1, x2], [y, y], color = 'k')
     ax[0].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
-    
+    ax[0].set_ylim(-0.5,13)
     
 
     # _, ax = plt.subplots()
     ax[1].boxplot([height_list_p,height_list_c], widths = 0.5,  showfliers=False, medianprops=dict(color='k')) 
     print_stats([height_list_p,height_list_c])
-    ax[1].set_xticklabels(['Near pole', 'Near center'])
+    ax[1].set_xticklabels(['Pole', 'Center'])
     ax[1].set_ylabel(r'height $nm (min)^{-1}$')
     # ax.set_title(title)
     pvalue1 = stats.ttest_ind(height_list_p,height_list_c).pvalue
     x1 = 1
     x2 = 2 
-    y = 0.8
+    y = 1.1
     h = 0.01
     ax[1].plot([x1, x2], [y, y], color = 'k')
     ax[1].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    ax[1].set_ylim(-0.05,1.25)
 
     
     plt.tight_layout()
@@ -1310,8 +1311,10 @@ if __name__ == "__main__":
     # feature_creation("WT_mc2_55/30-03-2015")     #"WT_mc2_55/30-03-2015", "all""no_WT"
     # feature_general_properties("WT_mc2_55/30-03-2015")
     # feature_creation_comparison("WT_drug",'WT_no_drug')
+    plt.rcParams.update({'font.size': 12})
     feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'
+    plt.rcParams.update({'font.size': 10})
     # feature_len_height_variation ("WT_mc2_55/30-03-2015")
     ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"
+    # feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"
     # datasets_statistics()

@@ -209,6 +209,7 @@ def division_statistics_INH_after_700(use_one_daughter=False):
     # ax.set_ylim(0.38,0.62)
     pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
     ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    plt.tight_layout()
     plt.show()
     
     
@@ -307,7 +308,7 @@ def division_pnt(datasetnames, use_one_daughter=False):
     print(title)
     print_stats([pnt_dist_peak, pnt_dist_trough])
     ax.set_xticklabels(["Peak", "Trough"])
-    ax.set_ylabel(r'Distance $\mu m $')
+    ax.set_ylabel(r'Distance $(\mu m )$')
     ax.set_title(title)
     pvalue = stats.ttest_ind(pnt_dist_peak, pnt_dist_trough).pvalue
     x1 = 1
@@ -332,30 +333,30 @@ def division_pnt(datasetnames, use_one_daughter=False):
                 pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs'],
                 diff_list])
     ax.set_xticklabels(["Peak", "Trough", 'whole features'])
-    ax.set_ylabel(r'Amplitude $nm $')
+    ax.set_ylabel(r'Amplitude $(nm )$')
     ax.set_title(title)
     pvalue = stats.ttest_ind(pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks'], pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs']).pvalue
     x1 = 1
     x2 = 2 
-    y = 370
+    y = 300
     h=0
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
     pvalue = stats.ttest_ind(pnt_height['closest']['peaks']+pnt_height['second_closest']['peaks'],diff_list).pvalue
     x1 = 1
     x2 = 3 
-    y = 410
+    y = 340
     h=0
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
     pvalue = stats.ttest_ind(diff_list, pnt_height['closest']['troughs']+pnt_height['second_closest']['troughs']).pvalue
     x1 = 2
     x2 = 3 
-    y = 450
+    y = 380
     h=0
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
-    ax.set_ylim(-50,500)
+    ax.set_ylim(-50,420)
     
     
     print('Comparing features')
@@ -427,7 +428,18 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                             window = mother['ys'][mask_window]
                         x_val = mother['xs'][mask_window]
                         p = np.polyfit(x_val, window, 2)
-                        stat_list.append(p[0]/1000)
+                        stat_list.append((2*p[0]/1000)/(1+(2*p[0]/1000*x_val[len(x_val)//2]+p[1]/1000)**2)**(3/2)) # stat_list.append(p[0]/1000)
+                        plt.figure()
+                        plt.title(roi_id)
+                        plt.plot( mother['xs'], mother['ys'], color='k')
+                        plt.plot(x_val, p[2]+p[1]*x_val+ p[0]*x_val**2, color='r', lw=4, label='2nd degree approximation' )
+                        plt.text(mother['xs'][mask_window][0], 250, f'c={p[0]/1000:.2e} '+r'$\mu m^{-1} $')
+                        plt.xlabel(r'centerline length $(\mu m)$')
+                        plt.ylabel(r'height $(n m$)')
+                        plt.legend()
+                        plt.tight_layout()
+                        
+                        
                     mother_time = mother['timestamp']
                     
                     
@@ -453,7 +465,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                             x_val = mid_mother['xs'][mask_window_mid]
                             
                             p = np.polyfit(x_val, window, 2)
-                            stat_mid.append(p[0]/1000)
+                            stat_mid.append((2*p[0]/1000)/(1+(2*p[0]/1000*x_val[len(x_val)//2]+p[1]/1000)**2)**(3/2)) # stat_mid.append(p[0]/1000)
                     
                     times = np.array([elem['timestamp'] for elem in lineage])
                     mask= times<=mother_time-150
@@ -474,7 +486,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                             x_val = mid_mother2['xs'][mask_window_mid2]
                             
                             p = np.polyfit(x_val, window, 2)
-                            stat_mid2.append(p[0]/1000)
+                            stat_mid2.append((2*p[0]/1000)/(1+(2*p[0]/1000*x_val[len(x_val)//2]+p[1]/1000)**2)**(3/2)) # stat_mid2.append(p[0]/1000) # 
                     
                     old_mother = lineage[0]
                     
@@ -491,7 +503,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                             x_val = old_mother['xs'][mask_window]
                             
                             p = np.polyfit(x_val, window, 2)
-                            stat_old.append(p[0]/1000)
+                            stat_old.append((2*p[0]/1000)/(1+(2*p[0]/1000*x_val[len(x_val)//2]+p[1]/1000)**2)**(3/2)) # stat_old.append(p[0]/1000)
                         
                     
                 
@@ -503,21 +515,21 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
     print(title)
     print_stats([stat_list, stat_mid, stat_mid2, stat_old])
     ax.set_title(title)
-    ax.set_xticklabels(["At division", "90 mn before", "150 mn before", 'Previous division'])
+    ax.set_xticklabels(["At division", f"90 mn \n before", f"150 mn \n before", f'Previous \n division'])
     ax.set_ylabel(r'Curvature at division site $\mu m^{-1} $')
     
     pvalue = stats.wilcoxon(stat_list, method='exact').pvalue  #stats.wilcoxon
-    ax.text(1.3, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.text(1, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_mid, method='exact').pvalue 
-    ax.text(2.2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.text(2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_mid2, method='exact').pvalue 
-    ax.text(3.2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.text(3, 0.6, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_old, method='exact').pvalue 
-    ax.text(4.2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
-    ax.set_ylim([-0.05,0.35])
+    ax.text(4, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.set_ylim([-0.05,0.65])
     plt.tight_layout()
     plt.show()
 
@@ -622,11 +634,11 @@ if __name__ == "__main__":
     # division_statistics_INH_after_700(use_one_daughter=True) 
     # division_statistics('WT_INH_700min_2014', use_one_daughter=True)
     # division_statistics("WT_no_drug", use_one_daughter=True)
-    division_pnt('WT', use_one_daughter=True)
+    # division_pnt('WT', use_one_daughter=True)
     # division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
     # division_pnt('WT_no_drug', use_one_daughter=True)
     # division_pnt('all', use_one_daughter=True)
-    # division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
+    division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
     # division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
     plt.rcParams.update({'font.size': 10})
     plt.show()

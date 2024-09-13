@@ -758,7 +758,7 @@ def feature_general_properties(dataset_names, plot=True):
         title = (
             f" Feature properties dataset \'{dataset_names}\',\n and {len(stat_list)} individual features"
         )
-        plt.title(title)
+        fig.suptitle(title)
         ax[0].boxplot(stat_list, showfliers=False, showmeans=True, meanline=True, medianprops=dict(color='k'),meanprops=dict(color='k')) 
         print(title)
         print_stats([stat_list])
@@ -1021,7 +1021,7 @@ def feature_displacement(dataset_names, plot=True, return_smooth_approx=False):
     print(title)
     print_stats([stat_list_p*1000,stat_list_c*1000])
     ax[0].set_xticklabels(['Pole', 'Center'])
-    ax[0].set_ylabel(f'Variation of feature : \n position '+r'$n m (min)^{-1}$')
+    ax[0].set_ylabel(f'Variation of feature : \n position '+r'$(n m (min)^{-1})$')
     # ax[0].set_title(title)
     pvalue1 = stats.ttest_ind(stat_list_p,stat_list_c).pvalue
     x1 = 1
@@ -1037,7 +1037,7 @@ def feature_displacement(dataset_names, plot=True, return_smooth_approx=False):
     ax[1].boxplot([height_list_p,height_list_c], widths = 0.5,  showfliers=False, medianprops=dict(color='k')) 
     print_stats([height_list_p,height_list_c])
     ax[1].set_xticklabels(['Pole', 'Center'])
-    ax[1].set_ylabel(r'height $nm (min)^{-1}$')
+    ax[1].set_ylabel(r'height $(nm (min)^{-1})$')
     # ax.set_title(title)
     pvalue1 = stats.ttest_ind(height_list_p,height_list_c).pvalue
     x1 = 1
@@ -1107,7 +1107,7 @@ def feature_len_height_variation(dataset_names):
     stat_list_height = np.array(stat_list_height)
 
     title = (
-        f"Variation of inter-feature distance with dataset \'{dataset_names}\',\n and {np.sum(stat_list_height[:,0] <= pole_size) } + {np.sum(stat_list_height[:,0] > pole_size) } features tracked"
+        f"Variation of inter-feature distance \n with dataset \'{dataset_names}\',\n and {np.sum(stat_list_height[:,0] <= pole_size) } + {np.sum(stat_list_height[:,0] > pole_size) } features tracked"
     )
 
     _, ax = plt.subplots()
@@ -1119,7 +1119,7 @@ def feature_len_height_variation(dataset_names):
     print(title)
     print_stats([1000*val1[:,1],1000*val2[:,1]])
     ax.set_xticklabels(['Near pole region', 'Near center region'])
-    ax.set_ylabel(r'Variation of inter-feature distance $n m (min)^{-1}$')
+    ax.set_ylabel(f'Variation of inter-feature \n distance '+ r'$(n m (min)^{-1})$')
     ax.set_title(title)
     pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
     x1 = 1
@@ -1128,9 +1128,10 @@ def feature_len_height_variation(dataset_names):
     h = 0.02
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    plt.tight_layout()
     
     title = (
-        f"Variation of inter-feature amplitude with dataset \'{dataset_names}\',\n and {np.sum(stat_list_height[:,0] <= pole_size) } + {np.sum(stat_list_height[:,0] > pole_size) } features tracked"
+        f"Variation of inter-feature amplitude \n with dataset \'{dataset_names}\',\n and {np.sum(stat_list_height[:,0] <= pole_size) } + {np.sum(stat_list_height[:,0] > pole_size) } features tracked"
     )
     _, ax = plt.subplots()
     mask1 = stat_list_height[:,0] <= pole_size
@@ -1143,7 +1144,7 @@ def feature_len_height_variation(dataset_names):
     print_stats([val1[:,1],val2[:,1]])
     
     ax.set_xticklabels(['Near pole region', 'Near center region'])
-    ax.set_ylabel(r'Variation of inter-feature amplitude $n m (min)^{-1}$')
+    ax.set_ylabel(f'Variation of inter-feature \n amplitude '+r'$(n m (min)^{-1})$')
     ax.set_title(title)
     pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
     x1 = 1
@@ -1152,7 +1153,7 @@ def feature_len_height_variation(dataset_names):
     h = 0.002
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
-    
+    plt.tight_layout()
     plt.show()        
     
     
@@ -1244,31 +1245,73 @@ def datasets_statistics():
     params = get_scaled_parameters(data_set=True, paths_and_names=True)
     mask_number = 0
     ROI_number = 0
+    frame_num = 0
     
     dicname = params["main_dict_name"]
     data_direc = params["main_data_direc"]
     
+    set = "WT_mc2_55/30-03-2015"
+    for _, cell in load_dataset(set, False):
+        if len(cell) > 5:
+            ROI_number+=1
+    dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+    frame_num += len(dic)
+    for fichier in dic:
+        mask_number += len(dic[fichier]['outlines'])
+    print(f'WT good mask number : {mask_number}')
+    print(f'WT good ROI number : {ROI_number}')
+    print(f'WT good frame number : {frame_num}')
+    
+    
+    mask_number = 0
+    ROI_number = 0
+    frame_num = 0
+    
+    set = "INH_after_700"
+    for _, cell in load_dataset(set, False):
+        if len(cell) > 5:
+            ROI_number+=1
+    dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+    frame_num += len(dic)
+    for fichier in dic:
+        mask_number += len(dic[fichier]['outlines'])
+    print(f'INH mask number : {mask_number}')
+    print(f'INH good ROI number : {ROI_number}')
+    print(f'INH good frame number : {frame_num}')
+    
+    
+    
+    mask_number = 0
+    ROI_number = 0
+    frame_num = 0
+    
     datasets = params['WT_no_drug']
+    
     for set in datasets:
         for _, cell in load_dataset(set, False):
             if len(cell) > 5:
                 ROI_number+=1
         dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        frame_num += len(dic)
         for fichier in dic:
             mask_number += len(dic[fichier]['outlines'])
     print(f'WT no drug mask number : {mask_number}')
     print(f'WT no drug ROI number : {ROI_number}')
+    print(f'WT no drug frame number : {frame_num}')
     
     datasets = params['WT_drug']
+    
     for set in datasets:
         for _, cell in load_dataset(set, False):
             if len(cell) > 5:
                 ROI_number+=1
         dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        frame_num += len(dic)
         for fichier in dic:
             mask_number += len(dic[fichier]['outlines'])
     print(f'WT mask number : {mask_number}')
     print(f'WT ROI number : {ROI_number}')
+    print(f'WT frame number : {frame_num}')
     
     datasets = params['no_WT']
     for set in datasets:
@@ -1276,11 +1319,13 @@ def datasets_statistics():
             if len(cell) > 5:
                 ROI_number+=1
         dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        frame_num += len(dic)
         for fichier in dic:
             mask_number += len(dic[fichier]['outlines'])
     
     print(f'Total mask number : {mask_number}')
     print(f'Total good ROI number : {ROI_number}')
+    print(f'Total frame number : {frame_num}')
     
 
 
@@ -1307,14 +1352,16 @@ def main():
 
 if __name__ == "__main__":
     # main()
+    plt.rcParams.update({'font.size': 13})
     # feature_number("WT_mc2_55/30-03-2015")
     # feature_creation("WT_mc2_55/30-03-2015")     #"WT_mc2_55/30-03-2015", "all""no_WT"
-    # feature_general_properties("WT_mc2_55/30-03-2015")
+    feature_general_properties("WT_mc2_55/30-03-2015")
     # feature_creation_comparison("WT_drug",'WT_no_drug')
-    plt.rcParams.update({'font.size': 12})
+    
     feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'
-    plt.rcParams.update({'font.size': 10})
-    # feature_len_height_variation ("WT_mc2_55/30-03-2015")
+    
+    feature_len_height_variation ("WT_mc2_55/30-03-2015")
     ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    # feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"
-    # datasets_statistics()
+    feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"
+    datasets_statistics()
+    plt.rcParams.update({'font.size': 10})

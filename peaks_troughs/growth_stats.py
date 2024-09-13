@@ -491,7 +491,7 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     plt.show()   
 
 def compare_INH_pole_growth(outlier_detection=False):
-    datasetname1, datasetname2 = "INH_before_700", "INH_after_700"
+    datasetname1, datasetname2 = "WT_mc2_55/30-03-2015", "INH_after_700"
     
     tot_growth1 = []
     overall_slopes1 = []  # first, second
@@ -583,14 +583,14 @@ def compare_INH_pole_growth(outlier_detection=False):
     overall_slopes2 = 1000*np.array(overall_slopes2)      
     old_new_slopes2 = 1000*np.array(old_new_slopes2)
     
-    title = f"New pole elongation speed \n with dataset {datasetname1} and {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells"
+    title = f"New pole elongation speed  with dataset\n {datasetname1} and {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells"
     _, ax = plt.subplots()
     ax.boxplot([old_new_slopes1[:,0], old_new_slopes1[:,1], old_new_slopes2[:,0], old_new_slopes2[:,1]], showfliers=False, medianprops=dict(color='k'))
     ax.set_title(title)
     print(title)
     print_stats([old_new_slopes1[:,0], old_new_slopes1[:,1], old_new_slopes2[:,0], old_new_slopes2[:,1]])
     ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
-    ax.set_xticklabels(["Before NETO, \n before INH", "After NETO,\n before INH","Before NETO,\n after INH", "After NETO,\n after INH"])
+    ax.set_xticklabels(["Before NETO, \n WT", "After NETO,\n WT","Before NETO,\n after INH", "After NETO,\n after INH"])
     pvalue = stats.ttest_ind(old_new_slopes1[:,0],old_new_slopes1[:,1]).pvalue
     pvalue2 = stats.ttest_ind(old_new_slopes2[:,0],old_new_slopes2[:,1]).pvalue
     pvalue3 = stats.ttest_ind(old_new_slopes1[:,0],old_new_slopes2[:,0]).pvalue
@@ -598,46 +598,46 @@ def compare_INH_pole_growth(outlier_detection=False):
     
     x1 = 1
     x2 = 2 
-    y = 40
-    h = 0.6
+    y = 11
+    h = 0.1
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue), ha='center', va='bottom')
     
     x1 = 3
     x2 = 4
     y = 8
-    h = 0.6
+    h = 0.1
     ax.plot([x1, x2], [y, y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
     
     x1 = 1
     x2 = 3
-    y = 44
-    h = 0.6
+    y = 13
+    h = 0.1
     ax.plot([x1, x2], [y, y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue3), ha='center', va='bottom')
     
     x1 = 2
     x2 = 4
-    y = 48
-    h = 0.6
+    y = 15
+    h = 0.1
     ax.plot([x1, x2], [y, y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue4), ha='center', va='bottom')
     
     
-    ax.set_ylim(-5,53)
+    ax.set_ylim(-3,17)
 
     plt.tight_layout()
     
     
-    title = f"Old pole elongation speed \n with dataset {datasetname1} and {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells"
+    title = f"Old pole elongation speed  with dataset \n{datasetname1} and {datasetname2} \n and {len(old_new_slopes1[:,0])} + {len(old_new_slopes2[:,0])} cells"
     _, ax = plt.subplots()
     ax.boxplot([old_new_slopes1[:,2], old_new_slopes1[:,3], old_new_slopes2[:,2], old_new_slopes2[:,3]], showfliers=False, medianprops=dict(color='k'))
     ax.set_title(title)
     print(title)
     print_stats([old_new_slopes1[:,2], old_new_slopes1[:,3], old_new_slopes2[:,2], old_new_slopes2[:,3]])
     ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
-    ax.set_xticklabels(["Before NETO, \n before INH", "After NETO,\n before INH","Before NETO,\n after INH", "After NETO,\n after INH"])
+    ax.set_xticklabels(["Before NETO, \n WT", "After NETO,\n WT","Before NETO,\n after INH", "After NETO,\n after INH"])
     pvalue = stats.ttest_ind(old_new_slopes1[:,2],old_new_slopes1[:,3]).pvalue
     pvalue2 = stats.ttest_ind(old_new_slopes2[:,2],old_new_slopes2[:,3]).pvalue
     pvalue3 = stats.ttest_ind(old_new_slopes1[:,3],old_new_slopes2[:,2]).pvalue
@@ -645,34 +645,34 @@ def compare_INH_pole_growth(outlier_detection=False):
     
     x1 = 1
     x2 = 2 
-    y = 26
-    h = 0.6
+    y = 20
+    h = 0.2
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue), ha='center', va='bottom')
     
     x1 = 3
     x2 = 4
     y = 7
-    h = 0.6
+    h = 0.2
     ax.plot([x1, x2], [y, y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
     
     x1 = 1
     x2 = 3
-    y = 29
-    h = 0.6
+    y = 23
+    h = 0.2
     ax.plot([x1, x2], [y, y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue3), ha='center', va='bottom')
     
     x1 = 2
     x2 = 4
-    y = 32
-    h = 0.6
+    y = 26
+    h = 0.2
     ax.plot([x1, x2], [y, y],  color = 'k')
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue4), ha='center', va='bottom')
     
     
-    ax.set_ylim(-10,35)
+    ax.set_ylim(-3,29)
     
     plt.tight_layout()
     plt.show()   
@@ -852,17 +852,16 @@ def compare_dataset_pole_growth(datasetname1, datasetname2, y, h, lim, outlier_d
 
 
 if __name__ == "__main__":
+    plt.rcParams.update({'font.size': 13})
     # plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True) #, outlier_detection=True
     # compute_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False)
-    plt.rcParams.update({'font.size': 14})
-    compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = True)
-    plt.rcParams.update({'font.size': 10})
+    # compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = True)
     compare_INH_pole_growth(outlier_detection=False)
-    compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_CCCP_irrigation_2016", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_CCCP_irrigation_2016", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_filamentation_cipro_2015",  [12,12,15,17,19,19,21.5,24], 0.4, [-6,21, -10,27], outlier_detection=False)
-    compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "INH_after_700", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
+    # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "INH_after_700", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "delta_parB/15-11-2014",  [12,8,15,17,19,16,21.5,24], 0.4, [-10,21, -6,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", 'delta_LTD6_04-06-2017', [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", 'delta_lamA_03-08-2018', [15,18,25,28,19,18,22,25], 0.4, [-10,32, -11,28], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_mc2_55/03-09-2014",  [12,8,15,17,19,16,21.5,24], 0.4, [-10,21, -6,27], outlier_detection=False)
-    
+    plt.rcParams.update({'font.size': 10}) 

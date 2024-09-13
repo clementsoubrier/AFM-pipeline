@@ -389,6 +389,6 @@ def main(Directory='all', saving=False):
 
 
 if __name__ == "__main__":
-    main(Directory="all", saving = True)
-    # main(Directory="WT_mc2_55/30-03-2015")
+    # main(Directory="all", saving = True)
+    main(Directory="WT_mc2_55/30-03-2015")
     

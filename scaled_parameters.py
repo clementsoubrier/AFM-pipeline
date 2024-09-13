@@ -222,7 +222,7 @@ POLE_REGION_SIZE = 1.5                  # mu m physical size of the pole region
 DIV_MAX_SUPERPOSITION = 0.5             # mu m maximum superposition of the 2 daughter centerlines admissible
 DIV_MAX_DIST_FROM_MOTH = 1              # mu m maximum distance from mother closest boundary
 DIV_MIN_DAUGTHER_SIZE = 2               # mu m min size of other daughter if 1 daughter selected
-DIV_CURV_PHY_WINDOW = 0.2               # mu m min size of window for computing local curvature
+DIV_CURV_PHY_WINDOW = 0.2               #0.2 mu m min size of window for computing local curvature
 DIV_CURV_SMOOTH = 0.1                  # mu m min size of guassian smoothing std for computing local curvature
 
 

@@ -396,6 +396,7 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     tot_growth = []
     overall_slopes = []  # first, second
     old_new_slopes = []  # first new, second new, old
+    after_neto_slopes = [] # first new, second old
     params = get_scaled_parameters(data_set=True)
     
     if datasetnames in params.keys():
@@ -449,15 +450,30 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
                     plt.xlabel(r'time $(min)$')
                     plt.ylabel(r'elongation $(\mu m)$')
                     plt.tight_layout()
-                        
-                        
-                        
                     
-                
+                if timestamps[-1] - t >75:
+                    maskn = new_times >=  t + (new_times[-1] - t) /2
+                    masko = old_times >=  t + (old_times[-1] - t) /2
+                    if np.sum(maskn) >= 5 and np.sum(masko) >= 5:
+                        o_p = old_pole_growth[masko]
+                        n_p = new_pole_growth[maskn]
+                        new_times = new_times[maskn]
+                        old_times = old_times[masko]
+                        mato = np.zeros((len(old_times),2))
+                        mato[:, 0] = old_times
+                        mato[:, 1] = 1
+                        slo, _ = np.linalg.lstsq(mato, o_p, None)[0]
+                        
+                        matn = np.zeros((len(new_times),2))
+                        matn[:, 0] = new_times
+                        matn[:, 1] = 1
+                        sln, _ = np.linalg.lstsq(matn, n_p, None)[0]
+                        after_neto_slopes.append([sln, slo])
                 
                 
     overall_slopes = 1000*np.array(overall_slopes)      
     old_new_slopes = 1000*np.array(old_new_slopes)
+    after_neto_slopes = 1000*np.array(after_neto_slopes)
     
     title = f"Pole elongation speed \n with dataset {datasetnames} and {len(old_new_slopes[:,0])} cells"
     _, ax = plt.subplots()
@@ -487,6 +503,25 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue2), ha='center', va='bottom')
     
     ax.set_ylim(-5,22)
+    plt.tight_layout()
+    
+    
+    title = f"Pole elongation after NETO \n with dataset {datasetnames} and {len(old_new_slopes[:,0])} cells"
+    _, ax = plt.subplots()
+    ax.boxplot([after_neto_slopes[:,0], after_neto_slopes[:,1]], showfliers=False, medianprops=dict(color='k'))
+    ax.set_title(title)
+    print(title)
+    print_stats([after_neto_slopes[:,0], after_neto_slopes[:,1]])
+    ax.set_ylabel(r"elongation speed ($n m (min)^{-1}$)")
+    ax.set_xticklabels(["New pole \n after NETO", "Old pole \n after NETO"])
+    pvalue = stats.ttest_ind(after_neto_slopes[:,0], after_neto_slopes[:,1]).pvalue
+    
+    x1 = 1
+    x2 = 2 
+    y = 11
+    h = 0.2
+    ax.plot([x1,  x2], [y,  y], color = 'k')
+    ax.text((x1+x2)*.5, y + h , p_value_to_str(pvalue), ha='center', va='bottom')
     plt.tight_layout()
     plt.show()   
 
@@ -856,7 +891,8 @@ if __name__ == "__main__":
     # plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True) #, outlier_detection=True
     # compute_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False)
     # compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = True)
-    compare_INH_pole_growth(outlier_detection=False)
+    compute_pole_growth_stats("good", outlier_detection=False)
+    # compare_INH_pole_growth(outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_CCCP_irrigation_2016", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_filamentation_cipro_2015",  [12,12,15,17,19,19,21.5,24], 0.4, [-6,21, -10,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "INH_after_700", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)

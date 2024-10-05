@@ -1247,8 +1247,36 @@ def fusion_erasing(extr_seg,div,alpha):
 
 
 
-
-
+def export_dataset(datset_name):
+    params = get_scaled_parameters(data_set=True,paths_and_names=True)
+    if datset_name in params.keys():
+        datasets = params[datset_name]
+    elif isinstance(datasets, str): 
+        raise NameError('This directory does not exist')
+    
+    data_direc = params["main_data_direc"]
+    dicname = params["main_dict_name"]
+    
+    
+    
+    for direc in datasets:
+        dir = os.path.join('single_cell', direc)
+        
+        if os.path.exists(dir):
+            rmtree(dir)
+        
+        
+        dic = np.load(os.path.join(data_direc, direc, dicname), allow_pickle=True)['arr_0'].item()
+        frame = 1
+        for fichier in dic:
+            # plot image with masks overlaid
+            img = np.load(dic[fichier]['adress'])['Height_fwd']
+            masks = dic[fichier]['masks']
+            fin_dir = os.path.join(dir, f'frame_{frame}')
+            frame +=1
+            os.makedirs(fin_dir)
+            np.save(os.path.join(fin_dir, 'image.npy'), img)
+            np.save(os.path.join(fin_dir, 'segmented_masks.npy'), masks)
       
 
 
@@ -1374,7 +1402,8 @@ def main(Directory= "all"):
 
 if __name__ == "__main__":
     Directory= 'WT_INH_700min_2014' #'delta_lamA_03-08-2018' #"WT_mc2_55/30-03-2015"
-    run_one_dataset_logs_only( Directory )
+    export_dataset("WT_mc2_55/30-03-2015")
+    # run_one_dataset_logs_only( Directory )
     # main()
     
 

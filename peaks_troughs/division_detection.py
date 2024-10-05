@@ -5,14 +5,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 # from numpy.polynomial.polynomial.Polynomial import fit
 from scipy import stats
-from statsmodels.stats.descriptivestats import sign_test
 package_path = '/home/c.soubrier/Documents/UBC_Vancouver/Projets_recherche/AFM/afm_pipeline'
 if not package_path in sys.path:
     sys.path.append(package_path)
 from scipy.ndimage import gaussian_filter1d
 
 from scaled_parameters import get_scaled_parameters
-from peaks_troughs.growth_stats import p_value_to_str, extract_growth, print_stats
+from peaks_troughs.growth_stats import p_value_to_str, extract_growth, print_stats, piecewise_pointwise_linear_regression
 from peaks_troughs.group_by_cell import Orientation, load_dataset, load_cell, load_data
 from peaks_troughs.stats import feature_general_properties
 
@@ -615,10 +614,150 @@ def division_local_curvature_trajectories(datasetnames, use_one_daughter=False, 
     plt.show()
                     
                             
-              
+# def div_pos_vs_NETO(datasetnames, use_one_daughter=False):         
+#     """Computing relative division position
+
+#     Args:
+#         datasetnames (str): dataset name
+#         use_one_daughter (bool, optional): Using division data with only 1 daughter cell. Defaults to False.
+
+#     Raises:
+#         NameError: wrong directory
+#     """
+#     params = get_scaled_parameters(data_set=True)
+#     if datasetnames in params.keys():
+#         datasets = params[datasetnames]
+#     elif isinstance(datasetnames, str): 
+#         raise NameError('This directory does not exist')
+#     else :
+#         datasets = datasetnames 
+    
+#     res = []
+#     for dataset in datasets:
+#         params = get_scaled_parameters(paths_and_names=True)
+#         data_direc = params["main_data_direc"]
+#         roi_dic_name = params["roi_dict_name"]
+#         roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+
+#         for roi_id, mother in load_dataset(dataset, False):
+#             if len(mother)>1:
+#                 timestamps = np.array([frame_data["timestamp"] for frame_data in mother])
+#                 timestamps = timestamps-timestamps[0]
+#                 overall_growth = [abs(frame_data["xs"][0]-frame_data["xs"][-1]) for frame_data in mother]
+#                 if len(timestamps)>=6 and timestamps[-1]-timestamps[0] > 100:
+#                     _, _, _, Neto = piecewise_pointwise_linear_regression(timestamps, overall_growth)
+#                     mother_cell = mother[-1]
+#                     div_index = detect_division(mother_cell, roi_id, roi_dic, dataset, use_one_daughter)
+#                     if div_index is not None:
+#                         moth_len = mother_cell['xs'][-1] - mother_cell['xs'][0]
+#                         x_coord = mother_cell['xs'][div_index] - mother_cell['xs'][0]
+#                         relat_pos = x_coord/moth_len
+#                         if relat_pos >= 0.5:
+#                             relat_pos = 1-relat_pos
+#                         res.append([Neto, relat_pos])
+
+                            
+                            
                     
                     
                     
+                    
+                    
+#     res = np.array(res) 
+#     title = (
+#         f"Neto vs division site position with dataset \'{datasetnames}\',\n and {len(res)} individual features"
+#     )
+#     print(res[:,0])
+#     plt.scatter(res[:,1], res[:,0], color='k')
+#     print(title)
+#     plt.ylabel(r'Neto $mn$')
+#     plt.xlabel( r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
+#     plt.title(title)
+#     # pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
+#     # ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    
+   
+#     plt.show()             
+                    
+def div_pos_vs_NETO(datasetnames, use_one_daughter=False, smoothing=True):         
+    """Computing relative division position
+
+    Args:
+        datasetnames (str): dataset name
+        use_one_daughter (bool, optional): Using division data with only 1 daughter cell. Defaults to False.
+
+    Raises:
+        NameError: wrong directory
+    """
+    params = get_scaled_parameters(data_set=True)
+    if datasetnames in params.keys():
+        datasets = params[datasetnames]
+    elif isinstance(datasetnames, str): 
+        raise NameError('This directory does not exist')
+    else :
+        datasets = datasetnames 
+    
+    res = []
+    for dataset in datasets:
+        params = get_scaled_parameters(paths_and_names=True)
+        data_direc = params["main_data_direc"]
+        roi_dic_name = params["roi_dict_name"]
+        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+
+        for roi_id, mother in load_dataset(dataset, False):
+            if len(mother)>1:
+                timestamps, old_pole_growth, new_pole_growth, overall_growth = extract_growth(mother)
+                
+                if len(timestamps)>=4 and  timestamps[-1]-timestamps[0]> 75:
+                    tot_time = timestamps[-1]-timestamps[0]
+                    _, _, _, Neto = piecewise_pointwise_linear_regression(timestamps, overall_growth)
+                    mother_cell = mother[-1]
+                    div_index = detect_division(mother_cell, roi_id, roi_dic, dataset, use_one_daughter)
+                    if div_index is not None:
+                        orientation = Orientation(mother_cell['orientation'])
+                        moth_len = mother_cell['xs'][-1] - mother_cell['xs'][0]
+                        x_coord = mother_cell['xs'][div_index] - mother_cell['xs'][0]
+                        match orientation:
+                            case Orientation.NEW_POLE_OLD_POLE:
+                                pos = x_coord - moth_len/2
+                                relat_pos = x_coord/moth_len
+                                res.append([Neto/tot_time, pos, relat_pos])
+                            case Orientation.OLD_POLE_NEW_POLE:
+                                pos = moth_len/2 - x_coord  
+                                relat_pos = (moth_len-x_coord)/moth_len
+                                res.append([Neto/tot_time, pos, relat_pos])
+                            
+                            
+                    
+                    
+                    
+                    
+                    
+    res = np.array(res) 
+    title = (
+        f"Neto vs division site position with dataset \'{datasetnames}\',\n and {len(res)} individual features"
+    )
+    _, ax = plt.subplots()
+    ax.scatter(res[:,2], 100*res[:,0], color='k')
+    mat = np.zeros((len(res), 2))
+    mat[:, 0] = res[:,2]
+    mat[:, 1] = 1
+    a, b = np.linalg.lstsq(mat, 100*res[:,0], None)[0]
+    ax.plot(res[:,2],a*res[:,2]+b, color='k', label='linear approximation')
+    print(title)
+    ax.legend()
+    ax.set_ylabel(r'Neto ($\%$ of cell life)')
+    ax.set_xlabel( f'division position \n'+ r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
+    ax.set_title(title)
+    ax.xaxis.set_major_formatter('{x:3.2f}')
+    ax.set_xlim(0.39,0.6)
+    # pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
+    # ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    plt.tight_layout()
+   
+    plt.show()
                     
                     
                     
@@ -638,7 +777,8 @@ if __name__ == "__main__":
     # division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
     # division_pnt('WT_no_drug', use_one_daughter=True)
     # division_pnt('all', use_one_daughter=True)
-    division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
+    # division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
     # division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
+    div_pos_vs_NETO('good', use_one_daughter=False)
     plt.rcParams.update({'font.size': 10})
     plt.show()

@@ -279,8 +279,8 @@ def feature_region_stats(datasetnames, feature='DMTModulus_fwd', averaged=True):
         
     dicname = params["main_dict_name"] 
     data_direc = params["main_data_direc"]
-    main_dict = np.load(os.path.join(data_direc, datasets[0], dicname), allow_pickle=True)['arr_0'].item()   
-    unit = main_dict[next(iter(main_dict))]['units'][feature]
+    # main_dict = np.load(os.path.join(data_direc, datasets[0], dicname), allow_pickle=True)['arr_0'].item()   
+    # unit = main_dict[next(iter(main_dict))]['units'][feature]
     
     pole_list = []
     non_pole_list = [] 
@@ -297,25 +297,25 @@ def feature_region_stats(datasetnames, feature='DMTModulus_fwd', averaged=True):
     diff_list = np.array(diff_list)
     
     
-    title = f"Region-averaged {feature} with dataset {datasetnames} \n and {len(non_pole_list)} cells"
+    title = f"Region-averaged {feature} with dataset \n {datasetnames}  and {len(non_pole_list)} masks"
     _, ax = plt.subplots()
-    ax.boxplot([pole_list, non_pole_list, diff_list], showfliers=False, medianprops=dict(color='k'))
+    ax.boxplot([pole_list, non_pole_list], showfliers=False, medianprops=dict(color='k'))#, diff_list
     ax.set_title(title)
     print(title)
-    print_stats([pole_list, non_pole_list, diff_list])
-    ax.set_ylabel(f"{feature} ({unit})")
-    ax.set_xticklabels(["Pole", "Non Pole", "Difference Non Pole / Pole"])
+    print_stats([pole_list, non_pole_list])#, diff_list
+    ax.set_ylabel(r'Stiffness : DMT modulus $(MPa)$') #f"{feature} ({unit})"
+    ax.set_xticklabels(["Sub-polar \n region", "Center"])# "Difference Non Pole / Pole"
     pvalue = stats.ttest_ind(pole_list,non_pole_list).pvalue
     
     x1 = 1
     x2 = 2 
-    y = 23
+    y = 30
     h=0.5
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
 
-    pvalue = stats.wilcoxon(diff_list, method='exact').pvalue  #stats.wilcoxon
-    ax.text(3, 20, p_value_to_str(pvalue), ha='center', va='bottom')
+    # pvalue = stats.wilcoxon(diff_list, method='exact').pvalue  #stats.wilcoxon
+    # ax.text(3, 20, p_value_to_str(pvalue), ha='center', va='bottom')
     # ax.set_ylim(-7,26)
     plt.show()
    
@@ -395,8 +395,10 @@ def division_site_vs_troughs(datasetnames, feature='DMTModulus_fwd', averaged=Tr
     plt.show()
     
 if __name__ == "__main__":
-    feature_pnt_stats("WT_mc2_55/06-10-2015") 
-    feature_region_stats("WT_mc2_55/06-10-2015") 
+    plt.rcParams.update({'font.size': 13})
+    # feature_pnt_stats("WT_mc2_55/06-10-2015") 
+    # feature_region_stats("WT_mc2_55/06-10-2015") 
     # feature_pnt_stats("WT_mc2_55/30-03-2015") 
-    # feature_region_stats("WT_mc2_55/30-03-2015", averaged=True) 
+    feature_region_stats("WT_mc2_55/30-03-2015", averaged=True) 
     # division_site_vs_troughs("WT_mc2_55/30-03-2015", averaged=True, use_one_daughter=True)
+    plt.rcParams.update({'font.size': 10})

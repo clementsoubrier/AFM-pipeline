@@ -15,7 +15,7 @@ if not package_path in sys.path:
     sys.path.append(package_path)
 
 from peaks_troughs.group_by_cell import Orientation, load_dataset, get_peak_troughs_lineage_lists
-from peaks_troughs.growth_stats import p_value_to_str, print_stats
+from peaks_troughs.growth_stats import p_value_to_str, print_stats, piecewise_pointwise_linear_regression, extract_growth
 from scaled_parameters import get_scaled_parameters
 
 #%% Statistics on peaks and troughs without lineage
@@ -327,6 +327,123 @@ def feature_creation(dataset_names):
     plt.show()
 
 
+
+
+def feature_creation_time_vs_NETO(dataset_names):
+    params = get_scaled_parameters(data_set=True,stats=True)
+    if dataset_names in params.keys():
+        datasets = params[dataset_names]
+    else : 
+        datasets = dataset_names
+    
+    
+    stat_list_np = []
+    stat_list_op = []
+    
+    
+    for dataset in datasets:
+        for roi_id, cell in load_dataset(dataset, False):
+            if len(cell) > 1:
+                pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
+                
+                timestamps, _, new_pole_growth, overall_growth = extract_growth(cell)
+                if len(timestamps)>=6 and timestamps[-1]-timestamps[0] > 100:
+                    timestamps = timestamps - timestamps[0]
+                    
+                    # a_1, a_2, _, NETO = piecewise_pointwise_linear_regression(timestamps, overall_growth)
+                    
+                    # if 0<a_1<=a_2:
+                    a_1, a_2, _, NETO = piecewise_pointwise_linear_regression(timestamps, new_pole_growth)
+                    if 0<a_1<=a_2:
+                        
+                                
+                            for key in pnt_ROI:
+                                if len(pnt_ROI[key]) >= 2:
+                                    root = pnt_ROI[key][0]
+                                    frame_data = cell[0]
+                                    orientation = Orientation(frame_data['orientation'])
+                                    time = pnt_list[root][-2]
+                                    if time >0 :
+                                        generation = int(pnt_list[root][1])
+                                        if generation >2 and  cell[generation]['timestamp']>700:
+                                            crea_time = cell[generation]['timestamp'] - frame_data['timestamp']
+                                            total_length =  abs(cell[generation]['xs'][0]-cell[generation]['xs'][-1])
+                                            x_coord = abs(pnt_list[root][3]-cell[generation]['xs'][0])
+                                            match orientation:
+                                                case Orientation.UNKNOWN:
+                                                    continue
+                                                        
+                                                case Orientation.NEW_POLE_OLD_POLE:
+                                                    if x_coord > total_length-1.5 :
+                                                        x_coord = total_length - x_coord
+                                                        stat_list_op.append([x_coord, crea_time, NETO])
+                                                        print('op',[roi_id, crea_time, NETO])
+                                                    elif x_coord < 1.5:
+                                                        stat_list_np.append([x_coord, crea_time, NETO])
+                                                        print('np',[roi_id, crea_time, NETO])
+                                                        
+                                                case Orientation.OLD_POLE_NEW_POLE:
+                                                    if x_coord > total_length-1.5:
+                                                        x_coord = total_length - x_coord
+                                                        stat_list_np.append([x_coord, crea_time, NETO])
+                                                        print('np',[roi_id, crea_time, NETO])
+                                                    elif x_coord < 1.5:
+                                                        stat_list_op.append([x_coord, crea_time, NETO])
+                                                        print('op',[roi_id, crea_time, NETO])
+                                            
+    stat_list_op = np.array(stat_list_op)
+    stat_list_np = np.array(stat_list_np)
+    
+    mask_op = stat_list_op[:,1]<stat_list_op[:,2]
+    mask_np = stat_list_np[:,1]<stat_list_np[:,2]
+
+    print( f'Feature numbers : {len(stat_list_op)+ len(stat_list_np)},  Creation : \n' 
+          f'OP before Neto {len(stat_list_op[mask_op])}, '
+          f'NP before Neto {len(stat_list_np[mask_np])}, '
+          f'NP after Neto {len(stat_list_np[np.logical_not(mask_np)])}, ' 
+          f'OP after Neto {len(stat_list_op[np.logical_not(mask_op)])}')
+    
+    # title =f"Creation pole vs NETO\'{dataset_names}\',\n and {len(stat_list_op)+len(stat_list_np)} features"
+    # _, ax = plt.subplots()
+    # ax.boxplot([stat_list_op[mask_op], stat_list_op[np.logical_not(mask_op)], stat_list_np[np.logical_not(mask_np)]]
+    #            ,  showfliers=False, medianprops=dict(color='k')) 
+    # print(title)
+    # print_stats([stat_list_op[mask_op], stat_list_op[np.logical_not(mask_op)], stat_list_np[np.logical_not(mask_np)]])
+    # ax.set_xticklabels(["Peaks new pole", "Peaks old pole", "Troughs new pole"])
+    # ax.set_ylabel(r"Distance ($\mu m$)")
+    # ax.set_title(title)
+    # pvalue1 = stats.ttest_ind(whole_stat['lenght']['np']['peaks'], whole_stat['lenght']['op']['peaks']).pvalue
+    # x1 = 1
+    # x2 = 2 
+    # y = 2.6
+    # h=0.02
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    # pvalue2 = stats.ttest_ind(whole_stat['lenght']['np']['troughs'], whole_stat['lenght']['op']['troughs']).pvalue
+    # x1 = 3
+    # x2 = 4 
+    # y =  2.8
+    # h=0.02
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
+    # pvalue1 = stats.ttest_ind(whole_stat['lenght']['np']['peaks'], whole_stat['lenght']['np']['troughs']).pvalue
+    # x1 = 1
+    # x2 = 3 
+    # y = 3.1
+    # h=0.02
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
+    # pvalue2 = stats.ttest_ind(whole_stat['lenght']['op']['troughs'], whole_stat['lenght']['op']['peaks']).pvalue
+    # x1 = 2
+    # x2 = 4 
+    # y = 3.4
+    # h=0.02
+    # ax.plot([x1, x2], [y, y], color = 'k')
+    # ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue2), ha='center', va='bottom')
+    # ax.set_ylim(0,3.6)
+                                        
+                                
+                                
 
 #comparision of old pole / new pole distributions
 def feature_properties_pole_feature(dataset_names):
@@ -819,33 +936,33 @@ def feature_general_properties(dataset_names, plot=True):
         
         
     
-        '''
-        plt.figure()
-        title = (
-            f"Feature height with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features, normalized total lenght"
-        )
-        # plt.scatter(position_list, stat_list, marker='.')
-        bins = 10
-        data_list = []
-        for elem in range(bins):
-            data_list.append([])
-        for i, elem in enumerate(position_list):
-            index = int(elem *2*bins)
-            if index == 10:
-                index = 9
-            data_list[index].append(stat_list[i])
 
-        plt.boxplot(data_list,labels= np.linspace(0.5,5,10)/10, showfliers=False)       #, showmeans=True, meanline=True
-        # slope, intercept = statistics.linear_regression(position_list, stat_list)
-        # min_x= np.min(position_list)
-        # max_x= np.max(position_list)
-        # plt.plot([min_x,max_x], [slope*min_x+intercept, slope*max_x+intercept], color='r', label='linear interpolation')
-        plt.xlabel(r' $\leftarrow \;\text{pole}\;|\;  \text{center} \;\rightarrow$')
-        plt.ylabel(r'Height ($n m$)')
-        # plt.legend()
-        plt.title(title)
+        # plt.figure()
+        # title = (
+        #     f"Feature height with dataset \'{dataset_names}\',\n and {len(stat_list)} individual features, normalized total lenght"
+        # )
+        # # plt.scatter(position_list, stat_list, marker='.')
+        # bins = 10
+        # data_list = []
+        # for elem in range(bins):
+        #     data_list.append([])
+        # for i, elem in enumerate(position_list):
+        #     index = int(elem *2*bins)
+        #     if index == 10:
+        #         index = 9
+        #     data_list[index].append(stat_list[i])
+
+        # plt.boxplot(data_list,labels= np.linspace(0.5,5,10)/10, showfliers=False)       #, showmeans=True, meanline=True
+        # # slope, intercept = statistics.linear_regression(position_list, stat_list)
+        # # min_x= np.min(position_list)
+        # # max_x= np.max(position_list)
+        # # plt.plot([min_x,max_x], [slope*min_x+intercept, slope*max_x+intercept], color='r', label='linear interpolation')
+        # plt.xlabel(r' $\leftarrow \;\text{pole}\;|\;  \text{center} \;\rightarrow$')
+        # plt.ylabel(r'Height ($n m$)')
+        # # plt.legend()
+        # plt.title(title)
         
-        '''
+
         plt.show()
     
     return stat_list, position_list, diff_list
@@ -1118,7 +1235,7 @@ def feature_len_height_variation(dataset_names):
     bp=ax.boxplot([1000*val1[:,1],1000*val2[:,1]],  showfliers=False, medianprops=dict(color='k')) 
     print(title)
     print_stats([1000*val1[:,1],1000*val2[:,1]])
-    ax.set_xticklabels(['Near pole region', 'Near center region'])
+    ax.set_xticklabels(['Sub-polar region', 'Central region'])
     ax.set_ylabel(f'Variation of inter-feature \n distance '+ r'$(n m (min)^{-1})$')
     ax.set_title(title)
     pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
@@ -1143,7 +1260,7 @@ def feature_len_height_variation(dataset_names):
     print(title)
     print_stats([val1[:,1],val2[:,1]])
     
-    ax.set_xticklabels(['Near pole region', 'Near center region'])
+    ax.set_xticklabels(['Sub-polar region', 'Central region'])
     ax.set_ylabel(f'Variation of inter-feature \n amplitude '+r'$(n m (min)^{-1})$')
     ax.set_title(title)
     pvalue1 = stats.ttest_ind(val1[:,1],val2[:,1]).pvalue
@@ -1353,15 +1470,16 @@ def main():
 if __name__ == "__main__":
     # main()
     plt.rcParams.update({'font.size': 13})
-    # feature_number("WT_mc2_55/30-03-2015")
-    # feature_creation("WT_mc2_55/30-03-2015")     #"WT_mc2_55/30-03-2015", "all""no_WT"
-    feature_general_properties("WT_mc2_55/30-03-2015")
-    # feature_creation_comparison("WT_drug",'WT_no_drug')
+    # # feature_number("WT_mc2_55/30-03-2015")
+    # # feature_creation("WT_mc2_55/30-03-2015")     #"WT_mc2_55/30-03-2015", "all""no_WT"
+    # feature_general_properties("WT_mc2_55/30-03-2015") #"WT_mc2_55/30-03-2015"
+    # # feature_creation_comparison("WT_drug",'WT_no_drug')
+    feature_creation_time_vs_NETO("WT_mc2_55/30-03-2015")
+    feature_creation_time_vs_NETO('WT_INH_700min_2014')
+    # feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'
     
-    feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'
-    
-    feature_len_height_variation ("WT_mc2_55/30-03-2015")
-    ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"
-    datasets_statistics()
+    # feature_len_height_variation ("WT_mc2_55/30-03-2015")
+    # ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
+    # feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"'WT_no_drug'
+    # # datasets_statistics()
     plt.rcParams.update({'font.size': 10})

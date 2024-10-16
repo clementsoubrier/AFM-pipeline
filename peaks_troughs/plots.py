@@ -116,7 +116,7 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
             cell_centerlines_renorm.append(np.vstack((xs,ys)))
             cell_peaks.append(frame_data["peaks"])
             cell_troughs.append(frame_data["troughs"])
-            cell_timestamps.append(frame_data["timestamp"]-base_time)
+            cell_timestamps.append(frame_data["timestamp"])#-base_time
 
         peaks_x = []
         peaks_y = []
@@ -183,7 +183,7 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
             for elem in pnt_ROI[key]:
                 coord_x.append(pnt_list[elem,3])
                 coord_y.append(pnt_list[elem,4] )
-                coord_z.append(pnt_list[elem,5]-base_time)
+                coord_z.append(pnt_list[elem,5])#-base_time
             ax.plot(coord_x, coord_z, coord_y, color = 'b')
     
     ax.set_zlabel(r'height ($n m$)')
@@ -357,22 +357,22 @@ def main(Directory='all', saving=False):
         
         for roi_id, cell in load_dataset(dataset, False):
             if len(cell)>5:
-                if len(roi_dic[roi_id]['Children']) >= 1:
-                    
-                    
-                    division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
-                    if division_point is not None:
-                        division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
-                    for daughter_cell in roi_dic[roi_id]['Children']:
-                        d_cell = load_cell(daughter_cell, dataset=dataset)
-                        if len(d_cell)>5:
-                            lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+                
+                
+                # if len(roi_dic[roi_id]['Children']) >= 1:
+                #     division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
+                #     if division_point is not None:
+                #         division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
+                #     for daughter_cell in roi_dic[roi_id]['Children']:
+                #         d_cell = load_cell(daughter_cell, dataset=dataset)
+                #         if len(d_cell)>5:
+                #             lineage = [(cell, roi_id),(d_cell, daughter_cell)]
                             
-                            kymograph(*lineage, dataset=dataset, division_point=division_point, saving=saving, saving_name=roi_id.replace(" ","")+'+'+daughter_cell.replace(" ",""), dir_im=dir_im)
+                #             kymograph(*lineage, dataset=dataset, division_point=division_point, saving=saving, saving_name=roi_id.replace(" ","")+'+'+daughter_cell.replace(" ",""), dir_im=dir_im)
                 
                 
                 # kymograph_feature((cell, roi_id), dataset=dataset)
-                # kymograph((cell, roi_id), dataset=dataset)
+                kymograph((cell, roi_id), dataset=dataset)
                 
                 # if len(roi_dic[roi_id]['Children']) >= 1:
                 #     for daughter_cell in roi_dic[roi_id]['Children']:

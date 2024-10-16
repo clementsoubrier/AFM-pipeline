@@ -443,7 +443,8 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                     
                     
                     times = np.array([elem['timestamp'] for elem in lineage])
-                    mask= times<=mother_time-90
+                    mask= times<= mother_time-82
+                    
                     
                     
                     if np.any(mask):
@@ -517,7 +518,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
     ax.set_xticklabels(["At division", f"90 mn \n before", f"150 mn \n before", f'Previous \n division'])
     ax.set_ylabel(r'Curvature at division site $\mu m^{-1} $')
     
-    pvalue = stats.wilcoxon(stat_list, method='exact').pvalue  #stats.wilcoxon
+    pvalue = stats.ttest_1samp(stat_list,0 ).pvalue  #stats.wilcoxon method='exact'
     ax.text(1, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
     
     pvalue = stats.wilcoxon(stat_mid, method='exact').pvalue 
@@ -528,7 +529,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
     
     pvalue = stats.wilcoxon(stat_old, method='exact').pvalue 
     ax.text(4, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
-    ax.set_ylim([-0.05,0.65])
+    # ax.set_ylim([-0.05,0.65])
     plt.tight_layout()
     plt.show()
 
@@ -777,8 +778,8 @@ if __name__ == "__main__":
     # division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
     # division_pnt('WT_no_drug', use_one_daughter=True)
     # division_pnt('all', use_one_daughter=True)
-    # division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
-    # division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
-    div_pos_vs_NETO('good', use_one_daughter=False)
+    division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
+    division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
+    # div_pos_vs_NETO('delta_lamA_03-08-2018', use_one_daughter=False)
     plt.rcParams.update({'font.size': 10})
     plt.show()

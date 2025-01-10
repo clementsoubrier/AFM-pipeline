@@ -122,6 +122,9 @@ def load_cell(
     cut_before_700=False,
     cut_after_700=False,
 ):
+    if dataset == 'INH_before_700':
+        cut_before_700 = True
+        dataset = 'WT_INH_700min_2014'
     roi_dir = os.path.join(get_roi_dir(cell_name, dataset),"lines")
     centerlines = os.listdir(roi_dir)
     roi = []

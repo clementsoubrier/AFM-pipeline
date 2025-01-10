@@ -606,10 +606,13 @@ def feature_properties_pole_feature(dataset_names):
 
 def feature_properties_pole(dataset_names):
     params = get_scaled_parameters(data_set=True, stats=True)
-    if dataset_names in params.keys():
-        datasets = params[dataset_names]
-    else : 
-        datasets = dataset_names
+    if isinstance(dataset_names, str):
+        if dataset_names in params.keys():
+            datasets = params[dataset_names]
+        else: 
+            raise NameError('This directory does not exist')
+    else :
+        datasets = dataset_names 
     pole_size = params["pole_region_size"] 
     whole_stat = {}
     for prop in ['lenght', 'height']:
@@ -693,11 +696,11 @@ def feature_properties_pole(dataset_names):
     pvalue1 = stats.ttest_ind(whole_stat['lenght']['np'], whole_stat['lenght']['op']).pvalue
     x1 = 1
     x2 = 2 
-    y = 1.5 # 1.05
+    y = 1.45 # 1.05
     h=0.02
     ax[0].plot([x1, x2], [y, y], color = 'k')
     ax[0].text((x1+x2)*.5, y+h, p_value_to_str(pvalue1), ha='center', va='bottom')
-    ax[0].set_ylim(0,2)
+    ax[0].set_ylim(0,2.2)
     # ax[0].set_ylim(0,1.25)
     
     ax[1].boxplot([whole_stat['height']['np'],
@@ -794,10 +797,13 @@ def feature_number(dataset_names):
 def feature_general_properties(dataset_names, plot=True):
     
     params = get_scaled_parameters(data_set=True,stats=True)
-    if dataset_names in params.keys():
-        datasets = params[dataset_names]
-    else : 
-        datasets = dataset_names
+    if isinstance(dataset_names, str):
+        if dataset_names in params.keys():
+            datasets = params[dataset_names]
+        else: 
+            raise NameError('This directory does not exist')
+    else :
+        datasets = dataset_names 
     
     stat_list = []
     position_list = []
@@ -1389,14 +1395,32 @@ def datasets_statistics():
         if len(cell) > 5:
             ROI_number+=1
     dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
-    frame_num += len(dic)
+    # frame_num += len(dic)
     for fichier in dic:
-        mask_number += len(dic[fichier]['outlines'])
+        if dic[fichier]['time']>=700:
+            frame_num +=1
+            mask_number += len(dic[fichier]['outlines'])
     print(f'INH mask number : {mask_number}')
     print(f'INH good ROI number : {ROI_number}')
     print(f'INH good frame number : {frame_num}')
     
     
+    
+    
+    
+    datasets = params['WT_no_drug']
+    
+    for set in datasets:
+        for _, cell in load_dataset(set, False):
+            if len(cell) > 5:
+                ROI_number+=1
+        dic=np.load(os.path.join(data_direc, set, dicname), allow_pickle=True)['arr_0'].item()
+        frame_num += len(dic)
+        for fichier in dic:
+            mask_number += len(dic[fichier]['outlines'])
+    print(f'WT no drug mask number : {mask_number}')
+    print(f'WT no drug ROI number : {ROI_number}')
+    print(f'WT no drug frame number : {frame_num}')
     
     mask_number = 0
     ROI_number = 0
@@ -1412,9 +1436,6 @@ def datasets_statistics():
         frame_num += len(dic)
         for fichier in dic:
             mask_number += len(dic[fichier]['outlines'])
-    print(f'WT no drug mask number : {mask_number}')
-    print(f'WT no drug ROI number : {ROI_number}')
-    print(f'WT no drug frame number : {frame_num}')
     
     datasets = params['WT_drug']
     
@@ -1473,13 +1494,15 @@ if __name__ == "__main__":
     # # feature_number("WT_mc2_55/30-03-2015")
     # # feature_creation("WT_mc2_55/30-03-2015")     #"WT_mc2_55/30-03-2015", "all""no_WT"
     # feature_general_properties("WT_mc2_55/30-03-2015") #"WT_mc2_55/30-03-2015"
+    # feature_general_properties("WT_no_drug")
+    # feature_general_properties("par_B")
     # # feature_creation_comparison("WT_drug",'WT_no_drug')
-    feature_creation_time_vs_NETO("WT_mc2_55/30-03-2015")
-    feature_creation_time_vs_NETO('WT_INH_700min_2014')
-    # feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'
+    # feature_creation_time_vs_NETO("WT_mc2_55/30-03-2015")
+    # feature_creation_time_vs_NETO('WT_INH_700min_2014')
+    # feature_displacement("WT_mc2_55/30-03-2015") #"all"'WT_no_drug'"WT_mc2_55/30-03-2015"
     
     # feature_len_height_variation ("WT_mc2_55/30-03-2015")
     # ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    # feature_properties_pole('WT_no_drug') #"WT_mc2_55/30-03-2015"'WT_no_drug'
-    # # datasets_statistics()
+    feature_properties_pole(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700']) #"WT_mc2_55/30-03-2015"'WT_no_drug'
+    datasets_statistics()
     plt.rcParams.update({'font.size': 10})

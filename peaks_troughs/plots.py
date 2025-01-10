@@ -91,14 +91,33 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
     base_time=cells_and_id[0][0][0]["timestamp"]
     pixelsize=[]
     title = []
-    
-    
+    v_min = None
+    v_max = None
+    ys_l=[]
+    first = True
     for cell_id in cells_and_id:
         cell = cell_id[0]
+        if first:
+            xs,ys = cell[0]["xs"],cell[0]["ys"]
+            x_init = xs[0]
+            base_time = cell[0]["timestamp"]
+            y_init = ys[0]
+            first = False
         title.append(cell_id[1])
         for frame_data in cell:
-            pixelsize.append((frame_data["xs"][-1]-frame_data["xs"][0])/(len(frame_data["xs"])-1))
-    
+            xs,ys = frame_data["xs"],frame_data["ys"]
+            pixelsize.append((xs[-1]-xs[0])/(len(xs)-1))
+            ys_l.append(ys)
+            base_time = min (base_time, frame_data["timestamp"])
+            y_init = min(y_init,np.min(ys))
+            # mi, ma = np.min(ys), np.max(ys)
+            # if v_min is None or v_min> mi:
+            #     v_min = mi
+            # if v_max is None or v_max< ma:
+            #     v_max = ma
+    ys_l = np.concatenate(ys_l)
+    v_max = np.quantile(ys_l,0.95)
+    v_min = np.quantile(ys_l,0.05)
     step=min(pixelsize)
     
     for cell_id in cells_and_id:
@@ -116,7 +135,7 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
             cell_centerlines_renorm.append(np.vstack((xs,ys)))
             cell_peaks.append(frame_data["peaks"])
             cell_troughs.append(frame_data["troughs"])
-            cell_timestamps.append(frame_data["timestamp"])#-base_time
+            cell_timestamps.append(frame_data["timestamp"])
 
         peaks_x = []
         peaks_y = []
@@ -145,34 +164,41 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
             xs_3d[i, :preval] = xs[0]
             xs_3d[i, postval:] = xs[-1]
             xs_3d[i, preval:postval]=xs
-            ys_3d[i, :] = cell_timestamps[i]
+            xs_3d[i, :]-= x_init
+            ys_3d[i, :] = cell_timestamps[i] - base_time
             zs_3d[i, :preval] = ys[0]
             zs_3d[i, postval:] = ys[-1]
             zs_3d[i, preval:postval]=ys
+            zs_3d[i, :] -= y_init
         ax.plot_surface(xs_3d, ys_3d, zs_3d, cmap="viridis", lw=0.5, rstride=1,
-                        cstride=1, alpha=0.4, edgecolor='none',
-                        norm=mplc.PowerNorm(gamma=1.5))
-        
-
+                        cstride=1, alpha=0.6, edgecolor='none',
+                        norm=mplc.PowerNorm(gamma=2.3,vmin=v_min-y_init, vmax=v_max-y_init))
+        divx = []
+        divy = []
+        divz = []
         for centerline, peaks, troughs,timestamp in zip(cell_centerlines, cell_peaks,
                                             cell_troughs,cell_timestamps):
-            xs = centerline[0, :]
-            ys = centerline[1, :] 
-            zs = timestamp * np.ones(len(xs))
+            xs = centerline[0, :] - x_init
+            ys = centerline[1, :] - y_init
+            zs = timestamp * np.ones(len(xs)) - base_time
             if peaks.size:
                 peaks_x.extend(xs[peaks])
                 peaks_y.extend(ys[peaks])
-                peaks_z.extend([timestamp]*len(peaks))
+                peaks_z.extend([timestamp - base_time]*len(peaks))
             if troughs.size:
                 troughs_x.extend(xs[troughs])
                 troughs_y.extend(ys[troughs])
-                troughs_z.extend([timestamp]*len(troughs))
-            ax.plot3D(xs, zs, ys,c="k", alpha=0.6)
-            if division_point is not None and division_point[1] >= timestamp:
-                div_ind = np.argmin((xs-division_point[0])**2)
-                ax.plot3D(xs[div_ind], timestamp, ys[div_ind]+10, c="darkorange", marker='v', markersize = 8, alpha=1 )
-        ax.scatter(peaks_x,  peaks_z, peaks_y,c="r")
-        ax.scatter(troughs_x, troughs_z, troughs_y, c="k")
+                troughs_z.extend([timestamp - base_time]*len(troughs))
+            ax.plot3D(xs, zs, ys,c="k")
+            if division_point is not None and division_point[1] >= timestamp - base_time:
+                div_ind = np.argmin((xs + x_init-division_point[0])**2)
+                divx.append(xs[div_ind])
+                divy.append(timestamp - base_time)
+                divz.append(ys[div_ind] + 10)
+        if divx!=[]:
+            ax.scatter(divx, divy, divz, alpha=1,  color="magenta")          #marker='|',markersize = 10,, linestyle='dashed'
+        ax.scatter(peaks_x,  peaks_z, peaks_y, c="r", s=10, alpha=1)
+        ax.scatter(troughs_x, troughs_z, troughs_y, c="k", s=10,  alpha=1)
         
         
         pnt_list, pnt_ROI = get_peak_troughs_lineage_lists(dataset, roi_id)
@@ -181,9 +207,9 @@ def kymograph(*cells_and_id,  dataset='', division_point = None, saving=False, s
             coord_y = []
             coord_z = []
             for elem in pnt_ROI[key]:
-                coord_x.append(pnt_list[elem,3])
-                coord_y.append(pnt_list[elem,4] )
-                coord_z.append(pnt_list[elem,5])#-base_time
+                coord_x.append(pnt_list[elem,3] - x_init)
+                coord_y.append(pnt_list[elem,4] - y_init)
+                coord_z.append(pnt_list[elem,5] - base_time) 
             ax.plot(coord_x, coord_z, coord_y, color = 'b')
     
     ax.set_zlabel(r'height ($n m$)')
@@ -359,20 +385,21 @@ def main(Directory='all', saving=False):
             if len(cell)>5:
                 
                 
-                # if len(roi_dic[roi_id]['Children']) >= 1:
-                #     division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
-                #     if division_point is not None:
-                #         division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
-                #     for daughter_cell in roi_dic[roi_id]['Children']:
-                #         d_cell = load_cell(daughter_cell, dataset=dataset)
-                #         if len(d_cell)>5:
-                #             lineage = [(cell, roi_id),(d_cell, daughter_cell)]
+                if len(roi_dic[roi_id]['Children']) >= 1:
+                    division_point = detect_division(cell[-1], roi_id, roi_dic, dataset, use_one_daughter = True)
+                    if division_point is not None:
+                        division_point = [cell[-1]['xs'][division_point], cell[-1]['timestamp']-cell[0]['timestamp'],cell[-1]['ys'][division_point]]
+                    for daughter_cell in roi_dic[roi_id]['Children']:
+                        d_cell = load_cell(daughter_cell, dataset=dataset)
+                        if len(d_cell)>5:
+                            lineage = [(cell, roi_id),(d_cell, daughter_cell)]
                             
-                #             kymograph(*lineage, dataset=dataset, division_point=division_point, saving=saving, saving_name=roi_id.replace(" ","")+'+'+daughter_cell.replace(" ",""), dir_im=dir_im)
+                            kymograph(*lineage, dataset=dataset, division_point=division_point, saving=saving, saving_name=roi_id.replace(" ","")+'+'+daughter_cell.replace(" ",""), dir_im=dir_im)
+                            # kymograph_feature(*lineage, dataset=dataset)
                 
                 
                 # kymograph_feature((cell, roi_id), dataset=dataset)
-                kymograph((cell, roi_id), dataset=dataset)
+                # kymograph((cell, roi_id), dataset=dataset)
                 
                 # if len(roi_dic[roi_id]['Children']) >= 1:
                 #     for daughter_cell in roi_dic[roi_id]['Children']:

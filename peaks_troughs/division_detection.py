@@ -76,13 +76,14 @@ def division_statistics(datasetnames, use_one_daughter=False):
     Raises:
         NameError: wrong directory
     """
-    params = get_scaled_parameters(data_set=True)
-    if datasetnames in params.keys():
-        datasets = params[datasetnames]
-    elif isinstance(datasetnames, str): 
-        raise NameError('This directory does not exist')
+    params = get_scaled_parameters(data_set=True, paths_and_names=True)
+    if isinstance(datasetnames, str):
+        if datasetnames in params.keys():
+            datasets = params[datasetnames]
+        else: 
+            raise NameError('This directory does not exist')
     else :
-        datasets = datasetnames 
+        datasets = datasetnames
     
     div_list = []
     div_list_ori= []
@@ -164,36 +165,38 @@ def division_statistics_INH_after_700(use_one_daughter=False):
     roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
 
     for roi_id, mother_ROI in load_dataset(dataset, False):
-        if len(mother_ROI)>1:
-            mother = mother_ROI[-1]
-            if mother['timestamp']>= 700:
-                div_index = detect_division(mother, roi_id, roi_dic, dataset, use_one_daughter)
-                if div_index is not None:
-                    orientation = Orientation(mother['orientation'])
-                    moth_len = mother['xs'][-1] - mother['xs'][0]
-                    x_coord = mother['xs'][div_index] - mother['xs'][0]
-                    match orientation:
-                        case Orientation.NEW_POLE_OLD_POLE:
-                            
-                            div_list_ori.append(x_coord/moth_len)
-                        case Orientation.OLD_POLE_NEW_POLE:
-                            div_list_ori.append((moth_len-x_coord)/moth_len)
-                        case _:
-                            first_pole = np.array([elem['xs'][0] for elem in mother_ROI])
-                            second_pole = np.array([elem['xs'][-1] for elem in mother_ROI])
-                            time = np.array([elem['timestamp'] for elem in mother_ROI])
-                            mat = np.zeros((len(time), 2))
-                            mat[:, 0] = time
-                            mat[:, 1] = 1
-                            sl1, _ = np.linalg.lstsq(mat, first_pole, None)[0]
-                            sl2, _ = np.linalg.lstsq(mat, second_pole, None)[0]
-                            
-                            if sl1 >= 1.2 * sl2:
-                                div_list_ori.append((moth_len-x_coord)/moth_len)
-                            elif sl2 >= 1.2 * sl1:
+        if roi_id != 'ROI 988':   # manual curation due to bad segmentation 
+            if len(mother_ROI)>1:
+                mother = mother_ROI[-1]
+                if mother['timestamp']>= 700:
+                    div_index = detect_division(mother, roi_id, roi_dic, dataset, use_one_daughter)
+                    if div_index is not None:
+                        orientation = Orientation(mother['orientation'])
+                        moth_len = mother['xs'][-1] - mother['xs'][0]
+                        x_coord = mother['xs'][div_index] - mother['xs'][0]
+                        match orientation:
+                            case Orientation.NEW_POLE_OLD_POLE:
+                                
                                 div_list_ori.append(x_coord/moth_len)
-                     
-                    
+                            case Orientation.OLD_POLE_NEW_POLE:
+                                div_list_ori.append((moth_len-x_coord)/moth_len)
+                            case _:
+                                first_pole = np.array([elem['xs'][0] for elem in mother_ROI])
+                                second_pole = np.array([elem['xs'][-1] for elem in mother_ROI])
+                                time = np.array([elem['timestamp'] for elem in mother_ROI])
+                                mat = np.zeros((len(time), 2))
+                                mat[:, 0] = time
+                                mat[:, 1] = 1
+                                sl1, _ = np.linalg.lstsq(mat, first_pole, None)[0]
+                                sl2, _ = np.linalg.lstsq(mat, second_pole, None)[0]
+                                if x_coord>1.5 and  moth_len-x_coord>1.5:
+                                    if sl1 >  sl2:
+                                        div_list_ori.append((moth_len-x_coord)/moth_len)
+                                    elif sl2 > sl1:
+                                        div_list_ori.append(x_coord/moth_len)
+                                        
+
+                            
     div_list_ori = np.array(div_list_ori) 
     title = (
         f"Division position with dataset \' INH_after_700\',\n and {len(div_list_ori)} individual features"
@@ -202,12 +205,12 @@ def division_statistics_INH_after_700(use_one_daughter=False):
     ax.boxplot([div_list_ori], showfliers=False, medianprops=dict(color='k'))
     print(title)
     print_stats([div_list_ori])
-    ax.set_xticklabels(['Division position'])
+    ax.set_xticklabels([f'Division position,\n cells treated with INH'])
     ax.set_ylabel(r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
     ax.set_title(title)
     # ax.set_ylim(0.38,0.62)
     pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
-    ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    ax.text(1.2, 0.56, p_value_to_str(pvalue), ha='center', va='bottom')
     plt.tight_layout()
     plt.show()
     
@@ -251,10 +254,11 @@ def division_pnt(datasetnames, use_one_daughter=False):
         NameError: wrong directory
     """
     params = get_scaled_parameters(data_set=True, paths_and_names=True)
-    if datasetnames in params.keys():
-        datasets = params[datasetnames]
-    elif isinstance(datasetnames, str): 
-        raise NameError('This directory does not exist')
+    if isinstance(datasetnames, str):
+        if datasetnames in params.keys():
+            datasets = params[datasetnames]
+        else: 
+            raise NameError('This directory does not exist')
     else :
         datasets = datasetnames 
     
@@ -266,14 +270,18 @@ def division_pnt(datasetnames, use_one_daughter=False):
     pnt_height = {'closest':{'peaks':[], 'troughs': []}, 'second_closest' : {'peaks':[], 'troughs': []}}
     
     for dataset in datasets:
-        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        if dataset == "INH_before_700":
+            roi_dic = np.load(os.path.join(data_direc, 'WT_INH_700min_2014', roi_dic_name), allow_pickle=True)['arr_0'].item()
+        else:
+            roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+        
 
         for roi_id, mother in load_dataset(dataset, False):
             if len(mother)>1:
                 mother = mother[-1]
                 div_index = detect_division(mother, roi_id, roi_dic, dataset, use_one_daughter)
                 if div_index is not None:
-                    if len (mother['troughs']) >= 1 and len (mother['peaks']) >= 1:
+                    if len (mother['troughs']) >= 1 and len (mother['peaks']) > 1:
                         closest_peak_ind = np.argmin(np.absolute(mother['xs'][mother['peaks']] - mother['xs'][div_index]) )
                         closest_peak_pos = mother['peaks'][closest_peak_ind]
                         pnt_dist_peak.append(abs  (mother['xs'][closest_peak_pos]- mother['xs'][div_index]))
@@ -355,7 +363,7 @@ def division_pnt(datasetnames, use_one_daughter=False):
     h=0
     ax.plot([x1, x2], [y, y], color = 'k')
     ax.text((x1+x2)*.5, y+h, p_value_to_str(pvalue), ha='center', va='bottom')
-    ax.set_ylim(-50,420)
+    # ax.set_ylim(-50,420)
     
     
     print('Comparing features')
@@ -443,30 +451,40 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                     
                     
                     times = np.array([elem['timestamp'] for elem in lineage])
-                    mask= times<= mother_time-82
+                    pre_cleav_time = 61
+                    period = 50
+                    mask = np.logical_and(mother_time-pre_cleav_time-period <=times, times<= mother_time-pre_cleav_time)
                     
                     
                     
                     if np.any(mask):
-                        mid_mother_ind= np.argmax(times[mask])
-                        
-                        mid_mother = lineage[mid_mother_ind]
-                        index = np.argmin((mid_mother['xs'] - mother['xs'][div_index])**2)
-                        
-                        mask_window_mid = (mid_mother['xs'] - mother['xs'][div_index])**2 <= window_phys_size**2
-                        
-                        
-                        if  np.sum(mask_window_mid) > 3 and index != 0 and index != len(mid_mother['xs'])-1 :
-                            if smoothing:
-                                window = gaussian_filter1d(mid_mother['ys'], smooth_std/pixel_size, mode="nearest")[mask_window_mid]
-                                # stat_mid.append((smoothed_line[index-1]+smoothed_line[index+1]-2*smoothed_line[index])/(1000*sq_delt))
-                            else:
-                                window = mid_mother['ys'][mask_window_mid]
-                            x_val = mid_mother['xs'][mask_window_mid]
+                        res = []
+                        for elem in np.nonzero(mask)[0]:
                             
-                            p = np.polyfit(x_val, window, 2)
-                            stat_mid.append((2*p[0]/1000)/(1+(2*p[0]/1000*x_val[len(x_val)//2]+p[1]/1000)**2)**(3/2)) # stat_mid.append(p[0]/1000)
-                    
+                            
+                            mid_mother = lineage[elem]
+                            index = np.argmin((mid_mother['xs'] - mother['xs'][div_index])**2)
+                            
+                            mask_window_mid = (mid_mother['xs'] - mother['xs'][div_index])**2 <= window_phys_size**2
+                            
+                            
+                            if  np.sum(mask_window_mid) > 3 and index != 0 and index != len(mid_mother['xs'])-1 :
+                                if smoothing:
+                                    window = gaussian_filter1d(mid_mother['ys'], smooth_std/pixel_size, mode="nearest")[mask_window_mid]
+                                    # stat_mid.append((smoothed_line[index-1]+smoothed_line[index+1]-2*smoothed_line[index])/(1000*sq_delt))
+                                else:
+                                    window = mid_mother['ys'][mask_window_mid]
+                                x_val = mid_mother['xs'][mask_window_mid]
+                                
+                                p = np.polyfit(x_val, window, 2)
+                                res.append((2*p[0]/1000)/(1+(2*p[0]/1000*x_val[len(x_val)//2]+p[1]/1000)**2)**(3/2)) # stat_mid.append(p[0]/1000)
+
+                        stat_mid.extend(res)
+                        # res = np.array(res)
+                        # stat_mid.append(np.mean(res))
+                        
+                        
+                        
                     times = np.array([elem['timestamp'] for elem in lineage])
                     mask= times<=mother_time-150
                     
@@ -490,7 +508,7 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
                     
                     old_mother = lineage[0]
                     
-                    if mother_time >= old_mother['timestamp'] + 180 :
+                    if mother_time >= old_mother['timestamp'] + 100 :
                         mask_window = (old_mother['xs'] - mother['xs'][div_index])**2 <= window_phys_size**2
                         index = np.argmin((old_mother['xs'] - mother['xs'][div_index])**2)
                         
@@ -511,25 +529,29 @@ def division_local_curvature(datasetnames, use_one_daughter=False, smoothing=Tru
         f"Curvature value with dataset \'{datasetnames}\' \n and {len(stat_list), len(stat_mid), len(stat_mid2), len(stat_old)} divisions"
     )
     _, ax = plt.subplots()
-    ax.boxplot([stat_list, stat_mid, stat_mid2, stat_old], showfliers=False, medianprops=dict(color='k'))
+    ax.boxplot([stat_list,   stat_old], showfliers=False, medianprops=dict(color='k'), vert=False, widths=0.4) #stat_mid,
     print(title)
-    print_stats([stat_list, stat_mid, stat_mid2, stat_old])
+    print_stats([stat_list, stat_mid, stat_old]) #stat_mid,
     ax.set_title(title)
-    ax.set_xticklabels(["At division", f"90 mn \n before", f"150 mn \n before", f'Previous \n division'])
-    ax.set_ylabel(r'Curvature at division site $\mu m^{-1} $')
+    ax.set_yticklabels([f"At \n division",  f'At birth'])#f" Before \n pre-cleavage \n furrow",
+    ax.set_xlabel(r'Curvature at division site $(\mu m^{-1}) $')
     
-    pvalue = stats.ttest_1samp(stat_list,0 ).pvalue  #stats.wilcoxon method='exact'
-    ax.text(1, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    pvalue = stats.ttest_1samp(stat_list, 0).pvalue  #stats.wilcoxon method='exact'
+    ax.text(0.38, 1.31, p_value_to_str(pvalue), ha='center', va='bottom')
     
-    pvalue = stats.wilcoxon(stat_mid, method='exact').pvalue 
-    ax.text(2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
+    # pvalue = stats.ttest_1samp(stat_mid, 0).pvalue 
+    # ax.text(2, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
     
-    pvalue = stats.wilcoxon(stat_mid2, method='exact').pvalue 
-    ax.text(3, 0.6, p_value_to_str(pvalue), ha='center', va='bottom')
+    # pvalue = stats.ttest_1samp(stat_mid2, 0).pvalue 
+    # ax.text(3, 0.6, p_value_to_str(pvalue), ha='center', va='bottom')
     
-    pvalue = stats.wilcoxon(stat_old, method='exact').pvalue 
-    ax.text(4, 0.3, p_value_to_str(pvalue), ha='center', va='bottom')
-    # ax.set_ylim([-0.05,0.65])
+    pvalue = stats.ttest_1samp(stat_old, 0).pvalue 
+    ax.text(0.33, 2, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    # pvalue = stats.ttest_ind(stat_old, stat_list).pvalue 
+    # ax.text(1.5, 0.4, p_value_to_str(pvalue), ha='center', va='bottom')
+    
+    # ax.set_ylim([-0.12,0.55])
     plt.tight_layout()
     plt.show()
 
@@ -691,11 +713,12 @@ def div_pos_vs_NETO(datasetnames, use_one_daughter=False, smoothing=True):
     Raises:
         NameError: wrong directory
     """
-    params = get_scaled_parameters(data_set=True)
-    if datasetnames in params.keys():
-        datasets = params[datasetnames]
-    elif isinstance(datasetnames, str): 
-        raise NameError('This directory does not exist')
+    params = get_scaled_parameters(data_set=True, paths_and_names=True)
+    if isinstance(datasetnames, str):
+        if datasetnames in params.keys():
+            datasets = params[datasetnames]
+        else: 
+            raise NameError('This directory does not exist')
     else :
         datasets = datasetnames 
     
@@ -712,22 +735,25 @@ def div_pos_vs_NETO(datasetnames, use_one_daughter=False, smoothing=True):
                 
                 if len(timestamps)>=4 and  timestamps[-1]-timestamps[0]> 75:
                     tot_time = timestamps[-1]-timestamps[0]
-                    _, _, _, Neto = piecewise_pointwise_linear_regression(timestamps, overall_growth)
-                    mother_cell = mother[-1]
-                    div_index = detect_division(mother_cell, roi_id, roi_dic, dataset, use_one_daughter)
-                    if div_index is not None:
-                        orientation = Orientation(mother_cell['orientation'])
-                        moth_len = mother_cell['xs'][-1] - mother_cell['xs'][0]
-                        x_coord = mother_cell['xs'][div_index] - mother_cell['xs'][0]
-                        match orientation:
-                            case Orientation.NEW_POLE_OLD_POLE:
-                                pos = x_coord - moth_len/2
-                                relat_pos = x_coord/moth_len
-                                res.append([Neto/tot_time, pos, relat_pos])
-                            case Orientation.OLD_POLE_NEW_POLE:
-                                pos = moth_len/2 - x_coord  
-                                relat_pos = (moth_len-x_coord)/moth_len
-                                res.append([Neto/tot_time, pos, relat_pos])
+                    _, _, _, Neto = piecewise_pointwise_linear_regression(timestamps, new_pole_growth)
+                    _, _, _, Neto2 = piecewise_pointwise_linear_regression(timestamps, overall_growth)
+                    if abs(Neto-Neto2)<70:
+                        mother_cell = mother[-1]
+                        div_index = detect_division(mother_cell, roi_id, roi_dic, dataset, use_one_daughter)
+                        
+                        if div_index is not None:
+                            orientation = Orientation(mother_cell['orientation'])
+                            moth_len = mother_cell['xs'][-1] - mother_cell['xs'][0]
+                            x_coord = mother_cell['xs'][div_index] - mother_cell['xs'][0]
+                            match orientation:
+                                case Orientation.NEW_POLE_OLD_POLE:
+                                    pos = x_coord - moth_len/2
+                                    relat_pos = x_coord/moth_len
+                                    res.append([Neto2/tot_time, pos, relat_pos])
+                                case Orientation.OLD_POLE_NEW_POLE:
+                                    pos = moth_len/2 - x_coord  
+                                    relat_pos = (moth_len-x_coord)/moth_len
+                                    res.append([Neto2/tot_time, pos, relat_pos])
                             
                             
                     
@@ -736,25 +762,30 @@ def div_pos_vs_NETO(datasetnames, use_one_daughter=False, smoothing=True):
                     
                     
     res = np.array(res) 
+    print(res)
     title = (
         f"Neto vs division site position with dataset \'{datasetnames}\',\n and {len(res)} individual features"
     )
     _, ax = plt.subplots()
-    ax.scatter(res[:,2], 100*res[:,0], color='k')
+    ax.scatter(100*res[:,0], res[:,2], color='k')
     mat = np.zeros((len(res), 2))
     mat[:, 0] = res[:,2]
     mat[:, 1] = 1
     a, b = np.linalg.lstsq(mat, 100*res[:,0], None)[0]
-    ax.plot(res[:,2],a*res[:,2]+b, color='k', label='linear approximation')
+    
+    a, b, r_value, _, _ = stats.linregress(res[:,2], 100*res[:,0])
+    ax.plot(a*res[:,2]+b, res[:,2], color='k', label=f'Linear approximation\n'+r'$r^2=$'+f'{r_value**2:.2e}')
     print(title)
+    print(f'slope ={1/a:.2e}')
     ax.legend()
-    ax.set_ylabel(r'Neto ($\%$ of cell life)')
-    ax.set_xlabel( f'division position \n'+ r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
+    ax.set_xlabel(r'Neto ($\%$ of cell life)')
+    ax.set_ylabel( f'division position \n'+ r' $\leftarrow \;\text{New pole}\;|\;  \text{old pole} \;\rightarrow$')
     ax.set_title(title)
-    ax.xaxis.set_major_formatter('{x:3.2f}')
-    ax.set_xlim(0.39,0.6)
+    ax.yaxis.set_major_formatter('{x:3.2f}')
+    # ax.set_xlim(0.39,0.6)
     # pvalue = stats.ttest_1samp(div_list_ori,0.5).pvalue #stats.wilcoxon ttest_1samp .pvalue
     # ax.text(1.2, 0.5, p_value_to_str(pvalue), ha='center', va='bottom')
+    print(f'value at mid cell {a*0.5+b}')
     
     plt.tight_layout()
    
@@ -762,7 +793,69 @@ def div_pos_vs_NETO(datasetnames, use_one_daughter=False, smoothing=True):
                     
                     
                     
+def division_timing(datasetnames, use_one_daughter=False, smoothing=True):         
+    """Computing time at which the division site is centered
 
+    Args:
+        datasetnames (str): dataset name
+        use_one_daughter (bool, optional): Using division data with only 1 daughter cell. Defaults to False.
+
+    Raises:
+        NameError: wrong directory
+    """
+    params = get_scaled_parameters(data_set=True, paths_and_names=True)
+    if isinstance(datasetnames, str):
+        if datasetnames in params.keys():
+            datasets = params[datasetnames]
+        else: 
+            raise NameError('This directory does not exist')
+    else :
+        datasets = datasetnames 
+        
+    res = []
+    for dataset in datasets:
+        params = get_scaled_parameters(paths_and_names=True)
+        data_direc = params["main_data_direc"]
+        roi_dic_name = params["roi_dict_name"]
+        roi_dic = np.load(os.path.join(data_direc, dataset, roi_dic_name), allow_pickle=True)['arr_0'].item()
+
+        for roi_id, mother in load_dataset(dataset, False):
+            tot_time = mother[-1]['timestamp']-mother[0]['timestamp']
+            if len(mother)>4 and tot_time> 75:
+                init_time = mother[0]['timestamp']
+                div_pos = []
+                mother_cell = mother[-1]
+                div_index = detect_division(mother_cell, roi_id, roi_dic, dataset, use_one_daughter)
+                
+                if div_index is not None:
+                    for elem in mother:
+                    
+                        orientation = Orientation(elem['orientation'])
+                        elem_len = elem['xs'][-1] - elem['xs'][0]
+                        x_coord = mother_cell['xs'][div_index] - elem['xs'][0]
+                        match orientation:
+                            case Orientation.NEW_POLE_OLD_POLE:
+                                relat_pos = x_coord/elem_len
+                                div_pos.append([(elem['timestamp']-init_time)/tot_time, relat_pos])
+                            case Orientation.OLD_POLE_NEW_POLE:
+                                relat_pos = (elem_len-x_coord)/elem_len
+                                div_pos.append([(elem['timestamp']-init_time)/tot_time, relat_pos])
+                        
+                div_pos = np.array(div_pos)
+                if len(div_pos)>=1:
+                    best_time = np.argmin((div_pos[:,1]-0.5)**2)
+                    res.append(div_pos[best_time,0])
+                            
+                            
+                    
+                    
+                    
+                    
+                    
+    res = np.array(res) 
+    print(res)
+    print_stats([res])
+    
 
 
 
@@ -773,13 +866,17 @@ if __name__ == "__main__":
     plt.rcParams.update({'font.size': 13})
     # division_statistics_INH_after_700(use_one_daughter=True) 
     # division_statistics('WT_INH_700min_2014', use_one_daughter=True)
-    # division_statistics("WT_no_drug", use_one_daughter=True)
-    # division_pnt('WT', use_one_daughter=True)
+    # division_statistics('par_B', use_one_daughter=True)
+    # division_pnt('par_B', use_one_daughter=True)
+    # division_local_curvature('par_B', use_one_daughter=True, smoothing=True)
+    division_statistics(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700'], use_one_daughter=True)
+    division_pnt(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700'], use_one_daughter=True)# 
     # division_pnt("WT_mc2_55/30-03-2015", use_one_daughter=True)
     # division_pnt('WT_no_drug', use_one_daughter=True)
     # division_pnt('all', use_one_daughter=True)
-    division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
-    division_local_curvature_trajectories("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
-    # div_pos_vs_NETO('delta_lamA_03-08-2018', use_one_daughter=False)
+    # division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing=True)  #'all' "WT_mc2_55/30-03-2015"'WT_no_drug'
+    # division_local_curvature("WT_mc2_55/30-03-2015", use_one_daughter=True, smoothing = True)
+    div_pos_vs_NETO(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700'], use_one_daughter=False)
+    # division_timing(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700'], use_one_daughter=False)
     plt.rcParams.update({'font.size': 10})
     plt.show()

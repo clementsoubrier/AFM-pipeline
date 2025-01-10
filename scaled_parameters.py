@@ -74,6 +74,11 @@ DATA_SET_FEAT = ["WT_mc2_55/06-10-2015",
                   'delta_lamA_03-08-2018',
                   'delta_LTD6_04-06-2017']
 
+PAR_B = ["delta_parB/15-11-2014",
+                  "delta_parB/18-01-2015",
+                  "delta_parB/18-11-2014",
+                  "delta_parB/03-02-2015"]
+
                 #   "WT_mc2_55/30-03-2015",
                 
             
@@ -289,6 +294,7 @@ def get_scaled_parameters(
         params['data_with_feature'] = DATA_SET_FEAT
         params["INH_before_700"] = INH_BEF
         params["INH_after_700"] = INH_AFT
+        params['par_B'] = PAR_B
 
 
     if cellpose:

@@ -477,11 +477,11 @@ def compute_pole_growth_stats(datasetnames, outlier_detection=False, plot=False)
     old_new_slopes = []  # first new, second new, old
     after_neto_slopes = [] # first new, second old
     params = get_scaled_parameters(data_set=True)
-    
-    if datasetnames in params.keys():
-        datasets = params[datasetnames]
-    elif isinstance(datasetnames, str): 
-        raise NameError('This directory does not exist')
+    if isinstance(datasetnames, str):
+        if datasetnames in params.keys():
+            datasets = params[datasetnames]
+        else: 
+            raise NameError('This directory does not exist')
     else :
         datasets = datasetnames 
     
@@ -909,11 +909,11 @@ def compare_dataset_pole_growth(datasetname1, datasetname2, y, h, lim, outlier_d
 if __name__ == "__main__":
     plt.rcParams.update({'font.size': 13})
     # plot_growth_all_cent(os.path.join("WT_mc2_55", "30-03-2015"), outlier_detection=True) #, outlier_detection=True
-    # compute_growth_stats("WT_no_drug", outlier_detection=False)
+    compute_growth_stats("WT_no_drug", outlier_detection=False)
     # compute_pole_growth_stats("par_B", outlier_detection=True, plot = True)
     # compute_pole_growth_stats("WT_mc2_55/30-03-2015", outlier_detection=False, plot = False)
-    compute_pole_growth_stats("WT_no_drug", outlier_detection=True)
-    # compute_pole_growth_stats("good", outlier_detection=False)
+    # compute_pole_growth_stats("WT_no_drug", outlier_detection=True)
+    # compute_pole_growth_stats(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700'], outlier_detection=False)
     # compare_INH_pole_growth(outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_CCCP_irrigation_2016", [12,8,15,17,19,16,21.5,24], 0.4, [-6,19, -13,27], outlier_detection=False)
     # compare_dataset_pole_growth("WT_mc2_55/30-03-2015", "WT_filamentation_cipro_2015",  [12,12,15,17,19,19,21.5,24], 0.4, [-6,21, -10,27], outlier_detection=False)

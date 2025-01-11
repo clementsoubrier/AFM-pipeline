@@ -1503,6 +1503,6 @@ if __name__ == "__main__":
     
     # feature_len_height_variation ("WT_mc2_55/30-03-2015")
     # ## feature_displacement_comparison("no_WT","WT_drug",'WT_no_drug')
-    feature_properties_pole(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700']) #"WT_mc2_55/30-03-2015"'WT_no_drug'
-    datasets_statistics()
+    # feature_properties_pole(["WT_mc2_55/06-10-2015","WT_mc2_55/30-03-2015","WT_mc2_55/03-09-2014",'INH_before_700']) #"WT_mc2_55/30-03-2015"'WT_no_drug'
+    # datasets_statistics()
     plt.rcParams.update({'font.size': 10})

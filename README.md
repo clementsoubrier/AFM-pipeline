@@ -14,3 +14,8 @@ Implementation of an automated pipeline for AFM data analysis :
 'peaks_troughs' and 'Centerlines' folders are used for statistical analysis
 
 'data_description' : description of the data structure once the data is processed
+
+## Authors and acknowledgment
+Authors: Clément Soubrier 
+Coding collaborators: Romain Ageron, Eshan Nirodi
+Project collaborators: Anotida Madzvamuse, Haig Alexander Eskandarian, Khanh Dao Duc  

@@ -17,5 +17,7 @@ Implementation of an automated pipeline for AFM data analysis :
 
 ## Authors and acknowledgment
 Authors: Clément Soubrier 
+
 Coding collaborators: Romain Ageron, Eshan Nirodi
+
 Project collaborators: Anotida Madzvamuse, Haig Alexander Eskandarian, Khanh Dao Duc  
